@@ -70,20 +70,20 @@ public class Player {
 
         isMoving = false;
 
-        float speed = 100;
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) {
+        float speed = 300;
+        if (Gdx.input.isKeyPressed(Input.Keys.W)||Gdx.input.isKeyPressed(Input.Keys.UP)) {
             newY += speed * delta;
             isMoving = true;
         }
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) {
+        if (Gdx.input.isKeyPressed(Input.Keys.S)||Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
             newY -= speed * delta;
             isMoving = true;
         }
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) {
+        if (Gdx.input.isKeyPressed(Input.Keys.A)||Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
             newX -= speed * delta;
             isMoving = true;
         }
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) {
+        if (Gdx.input.isKeyPressed(Input.Keys.D)||Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
             newX += speed * delta;
             isMoving = true;
         }
