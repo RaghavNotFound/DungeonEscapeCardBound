@@ -33,10 +33,10 @@ public class Player {
     private TextureRegion currentFrame;
 
     private float stateTime;
-    private boolean isMoving;
     private boolean isRunning;
-    private boolean facingRight;
+    private boolean facingRight = true;
     private boolean playBlink = false;
+    private boolean anyKeyPressed;
 
     private final Vector2 position;
     public Rectangle bounds;
@@ -44,20 +44,19 @@ public class Player {
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
 
-    private float speed = 80;
+    // 🔥 Stamina
+    private float stamina = 100f;
 
     public Player() {
+
         position = new Vector2(100, 100);
         bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
-
-        facingRight = true;
 
         int walkingFrameCount = 23;
         int runFrameCount = 12;
         int idleFrameCount = 18;
         int idleBlinkingFrameCount = 18;
 
-        // Allocate arrays
         walkingTextures = new Texture[walkingFrameCount];
         runTextures = new Texture[runFrameCount];
         idleTextures = new Texture[idleFrameCount];
@@ -68,33 +67,33 @@ public class Player {
         idleFrames = new TextureRegion[idleFrameCount];
         idleBlinkingFrames = new TextureRegion[idleBlinkingFrameCount];
 
-        // Load WALK
+        // WALK
         for (int i = 0; i < walkingFrameCount; i++) {
-            walkingTextures[i] = new Texture("Movments/walking/walking_" + (i+1) + ".png");
+            walkingTextures[i] = new Texture("Movments/walking/walking_" + (i + 1) + ".png");
             walkFrames[i] = new TextureRegion(walkingTextures[i]);
         }
 
-        // Load RUN
+        // RUN
         for (int i = 0; i < runFrameCount; i++) {
-            runTextures[i] = new Texture("Movments/running/running_" + (i+1) + ".png");
+            runTextures[i] = new Texture("Movments/running/running_" + (i + 1) + ".png");
             runFrames[i] = new TextureRegion(runTextures[i]);
         }
 
-        // Load IDLE
+        // IDLE
         for (int i = 0; i < idleFrameCount; i++) {
-            idleTextures[i] = new Texture("Movments/idle/idle_" + (i+1) + ".png");
+            idleTextures[i] = new Texture("Movments/idle/idle_" + (i + 1) + ".png");
             idleFrames[i] = new TextureRegion(idleTextures[i]);
         }
 
-        // Load IDLE BLINK
+        // IDLE BLINK
         for (int i = 0; i < idleBlinkingFrameCount; i++) {
-            idleBlinkingTextures[i] = new Texture("Movments/idleBlinking/idleBlinking_" + (i+1) + ".png");
+            idleBlinkingTextures[i] = new Texture("Movments/idleBlinking/idleBlinking_" + (i + 1) + ".png");
             idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
-        // Animations
-        walkAnimation = new Animation<>(0.08f, walkFrames);
-        runAnimation = new Animation<>(0.05f, runFrames);
+        // Animations (your values)
+        walkAnimation = new Animation<>(0.025f, walkFrames);
+        runAnimation = new Animation<>(0.08f, runFrames);
 
         idleAnimation = new Animation<>(0.08f, idleFrames);
         idleAnimation.setPlayMode(Animation.PlayMode.NORMAL);
@@ -107,19 +106,48 @@ public class Player {
     }
 
     public void update(float delta) {
-        handleMovement(delta);
+
+        boolean isMoving = handleMovement(delta);
+
+        float maxStamina = 100f;
+        if (isRunning && anyKeyPressed) {
+            stamina -= 25f * delta;
+
+            if (stamina <= 0) {
+                stamina = 0;
+                isRunning = false;
+            }
+
+        } else if (anyKeyPressed) {
+            stamina += 15f * delta;
+
+            if (stamina > maxStamina) {
+                stamina = maxStamina;
+            }
+
+        } else {
+            stamina += 25f * delta;
+
+            if (stamina > maxStamina) {
+                stamina = maxStamina;
+            }
+        }
 
         stateTime += delta;
 
+        // Animation
         if (isMoving) {
+
             if (isRunning) {
                 currentFrame = runAnimation.getKeyFrame(stateTime, true);
             } else {
                 currentFrame = walkAnimation.getKeyFrame(stateTime, true);
             }
+
             playBlink = false;
 
         } else {
+
             if (!playBlink) {
                 currentFrame = idleAnimation.getKeyFrame(stateTime, false);
 
@@ -141,28 +169,42 @@ public class Player {
         bounds.setPosition(position.x, position.y);
     }
 
-    private void handleMovement(float delta) {
+    private boolean handleMovement(float delta) {
+
         float newX = position.x;
         float newY = position.y;
 
-        isMoving = false;
+        anyKeyPressed =
+            Gdx.input.isKeyPressed(Input.Keys.W) ||
+                Gdx.input.isKeyPressed(Input.Keys.A) ||
+                Gdx.input.isKeyPressed(Input.Keys.S) ||
+                Gdx.input.isKeyPressed(Input.Keys.D) ||
+                Gdx.input.isKeyPressed(Input.Keys.UP) ||
+                Gdx.input.isKeyPressed(Input.Keys.DOWN) ||
+                Gdx.input.isKeyPressed(Input.Keys.LEFT) ||
+                Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
-        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
-            || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+        boolean shiftPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 
-        float currentSpeed = isRunning ? speed * 2 : speed;
+        isRunning = shiftPressed && stamina > 0;
+
+        float speed = 100f;
+        float currentSpeed = isRunning ? speed * 1.5f : speed;
+
+        boolean moved = false;
 
         if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) {
             newY += currentSpeed * delta;
-            isMoving = true;
+            moved = true;
         }
         if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
             newY -= currentSpeed * delta;
-            isMoving = true;
+            moved = true;
         }
+
         if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
             newX -= currentSpeed * delta;
-            isMoving = true;
+            moved = true;
 
             if (facingRight) {
                 flipFrames();
@@ -171,7 +213,7 @@ public class Player {
         }
         if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
             newX += currentSpeed * delta;
-            isMoving = true;
+            moved = true;
 
             if (!facingRight) {
                 flipFrames();
@@ -183,23 +225,34 @@ public class Player {
         newY = MathUtils.clamp(newY, 0, 600 - HEIGHT);
 
         position.set(newX, newY);
+
+        return moved;
     }
 
     private void flipFrames() {
-        for (TextureRegion frame : walkFrames) frame.flip(true, false);
-        for (TextureRegion frame : runFrames) frame.flip(true, false);
-        for (TextureRegion frame : idleFrames) frame.flip(true, false);
-        for (TextureRegion frame : idleBlinkingFrames) frame.flip(true, false);
+        for (TextureRegion f : walkFrames) f.flip(true, false);
+        for (TextureRegion f : runFrames) f.flip(true, false);
+        for (TextureRegion f : idleFrames) f.flip(true, false);
+        for (TextureRegion f : idleBlinkingFrames) f.flip(true, false);
     }
 
     public void render(SpriteBatch batch) {
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
     }
+    // 🔥 UI Getters
+//    public float getStamina() {
+//        return stamina;
+//    }
+//
+//    public float getMaxStamina() {
+//        return maxStamina;
+//    }
 
     public void dispose() {
-        for (Texture tex : walkingTextures) tex.dispose();
-        for (Texture tex : runTextures) tex.dispose();
-        for (Texture tex : idleTextures) tex.dispose();
-        for (Texture tex : idleBlinkingTextures) tex.dispose();
+        for (Texture t : walkingTextures) t.dispose();
+        for (Texture t : runTextures) t.dispose();
+        for (Texture t : idleTextures) t.dispose();
+        for (Texture t : idleBlinkingTextures) t.dispose();
     }
+
 }
