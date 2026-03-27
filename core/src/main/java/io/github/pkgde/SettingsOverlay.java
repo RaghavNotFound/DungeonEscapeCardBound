@@ -12,13 +12,6 @@ public class SettingsOverlay {
 
     private boolean active = false;
 
-    private float width = 250, height = 70;
-
-    private float res1X = 275, res1Y = 300;
-    private float res2X = 275, res2Y = 220;
-    private float fullX = 275, fullY = 140;
-    private float backX = 275, backY = 60;
-
     public void show() {
         active = true;
     }
@@ -33,10 +26,9 @@ public class SettingsOverlay {
 
     public void handleInput(Viewport viewport) {
 
-        if (!active) return;
-
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-            active = false;
+            hide();
+            return;
         }
 
         if (Gdx.input.justTouched()) {
@@ -47,56 +39,91 @@ public class SettingsOverlay {
             float x = touch.x;
             float y = touch.y;
 
-            if (x >= res1X && x <= res1X + width &&
-                y >= res1Y && y <= res1Y + height) {
+            float w = viewport.getWorldWidth();
+            float h = viewport.getWorldHeight();
+
+            float boxW = w * 0.25f;
+            float boxH = h * 0.08f;
+
+            float centerX = w / 2f - boxW / 2f;
+            float baseY = h * 0.55f;
+            float gap = h * 0.03f;
+
+            float y1 = baseY;
+            float y2 = y1 - boxH - gap;
+            float y3 = y2 - boxH - gap;
+            float y4 = y3 - boxH - gap;
+
+            // 800x600
+            if (x >= centerX && x <= centerX + boxW &&
+                y >= y1 && y <= y1 + boxH) {
 
                 Gdx.graphics.setWindowedMode(800, 600);
             }
 
-            if (x >= res2X && x <= res2X + width &&
-                y >= res2Y && y <= res2Y + height) {
+            // 1280x720
+            if (x >= centerX && x <= centerX + boxW &&
+                y >= y2 && y <= y2 + boxH) {
 
                 Gdx.graphics.setWindowedMode(1280, 720);
             }
 
-            if (x >= fullX && x <= fullX + width &&
-                y >= fullY && y <= fullY + height) {
+            // Fullscreen
+            if (x >= centerX && x <= centerX + boxW &&
+                y >= y3 && y <= y3 + boxH) {
 
                 Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
             }
 
-            if (x >= backX && x <= backX + width &&
-                y >= backY && y <= backY + height) {
+            // Back
+            if (x >= centerX && x <= centerX + boxW &&
+                y >= y4 && y <= y4 + boxH) {
 
-                active = false;
+                hide();
             }
         }
     }
 
-    public void render(ShapeRenderer shapeRenderer, SpriteBatch batch, BitmapFont font) {
+    public void render(ShapeRenderer shape, SpriteBatch batch, BitmapFont font, Viewport viewport) {
 
         if (!active) return;
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        float w = viewport.getWorldWidth();
+        float h = viewport.getWorldHeight();
 
-        shapeRenderer.setColor(0, 0, 0, 0.7f);
-        shapeRenderer.rect(0, 0, 800, 600);
+        float boxW = w * 0.25f;
+        float boxH = h * 0.08f;
 
-        shapeRenderer.setColor(1, 1, 1, 1);
+        float centerX = w / 2f - boxW / 2f;
+        float baseY = h * 0.55f;
+        float gap = h * 0.03f;
 
-        shapeRenderer.rect(res1X, res1Y, width, height);
-        shapeRenderer.rect(res2X, res2Y, width, height);
-        shapeRenderer.rect(fullX, fullY, width, height);
-        shapeRenderer.rect(backX, backY, width, height);
+        float y1 = baseY;
+        float y2 = y1 - boxH - gap;
+        float y3 = y2 - boxH - gap;
+        float y4 = y3 - boxH - gap;
 
-        shapeRenderer.end();
+        // ===== BUTTON BOXES =====
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(1, 1, 1, 1);
 
+        shape.rect(centerX, y1, boxW, boxH);
+        shape.rect(centerX, y2, boxW, boxH);
+        shape.rect(centerX, y3, boxW, boxH);
+        shape.rect(centerX, y4, boxW, boxH);
+
+        shape.end();
+
+        // ===== TEXT =====
         batch.begin();
 
-        font.draw(batch, "800x600", res1X + 70, res1Y + 45);
-        font.draw(batch, "1280x720", res2X + 60, res2Y + 45);
-        font.draw(batch, "FULLSCREEN", fullX + 50, fullY + 45);
-        font.draw(batch, "BACK (ESC)", backX + 50, backY + 45);
+        float scale = w / 800f;
+        font.getData().setScale(scale * 1.2f);
+
+        font.draw(batch, "800x600", centerX + boxW * 0.30f, y1 + boxH * 0.65f);
+        font.draw(batch, "1280x720", centerX + boxW * 0.25f, y2 + boxH * 0.65f);
+        font.draw(batch, "FULLSCREEN", centerX + boxW * 0.20f, y3 + boxH * 0.65f);
+        font.draw(batch, "BACK (ESC)", centerX + boxW * 0.25f, y4 + boxH * 0.65f);
 
         batch.end();
     }
