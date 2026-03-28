@@ -27,6 +27,8 @@ public class HomeScreen implements Screen {
 
     private SettingsOverlay settings;
 
+    private int selected = 0;
+
     @Override
     public void show() {
 
@@ -63,7 +65,6 @@ public class HomeScreen implements Screen {
         float worldW = viewport.getWorldWidth();
         float worldH = viewport.getWorldHeight();
 
-        // ===== RESPONSIVE UI =====
         float btnWidth = worldW * 0.20f;
         float btnHeight = worldH * 0.08f;
         float gap = worldH * 0.03f;
@@ -75,22 +76,29 @@ public class HomeScreen implements Screen {
 
         // ===== INPUT =====
         if (settings.isActive()) {
+
             settings.handleInput(viewport);
+
         } else {
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
-                ((Main) Gdx.app.getApplicationListener())
-                    .setScreen(new ExplorationScreen());
+            // ===== KEYBOARD NAV =====
+            if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+                selected = (selected + 2) % 3;
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
-                settings.show();
+            if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+                selected = (selected + 1) % 3;
+            }
+
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+                applySelection();
             }
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 Gdx.app.exit();
             }
 
+            // ===== MOUSE (SYNCED) =====
             if (Gdx.input.justTouched()) {
 
                 Vector3 touch = viewport.unproject(
@@ -101,29 +109,25 @@ public class HomeScreen implements Screen {
 
                 if (x >= btnX && x <= btnX + btnWidth &&
                     y >= playY && y <= playY + btnHeight) {
-
-                    ((Main) Gdx.app.getApplicationListener())
-                        .setScreen(new ExplorationScreen());
+                    selected = 0;
                 }
-
-                if (x >= btnX && x <= btnX + btnWidth &&
+                else if (x >= btnX && x <= btnX + btnWidth &&
                     y >= settingsY && y <= settingsY + btnHeight) {
-
-                    settings.show();
+                    selected = 1;
                 }
-
-                if (x >= btnX && x <= btnX + btnWidth &&
+                else if (x >= btnX && x <= btnX + btnWidth &&
                     y >= exitY && y <= exitY + btnHeight) {
-
-                    Gdx.app.exit();
+                    selected = 2;
                 }
+
+                // 🔥 SAME ACTION SYSTEM
+                applySelection();
             }
         }
 
         // ===== DRAW =====
         batch.begin();
 
-        // FULLSCREEN BACKGROUND (stretched intentionally)
         batch.draw(background, 0, 0, worldW, worldH);
 
         float scale = worldW / 800f;
@@ -138,17 +142,40 @@ public class HomeScreen implements Screen {
 
         batch.end();
 
-        // BUTTON BOXES
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        // ===== BUTTON BOXES =====
+        if (!settings.isActive()) {
 
-        shapeRenderer.rect(btnX, playY, btnWidth, btnHeight);
-        shapeRenderer.rect(btnX, settingsY, btnWidth, btnHeight);
-        shapeRenderer.rect(btnX, exitY, btnWidth, btnHeight);
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 
-        shapeRenderer.end();
+            shapeRenderer.setColor(selected == 0 ? 1 : 0.5f, 1, 1, 1);
+            shapeRenderer.rect(btnX, playY, btnWidth, btnHeight);
 
-        // SETTINGS OVERLAY
+            shapeRenderer.setColor(selected == 1 ? 1 : 0.5f, 1, 1, 1);
+            shapeRenderer.rect(btnX, settingsY, btnWidth, btnHeight);
+
+            shapeRenderer.setColor(selected == 2 ? 1 : 0.5f, 1, 1, 1);
+            shapeRenderer.rect(btnX, exitY, btnWidth, btnHeight);
+
+            shapeRenderer.end();
+        }
+
+        // ===== SETTINGS =====
         settings.render(shapeRenderer, batch, font, viewport);
+    }
+
+    // ✅ CENTRAL ACTION SYSTEM
+    private void applySelection() {
+
+        if (selected == 0) {
+            ((Main) Gdx.app.getApplicationListener())
+                .setScreen(new ExplorationScreen());
+        }
+        else if (selected == 1) {
+            settings.show();
+        }
+        else if (selected == 2) {
+            Gdx.app.exit();
+        }
     }
 
     @Override

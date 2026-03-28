@@ -15,7 +15,6 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.badlogic.gdx.math.Vector3;
 
 public class ExplorationScreen implements Screen {
 
@@ -37,6 +36,10 @@ public class ExplorationScreen implements Screen {
     private Texture pausedBackground;
 
     private boolean needsBlurRefresh = false;
+
+    private SettingsOverlay settingsOverlay;
+
+    private int pauseSelected = 0;
 
     public ExplorationScreen() {
 
@@ -62,6 +65,8 @@ public class ExplorationScreen implements Screen {
 
         blurH = BlurShader.createShader(true);
         blurV = BlurShader.createShader(false);
+
+        settingsOverlay = new SettingsOverlay();
     }
 
     private void createFBOs(int w, int h) {
@@ -129,14 +134,17 @@ public class ExplorationScreen implements Screen {
             needsBlurRefresh = false;
         }
 
+        // ESC
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
 
             if (menuState == MenuState.NONE) {
                 menuState = MenuState.PAUSE;
+                pauseSelected = 0;
                 captureAndBlur(w, h);
             }
             else if (menuState == MenuState.SETTINGS) {
                 menuState = MenuState.PAUSE;
+                settingsOverlay.hide();
             }
             else {
                 menuState = MenuState.NONE;
@@ -172,15 +180,18 @@ public class ExplorationScreen implements Screen {
         float btnH = h * 0.08f;
         float gap = h * 0.03f;
 
-        float pauseX = w * 0.25f - btnW / 2f;
-        float settingsX = w * 0.75f - btnW / 2f;
+        float pauseX = w / 2f - btnW / 2f;
 
-        float baseY = h * 0.55f;
+        float totalHeight = (btnH * 3) + (gap * 2);
+        float startY = h / 2f + totalHeight / 2f;
 
-        float y1 = baseY;
+        float y1 = startY - btnH;
         float y2 = y1 - btnH - gap;
         float y3 = y2 - btnH - gap;
 
+        // ===== INPUT =====
+        if (menuState == MenuState.SETTINGS) {
+            settingsOverlay.handleInput(viewport);
         float sy1 = baseY;
         float sy2 = sy1 - btnH - gap;
         float sy3 = sy2 - btnH - gap;
@@ -191,68 +202,86 @@ public class ExplorationScreen implements Screen {
             Vector3 touch = viewport.unproject(
                 new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
 
-            float x = touch.x;
-            float y = touch.y;
+            if (!settingsOverlay.isActive()) {
+                menuState = MenuState.PAUSE;
+            }
+        }
+        else if (menuState == MenuState.PAUSE) {
 
+            // KEYBOARD
+            if (Gdx.input.isKeyJustPressed(Input.Keys.UP))
+                pauseSelected = (pauseSelected + 2) % 3;
             if (menuState == MenuState.SETTINGS) {
 
-                if (x >= settingsX && x <= settingsX + btnW &&
-                    y >= sy1 && y <= sy1 + btnH) {
-                    Gdx.graphics.setWindowedMode(800, 600);
-                    needsBlurRefresh = true;
-                    return;
-                }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
+                pauseSelected = (pauseSelected + 1) % 3;
 
-                if (x >= settingsX && x <= settingsX + btnW &&
-                    y >= sy2 && y <= sy2 + btnH) {
-                    Gdx.graphics.setWindowedMode(1280, 720);
-                    needsBlurRefresh = true;
-                    return;
-                }
-
-                if (x >= settingsX && x <= settingsX + btnW &&
-                    y >= sy3 && y <= sy3 + btnH) {
-                    Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-                    needsBlurRefresh = true;
-                    return;
-                }
-
-                if (x >= settingsX && x <= settingsX + btnW &&
-                    y >= sy4 && y <= sy4 + btnH) {
-                    menuState = MenuState.PAUSE;
-                    return;
-                }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+                applyPauseSelection();
             }
 
+            // MOUSE
+            if (Gdx.input.justTouched()) {
+
+                var touch = viewport.unproject(
+                    new com.badlogic.gdx.math.Vector3(
+                        Gdx.input.getX(), Gdx.input.getY(), 0));
+
+                float x = touch.x;
+                float y = touch.y;
             if (menuState == MenuState.PAUSE) {
 
                 if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y1 && y <= y1 + btnH) {
-                    menuState = MenuState.NONE;
-                    return;
+                    pauseSelected = 0;
                 }
-
-                if (x >= pauseX && x <= pauseX + btnW &&
+                else if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y2 && y <= y2 + btnH) {
-                    menuState = MenuState.SETTINGS;
-                    return;
+                    pauseSelected = 1;
+                }
+                else if (x >= pauseX && x <= pauseX + btnW &&
+                    y >= y3 && y <= y3 + btnH) {
+                    pauseSelected = 2;
                 }
 
-                if (x >= pauseX && x <= pauseX + btnW &&
-                    y >= y3 && y <= y3 + btnH) {
-                    ((Main) Gdx.app.getApplicationListener())
-                        .setScreen(new HomeScreen());
-                    return;
-                }
+                applyPauseSelection();
             }
         }
 
+        // UPDATE
+        if (menuState == MenuState.NONE) {
+            player.update(delta);
+        }
+
+        // DRAW GAME / BLUR
+        if (menuState == MenuState.NONE) {
+            batch.begin();
+            batch.draw(background, 0, 0, w, h);
+            player.render(batch);
+            batch.end();
+        } else {
+            batch.begin();
+            batch.draw(pausedBackground,
+                0, 0, w, h,
+                0, 1, 1, -1);
+            batch.end();
+        }
+
+        // ===== DRAW PAUSE =====
+        
         if (menuState == MenuState.PAUSE || menuState == MenuState.SETTINGS) {
 
             shape.begin(ShapeRenderer.ShapeType.Line);
+
+            shape.setColor(pauseSelected == 0 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y1, btnW, btnH);
+
+            shape.setColor(pauseSelected == 1 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y2, btnW, btnH);
+
+            shape.setColor(pauseSelected == 2 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y3, btnW, btnH);
+
             shape.end();
 
             batch.begin();
@@ -260,31 +289,33 @@ public class ExplorationScreen implements Screen {
             float scale = w / 800f;
             font.getData().setScale(scale * 1.2f);
 
-            font.draw(batch, "GAME PAUSED", w * 0.42f, h * 0.75f);
+            font.draw(batch, "GAME PAUSED", w / 2f - 90 * scale, startY + btnH);
+
             font.draw(batch, "CONTINUE", pauseX + btnW * 0.25f, y1 + btnH * 0.65f);
             font.draw(batch, "SETTINGS", pauseX + btnW * 0.25f, y2 + btnH * 0.65f);
-            font.draw(batch, "MAIN MENU", pauseX + btnW * 0.2f, y3 + btnH * 0.65f);
+            font.draw(batch, "MAIN MENU", pauseX + btnW * 0.20f, y3 + btnH * 0.65f);
 
             batch.end();
         }
 
+        // ===== SETTINGS =====
         if (menuState == MenuState.SETTINGS) {
+            settingsOverlay.render(shape, batch, font, viewport);
+        }
+    }
 
-            shape.begin(ShapeRenderer.ShapeType.Line);
-            shape.rect(settingsX, sy1, btnW, btnH);
-            shape.rect(settingsX, sy2, btnW, btnH);
-            shape.rect(settingsX, sy3, btnW, btnH);
-            shape.rect(settingsX, sy4, btnW, btnH);
-            shape.end();
+    private void applyPauseSelection() {
 
-            batch.begin();
-
-            font.draw(batch, "800x600", settingsX + btnW * 0.3f, sy1 + btnH * 0.65f);
-            font.draw(batch, "1280x720", settingsX + btnW * 0.25f, sy2 + btnH * 0.65f);
-            font.draw(batch, "FULLSCREEN", settingsX + btnW * 0.2f, sy3 + btnH * 0.65f);
-            font.draw(batch, "BACK (ESC)", settingsX + btnW * 0.25f, sy4 + btnH * 0.65f);
-
-            batch.end();
+        if (pauseSelected == 0) {
+            menuState = MenuState.NONE;
+        }
+        else if (pauseSelected == 1) {
+            menuState = MenuState.SETTINGS;
+            settingsOverlay.show();
+        }
+        else if (pauseSelected == 2) {
+            ((Main) Gdx.app.getApplicationListener())
+                .setScreen(new HomeScreen());
         }
     }
 
