@@ -69,25 +69,25 @@ public class Player {
 
         // WALK
         for (int i = 0; i < walkingFrameCount; i++) {
-            walkingTextures[i] = new Texture("Movments/walking/walking_" + (i + 1) + ".png");
+            walkingTextures[i] = new Texture("Movements/Player/walking/walking_" + (i + 1) + ".png");
             walkFrames[i] = new TextureRegion(walkingTextures[i]);
         }
 
         // RUN
         for (int i = 0; i < runFrameCount; i++) {
-            runTextures[i] = new Texture("Movments/running/running_" + (i + 1) + ".png");
+            runTextures[i] = new Texture("Movements/Player/running/running_" + (i + 1) + ".png");
             runFrames[i] = new TextureRegion(runTextures[i]);
         }
 
         // IDLE
         for (int i = 0; i < idleFrameCount; i++) {
-            idleTextures[i] = new Texture("Movments/idle/idle_" + (i + 1) + ".png");
+            idleTextures[i] = new Texture("Movements/Player/idle/idle_" + (i + 1) + ".png");
             idleFrames[i] = new TextureRegion(idleTextures[i]);
         }
 
         // IDLE BLINK
         for (int i = 0; i < idleBlinkingFrameCount; i++) {
-            idleBlinkingTextures[i] = new Texture("Movments/idleBlinking/idleBlinking_" + (i + 1) + ".png");
+            idleBlinkingTextures[i] = new Texture("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png");
             idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
@@ -169,6 +169,8 @@ public class Player {
         bounds.setPosition(position.x, position.y);
     }
 
+// ONLY CHANGE IS INSIDE handleMovement()
+
     private boolean handleMovement(float delta) {
 
         float newX = position.x;
@@ -221,8 +223,18 @@ public class Player {
             }
         }
 
-        newX = MathUtils.clamp(newX, 0, 800 - WIDTH);
-        newY = MathUtils.clamp(newY, 0, 600 - HEIGHT);
+        // =========================
+        // 🔥 CUSTOM WALL BOUNDARIES
+        // =========================
+
+        float screenWidth = Gdx.graphics.getWidth();
+
+        // 👇 ADJUST THESE TWO VALUES IF NEEDED
+        float minY = 120f;   // bottom wall
+        float maxY = 800f;   // top wall
+
+        newX = MathUtils.clamp(newX, 0, screenWidth - WIDTH);
+        newY = MathUtils.clamp(newY, minY, maxY - HEIGHT);
 
         position.set(newX, newY);
 
@@ -253,6 +265,9 @@ public class Player {
         for (Texture t : runTextures) t.dispose();
         for (Texture t : idleTextures) t.dispose();
         for (Texture t : idleBlinkingTextures) t.dispose();
+    }
+    public Vector2 getPosition() {
+        return new Vector2(bounds.x, bounds.y);
     }
 
 }
