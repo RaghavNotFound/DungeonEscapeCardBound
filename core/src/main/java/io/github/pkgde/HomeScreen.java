@@ -10,8 +10,9 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.math.Vector3;
 
 public class HomeScreen implements Screen {
 
@@ -24,18 +25,6 @@ public class HomeScreen implements Screen {
     private OrthographicCamera camera;
     private Viewport viewport;
 
-    private final float WORLD_WIDTH = 800;
-    private final float WORLD_HEIGHT = 600;
-
-    // Button size
-    private float width = 220, height = 60;
-
-    // RIGHT SIDE BUTTONS (based on your sketch)
-    private float btnX = 550;
-    private float playY = 320;
-    private float settingsY = 240;
-    private float exitY = 160;
-
     private SettingsOverlay settings;
 
     @Override
@@ -45,14 +34,17 @@ public class HomeScreen implements Screen {
         batch = new SpriteBatch();
         font = new BitmapFont();
 
-        // 🔥 LOAD YOUR IMAGE
-        background = new Texture("assets/HomeScreen/HomeScreen.jpg");
+        background = new Texture("HomeScreen/HomeScreen.jpg");
 
         camera = new OrthographicCamera();
-        viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
+        viewport = new ScreenViewport(camera);
 
         viewport.apply(true);
-        camera.position.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 0);
+        camera.position.set(
+            viewport.getWorldWidth() / 2f,
+            viewport.getWorldHeight() / 2f,
+            0
+        );
         camera.update();
 
         settings = new SettingsOverlay();
@@ -61,12 +53,25 @@ public class HomeScreen implements Screen {
     @Override
     public void render(float delta) {
 
-        viewport.apply();
-
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        viewport.apply();
 
         batch.setProjectionMatrix(camera.combined);
         shapeRenderer.setProjectionMatrix(camera.combined);
+
+        float worldW = viewport.getWorldWidth();
+        float worldH = viewport.getWorldHeight();
+
+        // ===== RESPONSIVE UI =====
+        float btnWidth = worldW * 0.20f;
+        float btnHeight = worldH * 0.08f;
+        float gap = worldH * 0.03f;
+
+        float btnX = worldW * 0.70f;
+        float playY = worldH * 0.55f;
+        float settingsY = playY - btnHeight - gap;
+        float exitY = settingsY - btnHeight - gap;
 
         // ===== INPUT =====
         if (settings.isActive()) {
@@ -88,61 +93,62 @@ public class HomeScreen implements Screen {
 
             if (Gdx.input.justTouched()) {
 
-                var touch = viewport.unproject(
-                    new com.badlogic.gdx.math.Vector3(
-                        Gdx.input.getX(), Gdx.input.getY(), 0));
+                Vector3 touch = viewport.unproject(
+                    new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
 
                 float x = touch.x;
                 float y = touch.y;
 
-                if (x >= btnX && x <= btnX + width &&
-                    y >= playY && y <= playY + height) {
+                if (x >= btnX && x <= btnX + btnWidth &&
+                    y >= playY && y <= playY + btnHeight) {
 
                     ((Main) Gdx.app.getApplicationListener())
                         .setScreen(new ExplorationScreen());
                 }
 
-                if (x >= btnX && x <= btnX + width &&
-                    y >= settingsY && y <= settingsY + height) {
+                if (x >= btnX && x <= btnX + btnWidth &&
+                    y >= settingsY && y <= settingsY + btnHeight) {
 
                     settings.show();
                 }
 
-                if (x >= btnX && x <= btnX + width &&
-                    y >= exitY && y <= exitY + height) {
+                if (x >= btnX && x <= btnX + btnWidth &&
+                    y >= exitY && y <= exitY + btnHeight) {
 
                     Gdx.app.exit();
                 }
             }
         }
 
-        // ===== DRAW BACKGROUND =====
+        // ===== DRAW =====
         batch.begin();
-        batch.draw(background, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-        // ===== TITLE (TOP LEFT) =====
-        font.getData().setScale(2f);
-        font.draw(batch, "DUNGEON ESCAPE", 40, 560);
+        // FULLSCREEN BACKGROUND (stretched intentionally)
+        batch.draw(background, 0, 0, worldW, worldH);
 
-        // ===== BUTTON TEXT =====
-        font.getData().setScale(1.2f);
-        font.draw(batch, "PLAY", btnX + 70, playY + 40);
-        font.draw(batch, "SETTINGS", btnX + 40, settingsY + 40);
-        font.draw(batch, "EXIT", btnX + 70, exitY + 40);
+        float scale = worldW / 800f;
+
+        font.getData().setScale(scale * 2f);
+        font.draw(batch, "DUNGEON ESCAPE", worldW * 0.05f, worldH * 0.92f);
+
+        font.getData().setScale(scale * 1.2f);
+        font.draw(batch, "PLAY", btnX + btnWidth * 0.35f, playY + btnHeight * 0.65f);
+        font.draw(batch, "SETTINGS", btnX + btnWidth * 0.20f, settingsY + btnHeight * 0.65f);
+        font.draw(batch, "EXIT", btnX + btnWidth * 0.35f, exitY + btnHeight * 0.65f);
 
         batch.end();
 
-        // ===== BUTTON BOXES =====
+        // BUTTON BOXES
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 
-        shapeRenderer.rect(btnX, playY, width, height);
-        shapeRenderer.rect(btnX, settingsY, width, height);
-        shapeRenderer.rect(btnX, exitY, width, height);
+        shapeRenderer.rect(btnX, playY, btnWidth, btnHeight);
+        shapeRenderer.rect(btnX, settingsY, btnWidth, btnHeight);
+        shapeRenderer.rect(btnX, exitY, btnWidth, btnHeight);
 
         shapeRenderer.end();
 
-        // ===== SETTINGS =====
-        settings.render(shapeRenderer, batch, font);
+        // SETTINGS OVERLAY
+        settings.render(shapeRenderer, batch, font, viewport);
     }
 
     @Override
