@@ -189,8 +189,8 @@ public class Player {
             }
         }
 
-        newX = MathUtils.clamp(newX, 0, 800 - WIDTH);
-        newY = MathUtils.clamp(newY, 0, 600 - HEIGHT);
+        newX = MathUtils.clamp(newX, 0, Gdx.graphics.getWidth() - WIDTH);
+        newY = MathUtils.clamp(newY, 0, Gdx.graphics.getHeight() - HEIGHT);
 
         position.set(newX, newY);
 
