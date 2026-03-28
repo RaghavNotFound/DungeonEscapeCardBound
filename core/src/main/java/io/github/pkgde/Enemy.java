@@ -40,6 +40,9 @@ public class Enemy {
     private float moveDuration = 0f;
     private boolean isMoving = false;
 
+    // 🔥 HEALTH
+    private int hp = 3;
+
     public Enemy() {
         position = new Vector2(400, 300);
         bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
@@ -161,6 +164,15 @@ public class Enemy {
 
     public Rectangle getBounds() {
         return bounds;
+    }
+
+    // 🔥 HEALTH METHODS
+    public void takeDamage(int dmg) {
+        hp -= dmg;
+    }
+
+    public boolean isDead() {
+        return hp <= 0;
     }
 
     public void dispose() {

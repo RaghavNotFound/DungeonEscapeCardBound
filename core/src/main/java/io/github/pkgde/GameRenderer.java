@@ -61,20 +61,19 @@ public class GameRenderer {
             camera.viewportHeight
         );
 
-        // ===== GAME OBJECTS =====
+        // ===== GAME OBJECTS (DEPTH LAYERING) =====
+        if (world.getPlayer().getPosition().y > world.getEnemy().getBounds().y) {
+            world.getEnemy().render(batch);
+        }
+
         world.getPlayer().render(batch);
-        world.getEnemy().render(batch);
+
+        if (world.getPlayer().getPosition().y <= world.getEnemy().getBounds().y) {
+            world.getEnemy().render(batch);
+        }
 
         batch.end();
 
-        // ===== OPTIONAL DEBUG / FUTURE EFFECTS =====
-        // shape.begin(ShapeRenderer.ShapeType.Line);
-        // shape.setColor(Color.RED);
-        // shape.rect(world.getPlayer().getBounds().x,
-        //            world.getPlayer().getBounds().y,
-        //            world.getPlayer().getBounds().width,
-        //            world.getPlayer().getBounds().height);
-        // shape.end();
     }
 
     public SpriteBatch getBatch() { return batch; }

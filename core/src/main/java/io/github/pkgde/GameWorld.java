@@ -15,12 +15,12 @@ public class GameWorld {
     public static final float WORLD_HEIGHT = 720;
     public static final float FLOOR_OFFSET = 120f;
 
-    // 🔥 BOUNDARIES
-    private static ArrayList<Rectangle> boundaries;
+    // 🔥 BOUNDARIES (non-static)
+    private ArrayList<Rectangle> boundaries;
 
     public GameWorld() {
 
-        player = new Player();
+        player = new Player(this);
         enemy = new Enemy();
 
         boundaries = new ArrayList<>();
@@ -43,17 +43,30 @@ public class GameWorld {
     public void update(float delta, OrthographicCamera camera) {
         player.update(delta, camera);
         enemy.update(delta, player);
+
+        // ===== ARROW–ENEMY COLLISION =====
+        ArrayList<Arrow> arrows = player.getArrows();
+
+        for (int i = arrows.size() - 1; i >= 0; i--) {
+            Arrow arrow = arrows.get(i);
+
+            if (arrow.getBounds().overlaps(enemy.getBounds())) {
+                arrows.remove(i);
+                enemy.takeDamage(1);
+            }
+        }
     }
 
-    // 🔥 FIXED METHOD
+    // 🔥 FIXED: center-based distance check
     public boolean isPlayerNearEnemy() {
 
         Vector2 playerPos = player.getPosition();
 
-        // ✅ FIX: Rectangle has no getPosition()
+        Rectangle b = enemy.getBounds();
+
         Vector2 enemyPos = new Vector2(
-            enemy.getBounds().x,
-            enemy.getBounds().y
+            b.x + b.width / 2f,
+            b.y + b.height / 2f
         );
 
         float distance = playerPos.dst(enemyPos);
@@ -61,7 +74,8 @@ public class GameWorld {
         return distance < 150f;
     }
 
-    public static ArrayList<Rectangle> getBoundaries() {
+    // 🔥 FIXED: non-static
+    public ArrayList<Rectangle> getBoundaries() {
         return boundaries;
     }
 

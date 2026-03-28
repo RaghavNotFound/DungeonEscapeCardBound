@@ -45,7 +45,12 @@ public class Player {
     private float shootCooldown = 1.0f;
     private float shootTimer = 0f;
 
-    public Player() {
+    // WORLD REFERENCE
+    private GameWorld world;
+
+    public Player(GameWorld world) {
+
+        this.world = world;
 
         position = new Vector2(200, 200);
         bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
@@ -155,11 +160,7 @@ public class Player {
             Arrow arrow = arrows.get(i);
             arrow.update(delta);
 
-            if (arrow.isCollided(
-                camera.viewportWidth,
-                camera.viewportHeight,
-                new ArrayList<>()
-            )) {
+            if (arrow.isCollided(GameWorld.WORLD_WIDTH, GameWorld.WORLD_HEIGHT, world.getBoundaries())) {
                 arrows.remove(i);
             }
         }
@@ -221,7 +222,7 @@ public class Player {
         Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
 
         boolean collideX = false;
-        for (Rectangle wall : GameWorld.getBoundaries()) {
+        for (Rectangle wall : world.getBoundaries()) {
             if (xBounds.overlaps(wall)) {
                 collideX = true;
                 break;
@@ -236,7 +237,7 @@ public class Player {
         Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
 
         boolean collideY = false;
-        for (Rectangle wall : GameWorld.getBoundaries()) {
+        for (Rectangle wall : world.getBoundaries()) {
             if (yBounds.overlaps(wall)) {
                 collideY = true;
                 break;
@@ -274,5 +275,9 @@ public class Player {
 
     public Vector2 getPosition() {
         return new Vector2(bounds.x, bounds.y);
+    }
+
+    public ArrayList<Arrow> getArrows() {
+        return arrows;
     }
 }

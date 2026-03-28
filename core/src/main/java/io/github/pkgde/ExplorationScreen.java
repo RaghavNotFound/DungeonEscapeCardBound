@@ -113,19 +113,12 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // ===== SETTINGS INPUT =====
-        if (state == State.SETTINGS) {
-            settingsOverlay.handleInput(viewport);
-
-            if (!settingsOverlay.isActive()) {
-                state = State.PAUSE;
-            }
-        }
-
-        // ===== PAUSE INPUT =====
-        PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
-
+        // ===== PAUSE / SETTINGS INPUT =====
+        // 🔥 else-if ensures only ONE block runs per frame — prevents Enter
+        // from bleeding into the newly entered state on the same frame
         if (state == State.PAUSE) {
+            PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
+
             switch (pauseAction) {
                 case RESUME: state = State.GAME; break;
                 case SETTINGS:
@@ -136,6 +129,13 @@ public class ExplorationScreen implements Screen {
                     ((Main) Gdx.app.getApplicationListener())
                         .setScreen(new HomeScreen());
                     break;
+            }
+
+        } else if (state == State.SETTINGS) {
+            settingsOverlay.handleInput(viewport);
+
+            if (!settingsOverlay.isActive()) {
+                state = State.PAUSE;
             }
         }
 
@@ -212,7 +212,7 @@ public class ExplorationScreen implements Screen {
         BitmapFont font = renderer.getFont();
 
         if (state == State.PAUSE) {
-            pauseOverlay.render(shape, batch, font, viewport); // 🔥 NEW SYSTEM
+            pauseOverlay.render(shape, batch, font, viewport);
         }
 
         if (state == State.SETTINGS) {
