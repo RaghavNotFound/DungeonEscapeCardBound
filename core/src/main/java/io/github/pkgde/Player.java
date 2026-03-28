@@ -30,7 +30,6 @@ public class Player {
     private TextureRegion currentFrame;
 
     private float stateTime;
-    private boolean isMoving;
     private boolean isRunning;
     private boolean facingRight = true;
     private boolean playBlink = false;
@@ -40,8 +39,6 @@ public class Player {
 
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
-
-    private float speed = 100;
 
     public Player() {
 
@@ -104,11 +101,10 @@ public class Player {
     public void update(float delta) {
 
         boolean moved = handleMovement(delta);
-        isMoving = moved;
 
         stateTime += delta;
 
-        if (isMoving) {
+        if (moved) {
 
             if (isRunning) {
                 currentFrame = runAnimation.getKeyFrame(stateTime, true);
@@ -154,7 +150,6 @@ public class Player {
         boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
         boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
-        // ✅ Cancel ONLY conflicting axis
         if (up && down) {
             up = false;
             down = false;
@@ -167,9 +162,9 @@ public class Player {
         isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
             || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
 
+        float speed = 100;
         float currentSpeed = isRunning ? speed * 1.5f : speed;
 
-        // ✅ Apply movement independently
         if (up) newY += currentSpeed * delta;
         if (down) newY -= currentSpeed * delta;
 
@@ -191,12 +186,11 @@ public class Player {
             }
         }
 
-        newX = MathUtils.clamp(newX, 0, 800 - WIDTH);
-        newY = MathUtils.clamp(newY, 0, 600 - HEIGHT);
+        newX = MathUtils.clamp(newX, 0, Gdx.graphics.getWidth() - WIDTH);
+        newY = MathUtils.clamp(newY, 0, Gdx.graphics.getHeight() - HEIGHT);
 
         position.set(newX, newY);
 
-        // ✅ TRUE movement detection
         return (oldX != newX || oldY != newY);
     }
 
