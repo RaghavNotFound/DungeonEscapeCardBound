@@ -12,19 +12,16 @@ import com.badlogic.gdx.math.Vector2;
 
 public class Player {
 
-    // Animations
     private final Animation<TextureRegion> walkAnimation;
     private final Animation<TextureRegion> runAnimation;
     private final Animation<TextureRegion> idleAnimation;
     private final Animation<TextureRegion> idleBlinkingAnimation;
 
-    // Frames
     private final TextureRegion[] walkFrames;
     private final TextureRegion[] runFrames;
     private final TextureRegion[] idleFrames;
     private final TextureRegion[] idleBlinkingFrames;
 
-    // Textures
     private final Texture[] walkingTextures;
     private final Texture[] runTextures;
     private final Texture[] idleTextures;
@@ -33,10 +30,10 @@ public class Player {
     private TextureRegion currentFrame;
 
     private float stateTime;
+    private boolean isMoving;
     private boolean isRunning;
     private boolean facingRight = true;
     private boolean playBlink = false;
-    private boolean anyKeyPressed;
 
     private final Vector2 position;
     public Rectangle bounds;
@@ -44,8 +41,7 @@ public class Player {
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
 
-    // 🔥 Stamina
-    private float stamina = 100f;
+    private float speed = 100;
 
     public Player() {
 
@@ -91,7 +87,7 @@ public class Player {
             idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
-        // Animations (your values)
+        // KEEP YOUR VALUES
         walkAnimation = new Animation<>(0.025f, walkFrames);
         runAnimation = new Animation<>(0.08f, runFrames);
 
@@ -107,35 +103,11 @@ public class Player {
 
     public void update(float delta) {
 
-        boolean isMoving = handleMovement(delta);
-
-        float maxStamina = 100f;
-        if (isRunning && anyKeyPressed) {
-            stamina -= 25f * delta;
-
-            if (stamina <= 0) {
-                stamina = 0;
-                isRunning = false;
-            }
-
-        } else if (anyKeyPressed) {
-            stamina += 15f * delta;
-
-            if (stamina > maxStamina) {
-                stamina = maxStamina;
-            }
-
-        } else {
-            stamina += 25f * delta;
-
-            if (stamina > maxStamina) {
-                stamina = maxStamina;
-            }
-        }
+        boolean moved = handleMovement(delta);
+        isMoving = moved;
 
         stateTime += delta;
 
-        // Animation
         if (isMoving) {
 
             if (isRunning) {
@@ -171,49 +143,47 @@ public class Player {
 
     private boolean handleMovement(float delta) {
 
+        float oldX = position.x;
+        float oldY = position.y;
+
         float newX = position.x;
         float newY = position.y;
 
-        anyKeyPressed =
-            Gdx.input.isKeyPressed(Input.Keys.W) ||
-                Gdx.input.isKeyPressed(Input.Keys.A) ||
-                Gdx.input.isKeyPressed(Input.Keys.S) ||
-                Gdx.input.isKeyPressed(Input.Keys.D) ||
-                Gdx.input.isKeyPressed(Input.Keys.UP) ||
-                Gdx.input.isKeyPressed(Input.Keys.DOWN) ||
-                Gdx.input.isKeyPressed(Input.Keys.LEFT) ||
-                Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+        boolean up = Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
+        boolean down = Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
+        boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
+        boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
-        boolean shiftPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+        // ✅ Cancel ONLY conflicting axis
+        if (up && down) {
+            up = false;
+            down = false;
+        }
+        if (left && right) {
+            left = false;
+            right = false;
+        }
 
-        isRunning = shiftPressed && stamina > 0;
+        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
+            || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
 
-        float speed = 100f;
         float currentSpeed = isRunning ? speed * 1.5f : speed;
 
-        boolean moved = false;
+        // ✅ Apply movement independently
+        if (up) newY += currentSpeed * delta;
+        if (down) newY -= currentSpeed * delta;
 
-        if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) {
-            newY += currentSpeed * delta;
-            moved = true;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
-            newY -= currentSpeed * delta;
-            moved = true;
-        }
-
-        if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
+        if (left) {
             newX -= currentSpeed * delta;
-            moved = true;
 
             if (facingRight) {
                 flipFrames();
                 facingRight = false;
             }
         }
-        if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
+
+        if (right) {
             newX += currentSpeed * delta;
-            moved = true;
 
             if (!facingRight) {
                 flipFrames();
@@ -226,33 +196,25 @@ public class Player {
 
         position.set(newX, newY);
 
-        return moved;
+        // ✅ TRUE movement detection
+        return (oldX != newX || oldY != newY);
     }
 
     private void flipFrames() {
-        for (TextureRegion f : walkFrames) f.flip(true, false);
-        for (TextureRegion f : runFrames) f.flip(true, false);
-        for (TextureRegion f : idleFrames) f.flip(true, false);
-        for (TextureRegion f : idleBlinkingFrames) f.flip(true, false);
+        for (TextureRegion frame : walkFrames) frame.flip(true, false);
+        for (TextureRegion frame : runFrames) frame.flip(true, false);
+        for (TextureRegion frame : idleFrames) frame.flip(true, false);
+        for (TextureRegion frame : idleBlinkingFrames) frame.flip(true, false);
     }
 
     public void render(SpriteBatch batch) {
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
     }
-    // 🔥 UI Getters
-//    public float getStamina() {
-//        return stamina;
-//    }
-//
-//    public float getMaxStamina() {
-//        return maxStamina;
-//    }
 
     public void dispose() {
-        for (Texture t : walkingTextures) t.dispose();
-        for (Texture t : runTextures) t.dispose();
-        for (Texture t : idleTextures) t.dispose();
-        for (Texture t : idleBlinkingTextures) t.dispose();
+        for (Texture tex : walkingTextures) tex.dispose();
+        for (Texture tex : runTextures) tex.dispose();
+        for (Texture tex : idleTextures) tex.dispose();
+        for (Texture tex : idleBlinkingTextures) tex.dispose();
     }
-
 }
