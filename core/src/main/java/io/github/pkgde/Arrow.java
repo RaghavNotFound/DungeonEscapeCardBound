@@ -1,37 +1,38 @@
 package io.github.pkgde;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-import java.util.ArrayList; // ✅ ADDED
+import java.util.ArrayList;
 
 public class Arrow {
 
-    private static final Texture texture = new Texture("Vectors/Arrow.png");
+    private static Texture texture;
+
+    private static Texture getTexture() {
+        if (texture == null) {
+            texture = new Texture("Vectors/Arrow.png");
+        }
+        return texture;
+    }
 
     private Rectangle bounds;
-
     private Vector2 position;
     private Vector2 direction;
 
-    private float speed = 400f;
-
-    private float width = 32;
-    private float height = 32;
+    private static final float SPEED = 400f;
+    private static final float SIZE = 32f;
 
     public Arrow(float x, float y, Vector2 direction) {
         this.position = new Vector2(x, y);
         this.direction = new Vector2(direction).nor();
-        this.bounds = new Rectangle(x, y, width, height);
+        this.bounds = new Rectangle(x, y, SIZE, SIZE);
     }
 
     public void update(float delta) {
-        position.x += direction.x * speed * delta;
-        position.y += direction.y * speed * delta;
-
-        bounds.setPosition(position.x - width / 2f, position.y - height / 2f);
+        position.mulAdd(direction, SPEED * delta);
+        bounds.setPosition(position.x - SIZE / 2f, position.y - SIZE / 2f);
     }
 
     public Rectangle getBounds() {
@@ -39,46 +40,46 @@ public class Arrow {
     }
 
     public void render(SpriteBatch batch) {
-
+        Texture tex = getTexture();
         float angle = direction.angleDeg();
 
         batch.draw(
-            texture,
-            position.x - width / 2f,
-            position.y - height / 2f,
-            width / 2f,
-            height / 2f,
-            width,
-            height,
+            tex,
+            position.x - SIZE / 2f,
+            position.y - SIZE / 2f,
+            SIZE / 2f,
+            SIZE / 2f,
+            SIZE,
+            SIZE,
             1f,
             1f,
             angle,
             0,
             0,
-            texture.getWidth(),
-            texture.getHeight(),
+            tex.getWidth(),
+            tex.getHeight(),
             false,
             false
         );
     }
 
     public boolean isCollided(float worldWidth, float worldHeight, ArrayList<Rectangle> obstacles) {
-
         if (bounds.x < 0 || bounds.x + bounds.width > worldWidth ||
             bounds.y < 0 || bounds.y + bounds.height > worldHeight) {
             return true;
         }
 
         for (Rectangle rect : obstacles) {
-            if (bounds.overlaps(rect)) {
-                return true;
-            }
+            if (bounds.overlaps(rect)) return true;
         }
 
         return false;
     }
 
     public static void disposeTexture() {
-        texture.dispose();
+        if (texture != null) {
+            texture.dispose();
+            texture = null;
+        }
     }
 }

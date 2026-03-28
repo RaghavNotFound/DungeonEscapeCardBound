@@ -52,4 +52,7 @@ public class BlurShader {
 
         return shader;
     }
+    public static void dispose(ShaderProgram shader) {
+        if (shader != null) shader.dispose();
+    }
 }
