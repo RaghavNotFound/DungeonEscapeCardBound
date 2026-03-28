@@ -154,7 +154,6 @@ public class Player {
         boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
         boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
-        // ✅ Cancel ONLY conflicting axis
         if (up && down) {
             up = false;
             down = false;
@@ -169,7 +168,6 @@ public class Player {
 
         float currentSpeed = isRunning ? speed * 1.5f : speed;
 
-        // ✅ Apply movement independently
         if (up) newY += currentSpeed * delta;
         if (down) newY -= currentSpeed * delta;
 
@@ -196,7 +194,6 @@ public class Player {
 
         position.set(newX, newY);
 
-        // ✅ TRUE movement detection
         return (oldX != newX || oldY != newY);
     }
 
