@@ -1,16 +1,23 @@
 package io.github.pkgde;
 
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
+
+import java.util.ArrayList;
 
 public class Player {
+
+    private ArrayList<Arrow> arrows = new ArrayList<>();
 
     private final Animation<TextureRegion> walkAnimation;
     private final Animation<TextureRegion> runAnimation;
@@ -98,11 +105,41 @@ public class Player {
         stateTime = 0f;
     }
 
-    public void update(float delta) {
+    public void update(float delta, OrthographicCamera camera, ArrayList<Rectangle> obstacles) {
 
         boolean moved = handleMovement(delta);
 
         stateTime += delta;
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+
+            Vector3 mouse = new Vector3(
+                Gdx.input.getX(),
+                Gdx.input.getY(),
+                0
+            );
+
+            camera.unproject(mouse);
+
+            float startX = position.x + WIDTH / 2f;
+            float startY = position.y + HEIGHT / 2f;
+
+            Vector2 direction = new Vector2(
+                mouse.x - startX,
+                mouse.y - startY
+            ).nor();
+
+            arrows.add(new Arrow(startX, startY, direction));
+        }
+
+        for (int i = arrows.size() - 1; i >= 0; i--) {
+            Arrow arrow = arrows.get(i);
+            arrow.update(delta);
+
+            if (arrow.isCollided(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), obstacles)) {
+                arrows.remove(i);
+            }
+        }
 
         if (moved) {
 
@@ -203,6 +240,7 @@ public class Player {
 
     public void render(SpriteBatch batch) {
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+        for (Arrow arrow : arrows) arrow.render(batch);
     }
 
     public void dispose() {
