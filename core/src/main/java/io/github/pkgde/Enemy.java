@@ -3,230 +3,156 @@ package io.github.pkgde;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
+import java.util.ArrayList;
 
 public class Enemy {
 
     private Vector2 position;
-    private Vector2 forward;
     private Rectangle bounds;
 
-    private float patrolSpeed = 70f;
-    private float chaseSpeed = 130f;
+    private Animation<TextureRegion> walkAnim;
+    private TextureRegion currentFrame;
 
-    private float range = 250f;
-    private float fovAngle = 90f;
-
-    private float patrolLeft;
-    private float patrolRight;
-    private float patrolTop;
-    private float patrolBottom;
-    private boolean movingRight = true;
-    private boolean movingUp = true;
+    private ArrayList<Texture> textures = new ArrayList<>();
 
     private float stateTime = 0f;
 
-    private final int WIDTH = 128;
-    private final int HEIGHT = 128;
+    // ===== AI STATES =====
+    private enum State { IDLE, CHASE }
+    private State state = State.IDLE;
 
-    private enum State { WALK, RUN }
-    private enum Direction { FRONT, BACK, LEFT, RIGHT }
+    // ===== SETTINGS =====
+    private float speed = 120f;
 
-    private State state = State.WALK;
-    private Direction direction = Direction.FRONT;
+    private float baseRange = 200f;
+    private float alertRange = baseRange * 2f;
 
-    private Animation<TextureRegion> walkFront, walkBack, walkLeft, walkRight;
-    private Animation<TextureRegion> runFront, runBack, runLeft, runRight;
+    private float fovAngle = 90f;
 
-    private TextureRegion currentFrame;
+    private Vector2 forward = new Vector2(1, 0);
+
+    private final float WIDTH = 128;
+    private final float HEIGHT = 128;
+
+    // 🔥 RANDOM MOVEMENT
+    private Vector2 randomDir = new Vector2();
+    private float moveTimer = 0f;
+    private float moveDuration = 0f;
+    private boolean isMoving = false;
 
     public Enemy() {
-
         position = new Vector2(400, 300);
-        forward = new Vector2(1, 0);
-
         bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
 
-        patrolLeft = position.x - 350;
-        patrolRight = position.x + 350;
-        patrolTop = 480f;
-        patrolBottom = 130f;
+        walkAnim = load("Movements/Enemy/Front/Walking/Front - Walking_", 10);
+        currentFrame = walkAnim.getKeyFrame(0);
 
-        loadAnimations();
+        pickNewRandomAction();
     }
 
-    private Animation<TextureRegion> load(String folder, String prefix, int count) {
-
+    private Animation<TextureRegion> load(String path, int count) {
         TextureRegion[] frames = new TextureRegion[count];
 
         for (int i = 0; i < count; i++) {
-
-            String fileName = folder + "/" + prefix + "_" + String.format("%03d", i) + ".png";
-
-            frames[i] = new TextureRegion(new Texture(fileName));
+            Texture tex = new Texture(path + String.format("%03d", i) + ".png");
+            textures.add(tex);
+            frames[i] = new TextureRegion(tex);
         }
 
         return new Animation<>(0.1f, frames);
-    }
-
-    private void loadAnimations() {
-
-        walkFront = load("Movements/Enemy/Front/Walking", "Front - Walking", 10);
-        walkBack  = load("Movements/Enemy/Back/Walking", "Back - Walking", 10);
-        walkLeft  = load("Movements/Enemy/Left/Walking", "Left - Walking", 10);
-        walkRight = load("Movements/Enemy/Right/Walking", "Right - Walking", 10);
-
-        runFront = load("Movements/Enemy/Front/Running", "Front - Running", 10);
-        runBack  = load("Movements/Enemy/Back/Running", "Back - Running", 10);
-        runLeft  = load("Movements/Enemy/Left/Running", "Left - Running", 10);
-        runRight = load("Movements/Enemy/Right/Running", "Right - Running", 10);
-
-        currentFrame = walkFront.getKeyFrame(0);
-    }
-
-    private void updateDirectionFromMovement() {
-
-        if (Math.abs(forward.x) > Math.abs(forward.y)) {
-            direction = forward.x > 0 ? Direction.RIGHT : Direction.LEFT;
-        } else {
-            // FIX: In libGDX, Y+ is UP (camera faces down toward player's back → BACK animation)
-            //      Y- is DOWN (enemy faces toward camera → FRONT animation)
-            direction = forward.y > 0 ? Direction.BACK : Direction.FRONT;
-        }
     }
 
     public void update(float delta, Player player) {
 
         stateTime += delta;
 
-        if (canSeePlayer(player)) {
-            state = State.RUN;
-            chase(player, delta);
+        Vector2 playerPos = player.getPosition();
+
+        Vector2 toPlayer = new Vector2(playerPos).sub(position);
+        float distance = toPlayer.len();
+
+        boolean inRange;
+        boolean inCone = false;
+
+        // ===== RANGE =====
+        if (state == State.CHASE) {
+            inRange = distance <= alertRange;
         } else {
-            state = State.WALK;
-            patrol(delta);
+            inRange = distance <= baseRange;
         }
 
-        float minY = 120f;
-        float maxY = 800f;
-
-        position.y = MathUtils.clamp(position.y, minY, maxY - HEIGHT);
-
-        if (state == State.RUN) {
-            updateDirection(player);
-        } else {
-            updateDirectionFromMovement();
+        // ===== VISION =====
+        if (inRange) {
+            toPlayer.nor();
+            float dot = forward.dot(toPlayer);
+            float threshold = MathUtils.cosDeg(fovAngle / 2f);
+            inCone = dot >= threshold;
         }
 
-        updateAnimation();
-
-        bounds.setPosition(position.x, position.y);
-    }
-
-    private void patrol(float delta) {
-
-        float dx = 0;
-        float dy = 0;
-
-        // HORIZONTAL
-        if (movingRight) {
-            dx = patrolSpeed * delta;
-            position.x += dx;
-            if (position.x > patrolRight) movingRight = false;
-        } else {
-            dx = -patrolSpeed * delta;
-            position.x += dx;
-            if (position.x < patrolLeft) movingRight = true;
+        // ===== STATE =====
+        if (inRange && inCone) {
+            state = State.CHASE;
+        }
+        else if (state == State.CHASE && distance <= alertRange) {
+            state = State.CHASE;
+        }
+        else {
+            state = State.IDLE;
         }
 
-        // VERTICAL
-        if (movingUp) {
-            dy = patrolSpeed * delta;
-            position.y += dy;
-            if (position.y > patrolTop) movingUp = false;
-        } else {
-            dy = -patrolSpeed * delta;
-            position.y += dy;
-            if (position.y < patrolBottom) movingUp = true;
-        }
-
-        // 🔥 FIXED FORWARD (NO OVERRIDE)
-        // FIX: Only update forward when there is actual movement (dx or dy non-zero),
-        //      preventing a zero vector from corrupting the last valid direction.
-        if (dx != 0 || dy != 0) {
-            forward.set(dx, dy).nor();
-        }
-    }
-
-    private void chase(Player player, float delta) {
-
-        Vector2 target = new Vector2(player.bounds.x, player.bounds.y);
-        Vector2 dir = target.sub(position).nor();
-
-        position.add(dir.scl(chaseSpeed * delta));
-        forward.set(dir);
-    }
-
-    private void updateDirection(Player player) {
-
-        Vector2 dir = new Vector2(player.bounds.x, player.bounds.y)
-            .sub(position)
-            .nor();
-
-        if (Math.abs(dir.x) > Math.abs(dir.y)) {
-            direction = dir.x > 0 ? Direction.RIGHT : Direction.LEFT;
-        } else {
-            // FIX: Mirror the same corrected axis logic used in updateDirectionFromMovement()
-            direction = dir.y > 0 ? Direction.BACK : Direction.FRONT;
-        }
-    }
-
-    private void updateAnimation() {
-
+        // ===== BEHAVIOR =====
         switch (state) {
 
-            case WALK:
-                currentFrame = getWalk().getKeyFrame(stateTime, true);
+            case IDLE:
+
+                moveTimer -= delta;
+
+                if (moveTimer <= 0) {
+                    pickNewRandomAction();
+                }
+
+                if (isMoving) {
+                    position.mulAdd(randomDir, speed * 0.5f * delta);
+                    forward.set(randomDir);
+                }
+
                 break;
 
-            case RUN:
-                currentFrame = getRun().getKeyFrame(stateTime, true);
+            case CHASE:
+
+                Vector2 direction = new Vector2(playerPos)
+                    .sub(position)
+                    .nor();
+
+                position.mulAdd(direction, speed * delta);
+                forward.set(direction);
+
                 break;
         }
+
+        // ===== CLAMP =====
+        position.x = MathUtils.clamp(position.x, 0, 1280 - WIDTH);
+        position.y = MathUtils.clamp(position.y, 120f, 720 - HEIGHT);
+
+        bounds.setPosition(position.x, position.y);
+
+        currentFrame = walkAnim.getKeyFrame(stateTime, true);
     }
 
-    private Animation<TextureRegion> getWalk() {
-        switch (direction) {
-            case FRONT: return walkFront;
-            case BACK: return walkBack;
-            case LEFT: return walkLeft;
-            case RIGHT: return walkRight;
+    // 🔥 RANDOM ACTION PICKER
+    private void pickNewRandomAction() {
+
+        isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
+
+        moveDuration = MathUtils.random(1f, 3f);
+        moveTimer = moveDuration;
+
+        if (isMoving) {
+            randomDir.set(
+                MathUtils.random(-1f, 1f),
+                MathUtils.random(-1f, 1f)
+            ).nor();
         }
-        return walkFront;
-    }
-
-    private Animation<TextureRegion> getRun() {
-        switch (direction) {
-            case FRONT: return runFront;
-            case BACK: return runBack;
-            case LEFT: return runLeft;
-            case RIGHT: return runRight;
-        }
-        return runFront;
-    }
-
-    private boolean canSeePlayer(Player player) {
-
-        Vector2 toPlayer = new Vector2(player.bounds.x, player.bounds.y)
-            .sub(position);
-
-        if (toPlayer.len2() > range * range) return false;
-
-        toPlayer.nor();
-
-        float dot = forward.dot(toPlayer);
-        float threshold = MathUtils.cosDeg(fovAngle / 2);
-
-        return dot >= threshold;
     }
 
     public void render(SpriteBatch batch) {
@@ -238,6 +164,8 @@ public class Enemy {
     }
 
     public void dispose() {
-        // For now empty
+        for (Texture t : textures) {
+            t.dispose();
+        }
     }
 }
