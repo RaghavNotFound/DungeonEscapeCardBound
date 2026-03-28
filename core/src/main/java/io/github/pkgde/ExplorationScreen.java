@@ -1,321 +1,222 @@
 package io.github.pkgde;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.Screen;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.*;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
-
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
-import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.utils.viewport.*;
+import com.badlogic.gdx.math.MathUtils;
 
 public class ExplorationScreen implements Screen {
-
-    private SpriteBatch batch;
-    private Texture background;
-    private Player player;
-    private ShapeRenderer shape;
-    private BitmapFont font;
-    private Enemy enemy;
 
     private OrthographicCamera camera;
     private Viewport viewport;
 
-    private enum MenuState { NONE, PAUSE, SETTINGS }
-    private MenuState menuState = MenuState.NONE;
+    private GameWorld world;
+    private GameRenderer renderer;
+    private InputHandler input;
 
-    private FrameBuffer fbo1, fbo2;
-    private ShaderProgram blurH, blurV;
-    private Texture pausedBackground;
-
-    private boolean needsBlurRefresh = false;
-
+    private PauseOverlay pauseOverlay;
     private SettingsOverlay settingsOverlay;
 
-    private int pauseSelected = 0;
+    public enum State { GAME, PAUSE, SETTINGS }
+    private State state = State.GAME;
+
+    // 💥 SHAKE
+    private float shakeTime = 0f;
+    private float shakeDuration = 0.25f;
+    private float shakeIntensity = 10f;
+    private boolean shakeTriggered = false;
+
+    // 🌫️ BLUR
+    private FrameBuffer fbo;
+    private ShaderProgram blurShader;
+    private SpriteBatch blurBatch;
 
     public ExplorationScreen() {
 
-        batch = new SpriteBatch();
-        background = new Texture("background.png");
-        player = new Player();
-        enemy = new Enemy();
-        shape = new ShapeRenderer();
-        font = new BitmapFont();
-
         camera = new OrthographicCamera();
-        viewport = new ScreenViewport(camera);
 
+        viewport = new FitViewport(1280, 720, camera);
         viewport.apply(true);
-        camera.position.set(
-            viewport.getWorldWidth() / 2f,
-            viewport.getWorldHeight() / 2f,
-            0
-        );
+
+        camera.position.set(viewport.getWorldWidth()/2f, viewport.getWorldHeight()/2f, 0);
         camera.update();
 
-        createFBOs(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        world = new GameWorld();
+        renderer = new GameRenderer(world, camera);
+        input = new InputHandler(viewport);
 
-        blurH = BlurShader.createShader(true);
-        blurV = BlurShader.createShader(false);
-
+        pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
-    }
 
-    private void createFBOs(int w, int h) {
-        fbo1 = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
-        fbo2 = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
-    }
+        // 🔥 DYNAMIC FBO (QUALITY FIX)
+        fbo = new FrameBuffer(
+            Pixmap.Format.RGBA8888,
+            Gdx.graphics.getWidth(),
+            Gdx.graphics.getHeight(),
+            false
+        );
 
-    private void captureAndBlur(float w, float h) {
+        fbo.getColorBufferTexture().setFilter(
+            Texture.TextureFilter.Linear,
+            Texture.TextureFilter.Linear
+        );
 
-        fbo1.begin();
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        batch.begin();
-        batch.draw(background, 0, 0, w, h);
-        player.render(batch);
-        enemy.render(batch); // ✅ ADDED
-        batch.end();
-
-        fbo1.end();
-
-        for (int i = 0; i < 3; i++) {
-
-            batch.setShader(blurH);
-            batch.begin();
-            blurH.setUniformf("blur", 3f / w);
-
-            fbo2.begin();
-            batch.draw(fbo1.getColorBufferTexture(),
-                0, 0, w, h,
-                0, 1, 1, -1);
-            batch.end();
-            fbo2.end();
-
-            batch.setShader(blurV);
-            batch.begin();
-            blurV.setUniformf("blur", 3f / h);
-
-            fbo1.begin();
-            batch.draw(fbo2.getColorBufferTexture(),
-                0, 0, w, h,
-                0, 1, 1, -1);
-            batch.end();
-            fbo1.end();
-        }
-
-        batch.setShader(null);
-        pausedBackground = fbo1.getColorBufferTexture();
+        blurShader = BlurShader.createShader(true);
+        blurBatch = new SpriteBatch();
+        blurBatch.setShader(blurShader);
     }
 
     @Override
     public void render(float delta) {
 
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        viewport.apply();
-
-        batch.setProjectionMatrix(camera.combined);
-        shape.setProjectionMatrix(camera.combined);
-
-        float w = viewport.getWorldWidth();
-        float h = viewport.getWorldHeight();
-
-        if (needsBlurRefresh && menuState != MenuState.NONE) {
-            captureAndBlur(w, h);
-            needsBlurRefresh = false;
-        }
-
-        // ESC
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-
-            if (menuState == MenuState.NONE) {
-                menuState = MenuState.PAUSE;
-                pauseSelected = 0;
-                captureAndBlur(w, h);
-            }
-            else if (menuState == MenuState.SETTINGS) {
-                menuState = MenuState.PAUSE;
-                settingsOverlay.hide();
-            }
-            else {
-                menuState = MenuState.NONE;
-            }
-        }
-
-        // ✅ UPDATED GAME LOGIC
-        if (menuState == MenuState.NONE) {
-            player.update(delta);
-            enemy.update(delta, player);
-
-            // 🔥 COMBAT TRIGGER
-            if (enemy.getBounds().overlaps(player.bounds)) {
-                System.out.println("COMBAT TRIGGERED");
-            }
-        }
-
-        if (menuState == MenuState.NONE) {
-            batch.begin();
-            batch.draw(background, 0, 0, w, h);
-            player.render(batch);
-            enemy.render(batch);
-            batch.end();
-        } else {
-            batch.begin();
-            batch.draw(pausedBackground,
-                0, 0, w, h,
-                0, 1, 1, -1);
-            batch.end();
-        }
-
-        float btnW = w * 0.22f;
-        float btnH = h * 0.08f;
-        float gap = h * 0.03f;
-
-        float pauseX = w / 2f - btnW / 2f;
-
-        float totalHeight = (btnH * 3) + (gap * 2);
-        float startY = h / 2f + totalHeight / 2f;
-
-        float y1 = startY - btnH;
-        float y2 = y1 - btnH - gap;
-        float y3 = y2 - btnH - gap;
-
         // ===== INPUT =====
-        if (menuState == MenuState.SETTINGS) {
+        InputHandler.Action action = input.handle();
+
+        switch (action) {
+            case TOGGLE_PAUSE:
+                if (state == State.GAME) state = State.PAUSE;
+                else if (state == State.PAUSE) state = State.GAME;
+                else if (state == State.SETTINGS) {
+                    state = State.PAUSE;
+                    settingsOverlay.hide();
+                }
+                break;
+
+            case OPEN_SETTINGS:
+                if (state == State.PAUSE) {
+                    state = State.SETTINGS;
+                    settingsOverlay.show();
+                }
+                break;
+
+            case EXIT_TO_MENU:
+                ((Main) Gdx.app.getApplicationListener())
+                    .setScreen(new HomeScreen());
+                break;
+        }
+
+        // ===== UPDATE =====
+        if (state == State.GAME) {
+            world.update(delta, camera);
+
+            if (world.isPlayerNearEnemy()) {
+                if (!shakeTriggered) {
+                    shakeTime = shakeDuration;
+                    shakeTriggered = true;
+                }
+            } else {
+                shakeTriggered = false;
+            }
+        }
+
+        // ===== SETTINGS INPUT =====
+        if (state == State.SETTINGS) {
             settingsOverlay.handleInput(viewport);
-        float sy1 = baseY;
-        float sy2 = sy1 - btnH - gap;
-        float sy3 = sy2 - btnH - gap;
-        float sy4 = sy3 - btnH - gap;
-
-        if (Gdx.input.justTouched()) {
-
-            Vector3 touch = viewport.unproject(
-                new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
 
             if (!settingsOverlay.isActive()) {
-                menuState = MenuState.PAUSE;
-            }
-        }
-        else if (menuState == MenuState.PAUSE) {
-
-            // KEYBOARD
-            if (Gdx.input.isKeyJustPressed(Input.Keys.UP))
-                pauseSelected = (pauseSelected + 2) % 3;
-            if (menuState == MenuState.SETTINGS) {
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
-                pauseSelected = (pauseSelected + 1) % 3;
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
-                applyPauseSelection();
-            }
-
-            // MOUSE
-            if (Gdx.input.justTouched()) {
-
-                var touch = viewport.unproject(
-                    new com.badlogic.gdx.math.Vector3(
-                        Gdx.input.getX(), Gdx.input.getY(), 0));
-
-                float x = touch.x;
-                float y = touch.y;
-            if (menuState == MenuState.PAUSE) {
-
-                if (x >= pauseX && x <= pauseX + btnW &&
-                    y >= y1 && y <= y1 + btnH) {
-                    pauseSelected = 0;
-                }
-                else if (x >= pauseX && x <= pauseX + btnW &&
-                    y >= y2 && y <= y2 + btnH) {
-                    pauseSelected = 1;
-                }
-                else if (x >= pauseX && x <= pauseX + btnW &&
-                    y >= y3 && y <= y3 + btnH) {
-                    pauseSelected = 2;
-                }
-
-                applyPauseSelection();
+                state = State.PAUSE;
             }
         }
 
-        // UPDATE
-        if (menuState == MenuState.NONE) {
-            player.update(delta);
+        // ===== PAUSE INPUT =====
+        PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
+
+        if (state == State.PAUSE) {
+            switch (pauseAction) {
+                case RESUME: state = State.GAME; break;
+                case SETTINGS:
+                    state = State.SETTINGS;
+                    settingsOverlay.show();
+                    break;
+                case EXIT:
+                    ((Main) Gdx.app.getApplicationListener())
+                        .setScreen(new HomeScreen());
+                    break;
+            }
         }
 
-        // DRAW GAME / BLUR
-        if (menuState == MenuState.NONE) {
-            batch.begin();
-            batch.draw(background, 0, 0, w, h);
-            player.render(batch);
-            batch.end();
-        } else {
-            batch.begin();
-            batch.draw(pausedBackground,
-                0, 0, w, h,
-                0, 1, 1, -1);
-            batch.end();
+        // ===== SHAKE =====
+        float offsetX = 0, offsetY = 0;
+
+        if (shakeTime > 0) {
+            shakeTime -= delta;
+            offsetX = MathUtils.random(-shakeIntensity, shakeIntensity);
+            offsetY = MathUtils.random(-shakeIntensity, shakeIntensity);
         }
 
-        // ===== DRAW PAUSE =====
-        
-        if (menuState == MenuState.PAUSE || menuState == MenuState.SETTINGS) {
+        camera.position.set(
+            viewport.getWorldWidth()/2f + offsetX,
+            viewport.getWorldHeight()/2f + offsetY,
+            0
+        );
+        camera.update();
 
-            shape.begin(ShapeRenderer.ShapeType.Line);
+        // ===== RENDER =====
+        if (state == State.PAUSE || state == State.SETTINGS) {
 
-            shape.setColor(pauseSelected == 0 ? 1 : 0.5f, 1, 1, 1);
-            shape.rect(pauseX, y1, btnW, btnH);
+            fbo.begin();
+            renderer.render();
+            fbo.end();
 
-            shape.setColor(pauseSelected == 1 ? 1 : 0.5f, 1, 1, 1);
-            shape.rect(pauseX, y2, btnW, btnH);
+            Texture tex = fbo.getColorBufferTexture();
 
-            shape.setColor(pauseSelected == 2 ? 1 : 0.5f, 1, 1, 1);
-            shape.rect(pauseX, y3, btnW, btnH);
+            blurBatch.setProjectionMatrix(camera.combined);
 
+            blurBatch.begin();
+            blurShader.setUniformf("blur", 0.002f);
+
+            // 🔥 FIXED DRAW (NO ARTIFACTS)
+            blurBatch.draw(
+                tex,
+                camera.position.x - camera.viewportWidth/2f,
+                camera.position.y - camera.viewportHeight/2f,
+                camera.viewportWidth,
+                camera.viewportHeight,
+                0, 0,
+                tex.getWidth(),
+                tex.getHeight(),
+                false, true
+            );
+
+            blurBatch.end();
+
+            // 🌑 SOFTER OVERLAY
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+
+            ShapeRenderer shape = renderer.getShape();
+            shape.setProjectionMatrix(camera.combined);
+
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            shape.setColor(0, 0, 0, 0.5f);
+            shape.rect(
+                camera.position.x - camera.viewportWidth/2f,
+                camera.position.y - camera.viewportHeight/2f,
+                camera.viewportWidth,
+                camera.viewportHeight
+            );
             shape.end();
 
-            batch.begin();
+            Gdx.gl.glDisable(GL20.GL_BLEND);
 
-            float scale = w / 800f;
-            font.getData().setScale(scale * 1.2f);
-
-            font.draw(batch, "GAME PAUSED", w / 2f - 90 * scale, startY + btnH);
-
-            font.draw(batch, "CONTINUE", pauseX + btnW * 0.25f, y1 + btnH * 0.65f);
-            font.draw(batch, "SETTINGS", pauseX + btnW * 0.25f, y2 + btnH * 0.65f);
-            font.draw(batch, "MAIN MENU", pauseX + btnW * 0.20f, y3 + btnH * 0.65f);
-
-            batch.end();
+        } else {
+            renderer.render();
         }
 
-        // ===== SETTINGS =====
-        if (menuState == MenuState.SETTINGS) {
+        // ===== UI =====
+        SpriteBatch batch = renderer.getBatch();
+        ShapeRenderer shape = renderer.getShape();
+        BitmapFont font = renderer.getFont();
+
+        if (state == State.PAUSE) {
+            pauseOverlay.render(shape, batch, font, viewport); // 🔥 NEW SYSTEM
+        }
+
+        if (state == State.SETTINGS) {
             settingsOverlay.render(shape, batch, font, viewport);
-        }
-    }
-
-    private void applyPauseSelection() {
-
-        if (pauseSelected == 0) {
-            menuState = MenuState.NONE;
-        }
-        else if (pauseSelected == 1) {
-            menuState = MenuState.SETTINGS;
-            settingsOverlay.show();
-        }
-        else if (pauseSelected == 2) {
-            ((Main) Gdx.app.getApplicationListener())
-                .setScreen(new HomeScreen());
         }
     }
 
@@ -323,29 +224,25 @@ public class ExplorationScreen implements Screen {
     public void resize(int width, int height) {
         viewport.update(width, height, true);
 
-        if (fbo1 != null) fbo1.dispose();
-        if (fbo2 != null) fbo2.dispose();
+        camera.position.set(
+            viewport.getWorldWidth()/2f,
+            viewport.getWorldHeight()/2f,
+            0
+        );
+        camera.update();
+    }
 
-        createFBOs(width, height);
-        needsBlurRefresh = true;
+    @Override
+    public void dispose() {
+        renderer.dispose();
+        world.dispose();
+        fbo.dispose();
+        blurBatch.dispose();
+        blurShader.dispose();
     }
 
     @Override public void show() {}
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
-
-    @Override
-    public void dispose() {
-        batch.dispose();
-        background.dispose();
-        player.dispose();
-        enemy.dispose(); // ✅ ADDED
-        shape.dispose();
-        font.dispose();
-        fbo1.dispose();
-        fbo2.dispose();
-        blurH.dispose();
-        blurV.dispose();
-    }
 }
