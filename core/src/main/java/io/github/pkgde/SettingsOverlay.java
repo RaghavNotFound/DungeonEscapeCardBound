@@ -72,8 +72,8 @@ public class SettingsOverlay {
             if (x >= centerX && x <= centerX + boxW &&
                 y >= y3 && y <= y3 + boxH) {
 
-                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-            }
+                var mode = Gdx.graphics.getDisplayMode();
+                Gdx.graphics.setWindowedMode(mode.width, mode.height-58);            }
 
             // Back
             if (x >= centerX && x <= centerX + boxW &&
