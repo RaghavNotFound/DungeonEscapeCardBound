@@ -23,6 +23,7 @@ public class ExplorationScreen implements Screen {
     private Player player;
     private ShapeRenderer shape;
     private BitmapFont font;
+    private Enemy enemy;
 
     private OrthographicCamera camera;
     private Viewport viewport;
@@ -45,6 +46,7 @@ public class ExplorationScreen implements Screen {
         batch = new SpriteBatch();
         background = new Texture("background.png");
         player = new Player();
+        enemy = new Enemy();
         shape = new ShapeRenderer();
         font = new BitmapFont();
 
@@ -80,6 +82,7 @@ public class ExplorationScreen implements Screen {
         batch.begin();
         batch.draw(background, 0, 0, w, h);
         player.render(batch);
+        enemy.render(batch); // ✅ ADDED
         batch.end();
 
         fbo1.end();
@@ -148,7 +151,31 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // ===== UI DIMENSIONS =====
+        // ✅ UPDATED GAME LOGIC
+        if (menuState == MenuState.NONE) {
+            player.update(delta);
+            enemy.update(delta, player);
+
+            // 🔥 COMBAT TRIGGER
+            if (enemy.getBounds().overlaps(player.bounds)) {
+                System.out.println("COMBAT TRIGGERED");
+            }
+        }
+
+        if (menuState == MenuState.NONE) {
+            batch.begin();
+            batch.draw(background, 0, 0, w, h);
+            player.render(batch);
+            enemy.render(batch);
+            batch.end();
+        } else {
+            batch.begin();
+            batch.draw(pausedBackground,
+                0, 0, w, h,
+                0, 1, 1, -1);
+            batch.end();
+        }
+
         float btnW = w * 0.22f;
         float btnH = h * 0.08f;
         float gap = h * 0.03f;
@@ -165,6 +192,15 @@ public class ExplorationScreen implements Screen {
         // ===== INPUT =====
         if (menuState == MenuState.SETTINGS) {
             settingsOverlay.handleInput(viewport);
+        float sy1 = baseY;
+        float sy2 = sy1 - btnH - gap;
+        float sy3 = sy2 - btnH - gap;
+        float sy4 = sy3 - btnH - gap;
+
+        if (Gdx.input.justTouched()) {
+
+            Vector3 touch = viewport.unproject(
+                new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
 
             if (!settingsOverlay.isActive()) {
                 menuState = MenuState.PAUSE;
@@ -175,6 +211,7 @@ public class ExplorationScreen implements Screen {
             // KEYBOARD
             if (Gdx.input.isKeyJustPressed(Input.Keys.UP))
                 pauseSelected = (pauseSelected + 2) % 3;
+            if (menuState == MenuState.SETTINGS) {
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
                 pauseSelected = (pauseSelected + 1) % 3;
@@ -192,6 +229,7 @@ public class ExplorationScreen implements Screen {
 
                 float x = touch.x;
                 float y = touch.y;
+            if (menuState == MenuState.PAUSE) {
 
                 if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y1 && y <= y1 + btnH) {
@@ -230,7 +268,8 @@ public class ExplorationScreen implements Screen {
         }
 
         // ===== DRAW PAUSE =====
-        if (menuState == MenuState.PAUSE) {
+        
+        if (menuState == MenuState.PAUSE || menuState == MenuState.SETTINGS) {
 
             shape.begin(ShapeRenderer.ShapeType.Line);
 
@@ -301,6 +340,7 @@ public class ExplorationScreen implements Screen {
         batch.dispose();
         background.dispose();
         player.dispose();
+        enemy.dispose(); // ✅ ADDED
         shape.dispose();
         font.dispose();
         fbo1.dispose();
