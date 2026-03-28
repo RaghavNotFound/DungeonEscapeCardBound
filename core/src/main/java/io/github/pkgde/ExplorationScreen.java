@@ -24,6 +24,7 @@ public class ExplorationScreen implements Screen {
     private Player player;
     private ShapeRenderer shape;
     private BitmapFont font;
+    private Enemy enemy;
 
     private OrthographicCamera camera;
     private Viewport viewport;
@@ -42,6 +43,7 @@ public class ExplorationScreen implements Screen {
         batch = new SpriteBatch();
         background = new Texture("background.png");
         player = new Player();
+        enemy = new Enemy();
         shape = new ShapeRenderer();
         font = new BitmapFont();
 
@@ -75,6 +77,7 @@ public class ExplorationScreen implements Screen {
         batch.begin();
         batch.draw(background, 0, 0, w, h);
         player.render(batch);
+        enemy.render(batch); // ✅ ADDED
         batch.end();
 
         fbo1.end();
@@ -121,13 +124,11 @@ public class ExplorationScreen implements Screen {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        // refresh blur after resize
         if (needsBlurRefresh && menuState != MenuState.NONE) {
             captureAndBlur(w, h);
             needsBlurRefresh = false;
         }
 
-        // ESC handling
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
 
             if (menuState == MenuState.NONE) {
@@ -142,16 +143,22 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // update game
+        // ✅ UPDATED GAME LOGIC
         if (menuState == MenuState.NONE) {
             player.update(delta);
+            enemy.update(delta, player);
+
+            // 🔥 COMBAT TRIGGER
+            if (enemy.getBounds().overlaps(player.bounds)) {
+                System.out.println("COMBAT TRIGGERED");
+            }
         }
 
-        // draw
         if (menuState == MenuState.NONE) {
             batch.begin();
             batch.draw(background, 0, 0, w, h);
             player.render(batch);
+            enemy.render(batch);
             batch.end();
         } else {
             batch.begin();
@@ -179,7 +186,6 @@ public class ExplorationScreen implements Screen {
         float sy3 = sy2 - btnH - gap;
         float sy4 = sy3 - btnH - gap;
 
-        // ✅ SINGLE INPUT SYSTEM (FIXED)
         if (Gdx.input.justTouched()) {
 
             Vector3 touch = viewport.unproject(
@@ -188,7 +194,6 @@ public class ExplorationScreen implements Screen {
             float x = touch.x;
             float y = touch.y;
 
-            // SETTINGS
             if (menuState == MenuState.SETTINGS) {
 
                 if (x >= settingsX && x <= settingsX + btnW &&
@@ -219,7 +224,6 @@ public class ExplorationScreen implements Screen {
                 }
             }
 
-            // PAUSE
             if (menuState == MenuState.PAUSE) {
 
                 if (x >= pauseX && x <= pauseX + btnW &&
@@ -243,7 +247,6 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // DRAW PAUSE
         if (menuState == MenuState.PAUSE || menuState == MenuState.SETTINGS) {
 
             shape.begin(ShapeRenderer.ShapeType.Line);
@@ -265,7 +268,6 @@ public class ExplorationScreen implements Screen {
             batch.end();
         }
 
-        // DRAW SETTINGS
         if (menuState == MenuState.SETTINGS) {
 
             shape.begin(ShapeRenderer.ShapeType.Line);
@@ -307,6 +309,7 @@ public class ExplorationScreen implements Screen {
         batch.dispose();
         background.dispose();
         player.dispose();
+        enemy.dispose(); // ✅ ADDED
         shape.dispose();
         font.dispose();
         fbo1.dispose();
