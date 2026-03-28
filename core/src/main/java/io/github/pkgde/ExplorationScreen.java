@@ -23,6 +23,12 @@ import com.badlogic.gdx.math.Vector3;
 
     public class ExplorationScreen implements Screen {
 
+    private SpriteBatch batch;
+    private Texture background;
+    private Player player;
+    private ShapeRenderer shape;
+    private BitmapFont font;
+    private Enemy enemy;
         private ArrayList<Rectangle> obstacles = new ArrayList<>();
 
         private ScreenMap currentMap;
@@ -54,11 +60,16 @@ import com.badlogic.gdx.math.Vector3;
         // ===== SETTINGS OVERLAY =====
         private final SettingsOverlay settings;
 
+    private SettingsOverlay settingsOverlay;
+
+    private int pauseSelected = 0;
+
     public ExplorationScreen() {
 
         batch = new SpriteBatch();
         background = new Texture("background.png");
         player = new Player();
+        enemy = new Enemy();
         shape = new ShapeRenderer();
         font = new BitmapFont();
         public ExplorationScreen() {
@@ -90,6 +101,8 @@ import com.badlogic.gdx.math.Vector3;
 
         blurH = BlurShader.createShader(true);
         blurV = BlurShader.createShader(false);
+
+        settingsOverlay = new SettingsOverlay();
     }
 
     private void createFBOs(int w, int h) {
@@ -105,6 +118,7 @@ import com.badlogic.gdx.math.Vector3;
         batch.begin();
         batch.draw(background, 0, 0, w, h);
         player.render(batch);
+        enemy.render(batch); // ✅ ADDED
         batch.end();
 
         fbo1.end();
@@ -164,7 +178,7 @@ import com.badlogic.gdx.math.Vector3;
             needsBlurRefresh = false;
         }
 
-        // ESC handling
+        // ESC
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             // ===== ESC LOGIC =====
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
@@ -182,19 +196,27 @@ import com.badlogic.gdx.math.Vector3;
             }
             if (menuState == MenuState.NONE) {
                 menuState = MenuState.PAUSE;
+                pauseSelected = 0;
                 captureAndBlur(w, h);
             }
             else if (menuState == MenuState.SETTINGS) {
                 menuState = MenuState.PAUSE;
+                settingsOverlay.hide();
             }
             else {
                 menuState = MenuState.NONE;
             }
         }
 
-        // update game
+        // ✅ UPDATED GAME LOGIC
         if (menuState == MenuState.NONE) {
             player.update(delta);
+            enemy.update(delta, player);
+
+            // 🔥 COMBAT TRIGGER
+            if (enemy.getBounds().overlaps(player.bounds)) {
+                System.out.println("COMBAT TRIGGERED");
+            }
         }
             // ===== GAME UPDATE =====
             if (!isPaused && !settings.isActive()) {
@@ -206,6 +228,7 @@ import com.badlogic.gdx.math.Vector3;
             batch.begin();
             batch.draw(background, 0, 0, w, h);
             player.render(batch);
+            enemy.render(batch);
             batch.end();
         } else {
             batch.begin();
@@ -219,8 +242,7 @@ import com.badlogic.gdx.math.Vector3;
         float btnH = h * 0.08f;
         float gap = h * 0.03f;
 
-        float pauseX = w * 0.25f - btnW / 2f;
-        float settingsX = w * 0.75f - btnW / 2f;
+        float pauseX = w / 2f - btnW / 2f;
 
         float baseY = h * 0.55f;
             // ===== DRAW GAME =====
@@ -231,6 +253,8 @@ import com.badlogic.gdx.math.Vector3;
 
             // ===== DEBUG (optional) =====
             shape.begin(ShapeRenderer.ShapeType.Line);
+        float totalHeight = (btnH * 3) + (gap * 2);
+        float startY = h / 2f + totalHeight / 2f;
 
             for (Rectangle rect : obstacles) {
                 shape.rect(rect.x, rect.y, rect.width, rect.height);
@@ -241,6 +265,7 @@ import com.badlogic.gdx.math.Vector3;
             shape.rect(player.bounds.x, player.bounds.y, player.bounds.width, player.bounds.height);
             shape.end();
         float y1 = baseY;
+        float y1 = startY - btnH;
         float y2 = y1 - btnH - gap;
         float y3 = y2 - btnH - gap;
 
@@ -255,6 +280,9 @@ import com.badlogic.gdx.math.Vector3;
             float menuX = 275;
             float menuY = 100;
             if (isPaused && !settings.isActive() && Gdx.input.justTouched()) {
+        // ===== INPUT =====
+        if (menuState == MenuState.SETTINGS) {
+            settingsOverlay.handleInput(viewport);
         float sy1 = baseY;
         float sy2 = sy1 - btnH - gap;
         float sy3 = sy2 - btnH - gap;
@@ -312,24 +340,51 @@ import com.badlogic.gdx.math.Vector3;
                 if (x >= settingsX && x <= settingsX + width &&
                     y >= settingsY && y <= settingsY + height) {
             // PAUSE
+            if (!settingsOverlay.isActive()) {
+                menuState = MenuState.PAUSE;
+            }
+        }
+        else if (menuState == MenuState.PAUSE) {
+
+            // KEYBOARD
+            if (Gdx.input.isKeyJustPressed(Input.Keys.UP))
+                pauseSelected = (pauseSelected + 2) % 3;
+            if (menuState == MenuState.SETTINGS) {
+
+            if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
+                pauseSelected = (pauseSelected + 1) % 3;
+
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+                applyPauseSelection();
+            }
+
+            // MOUSE
+            if (Gdx.input.justTouched()) {
+
+                var touch = viewport.unproject(
+                    new com.badlogic.gdx.math.Vector3(
+                        Gdx.input.getX(), Gdx.input.getY(), 0));
+
+                float x = touch.x;
+                float y = touch.y;
             if (menuState == MenuState.PAUSE) {
 
                     settings.show();
                 }
                 if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y1 && y <= y1 + btnH) {
-                    menuState = MenuState.NONE;
-                    return;
+                    pauseSelected = 0;
                 }
+                else if (x >= pauseX && x <= pauseX + btnW &&
 
                 // Main Menu
                 if (x >= menuX && x <= menuX + width &&
                     y >= menuY && y <= menuY + height) {
                 if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y2 && y <= y2 + btnH) {
-                    menuState = MenuState.SETTINGS;
-                    return;
+                    pauseSelected = 1;
                 }
+                else if (x >= pauseX && x <= pauseX + btnW &&
 
                     ((Main) Gdx.app.getApplicationListener())
                         .setScreen(new HomeScreen());
@@ -340,15 +395,36 @@ import com.badlogic.gdx.math.Vector3;
             if (isPaused) {
                 if (x >= pauseX && x <= pauseX + btnW &&
                     y >= y3 && y <= y3 + btnH) {
-                    ((Main) Gdx.app.getApplicationListener())
-                        .setScreen(new HomeScreen());
-                    return;
+                    pauseSelected = 2;
                 }
+
+                applyPauseSelection();
             }
+        }
+
+        // UPDATE
+        if (menuState == MenuState.NONE) {
+            player.update(delta);
+        }
+
+        // DRAW GAME / BLUR
+        if (menuState == MenuState.NONE) {
+            batch.begin();
+            batch.draw(background, 0, 0, w, h);
+            player.render(batch);
+            batch.end();
+        } else {
+            batch.begin();
+            batch.draw(pausedBackground,
+                0, 0, w, h,
+                0, 1, 1, -1);
+            batch.end();
         }
 
                 shape.begin(ShapeRenderer.ShapeType.Filled);
         // DRAW PAUSE
+        // ===== DRAW PAUSE =====
+
         if (menuState == MenuState.PAUSE || menuState == MenuState.SETTINGS) {
 
                 shape.setColor(0, 0, 0, 0.7f);
@@ -362,9 +438,16 @@ import com.badlogic.gdx.math.Vector3;
 
                 shape.end();
             shape.begin(ShapeRenderer.ShapeType.Line);
+
+            shape.setColor(pauseSelected == 0 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y1, btnW, btnH);
+
+            shape.setColor(pauseSelected == 1 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y2, btnW, btnH);
+
+            shape.setColor(pauseSelected == 2 ? 1 : 0.5f, 1, 1, 1);
             shape.rect(pauseX, y3, btnW, btnH);
+
             shape.end();
 
                 batch.begin();
@@ -372,7 +455,8 @@ import com.badlogic.gdx.math.Vector3;
             float scale = w / 800f;
             font.getData().setScale(scale * 1.2f);
 
-            font.draw(batch, "GAME PAUSED", w * 0.42f, h * 0.75f);
+            font.draw(batch, "GAME PAUSED", w / 2f - 90 * scale, startY + btnH);
+
             font.draw(batch, "CONTINUE", pauseX + btnW * 0.25f, y1 + btnH * 0.65f);
             font.draw(batch, "SETTINGS", pauseX + btnW * 0.25f, y2 + btnH * 0.65f);
             font.draw(batch, "MAIN MENU", pauseX + btnW * 0.2f, y3 + btnH * 0.65f);
@@ -380,6 +464,7 @@ import com.badlogic.gdx.math.Vector3;
                 font.draw(batch, "CONTINUE", continueX + 60, continueY + 45);
                 font.draw(batch, "SETTINGS", settingsX + 65, settingsY + 45);
                 font.draw(batch, "MAIN MENU", menuX + 55, menuY + 45);
+            font.draw(batch, "MAIN MENU", pauseX + btnW * 0.20f, y3 + btnH * 0.65f);
 
                 batch.end();
             }
@@ -389,22 +474,22 @@ import com.badlogic.gdx.math.Vector3;
         }
         // DRAW SETTINGS
         if (menuState == MenuState.SETTINGS) {
+            settingsOverlay.render(shape, batch, font, viewport);
+        }
+    }
 
-            shape.begin(ShapeRenderer.ShapeType.Line);
-            shape.rect(settingsX, sy1, btnW, btnH);
-            shape.rect(settingsX, sy2, btnW, btnH);
-            shape.rect(settingsX, sy3, btnW, btnH);
-            shape.rect(settingsX, sy4, btnW, btnH);
-            shape.end();
+    private void applyPauseSelection() {
 
-            batch.begin();
-
-            font.draw(batch, "800x600", settingsX + btnW * 0.3f, sy1 + btnH * 0.65f);
-            font.draw(batch, "1280x720", settingsX + btnW * 0.25f, sy2 + btnH * 0.65f);
-            font.draw(batch, "FULLSCREEN", settingsX + btnW * 0.2f, sy3 + btnH * 0.65f);
-            font.draw(batch, "BACK (ESC)", settingsX + btnW * 0.25f, sy4 + btnH * 0.65f);
-
-            batch.end();
+        if (pauseSelected == 0) {
+            menuState = MenuState.NONE;
+        }
+        else if (pauseSelected == 1) {
+            menuState = MenuState.SETTINGS;
+            settingsOverlay.show();
+        }
+        else if (pauseSelected == 2) {
+            ((Main) Gdx.app.getApplicationListener())
+                .setScreen(new HomeScreen());
         }
     }
 
@@ -442,6 +527,7 @@ import com.badlogic.gdx.math.Vector3;
         batch.dispose();
         background.dispose();
         player.dispose();
+        enemy.dispose(); // ✅ ADDED
         shape.dispose();
         font.dispose();
         fbo1.dispose();
