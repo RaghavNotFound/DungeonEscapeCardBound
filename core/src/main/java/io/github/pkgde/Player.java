@@ -35,6 +35,8 @@ public class Player {
     private final Vector2 position;
     public Rectangle bounds;
 
+    private ArrayList<Rectangle> boundaries;
+
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
 
@@ -100,6 +102,10 @@ public class Player {
 
         currentFrame = idleFrames[0];
         stateTime = 0f;
+    }
+
+    public void setBoundaries(ArrayList<Rectangle> boundaries) {
+        this.boundaries = boundaries;
     }
 
     public void update(float delta, OrthographicCamera camera) {
@@ -221,7 +227,7 @@ public class Player {
         Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
 
         boolean collideX = false;
-        for (Rectangle wall : GameWorld.getBoundaries()) {
+        for (Rectangle wall : boundaries) {
             if (xBounds.overlaps(wall)) {
                 collideX = true;
                 break;
@@ -236,7 +242,7 @@ public class Player {
         Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
 
         boolean collideY = false;
-        for (Rectangle wall : GameWorld.getBoundaries()) {
+        for (Rectangle wall : boundaries) {
             if (yBounds.overlaps(wall)) {
                 collideY = true;
                 break;
@@ -273,6 +279,6 @@ public class Player {
     }
 
     public Vector2 getPosition() {
-        return new Vector2(bounds.x, bounds.y);
+        return position;
     }
 }

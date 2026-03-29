@@ -10,34 +10,23 @@ public class GameWorld {
     private Player player;
     private Enemy enemy;
 
-    // 🔥 WORLD SIZE
-    public static final float WORLD_WIDTH = 1280;
-    public static final float WORLD_HEIGHT = 720;
-    public static final float FLOOR_OFFSET = 120f;
+    private ArrayList<Rectangle> boundaries;
 
-    // 🔥 BOUNDARIES
-    private static ArrayList<Rectangle> boundaries;
-
-    public GameWorld() {
+    public GameWorld(MapManager mapManager) {
 
         player = new Player();
         enemy = new Enemy();
 
-        boundaries = new ArrayList<>();
+        boundaries = mapManager.getCollisionRects();
+        player.setBoundaries(boundaries);
 
-        float t = 10f; // thickness
+        // 🔥 APPLY SPAWN
+        player.getPosition().set(mapManager.getPlayerSpawn());
 
-        // LEFT
-        boundaries.add(new Rectangle(-t, 0, t, WORLD_HEIGHT));
-
-        // RIGHT
-        boundaries.add(new Rectangle(WORLD_WIDTH, 0, t, WORLD_HEIGHT));
-
-        // BOTTOM
-        boundaries.add(new Rectangle(0, 0, WORLD_WIDTH, FLOOR_OFFSET));
-
-        // TOP
-        boundaries.add(new Rectangle(0, WORLD_HEIGHT, WORLD_WIDTH, t));
+        // (for now single enemy)
+        if (!mapManager.getEnemySpawns().isEmpty()) {
+            enemy.getBounds().setPosition(mapManager.getEnemySpawns().get(0));
+        }
     }
 
     public void update(float delta, OrthographicCamera camera) {
@@ -61,7 +50,7 @@ public class GameWorld {
         return distance < 150f;
     }
 
-    public static ArrayList<Rectangle> getBoundaries() {
+    public ArrayList<Rectangle> getBoundaries() {
         return boundaries;
     }
 

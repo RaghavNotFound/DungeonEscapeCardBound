@@ -24,35 +24,50 @@ public class ExplorationScreen implements Screen {
     public enum State { GAME, PAUSE, SETTINGS }
     private State state = State.GAME;
 
-    // 💥 SHAKE
+    // SHAKE
     private float shakeTime = 0f;
     private float shakeDuration = 0.25f;
     private float shakeIntensity = 10f;
     private boolean shakeTriggered = false;
 
-    // 🌫️ BLUR
+    // BLUR
     private FrameBuffer fbo;
     private ShaderProgram blurShader;
     private SpriteBatch blurBatch;
 
     public ExplorationScreen() {
 
+        // ===== LOAD MAP =====
+        MapManager mapManager = new MapManager();
+        mapManager.load("maps/safeRoom.tmx");
+
+        // ===== SCREEN SIZE =====
+        float mapWidth = mapManager.getMapWidth();
+        float mapHeight = mapManager.getMapHeight();
+
         camera = new OrthographicCamera();
 
-        viewport = new FitViewport(1280, 720, camera);
-        viewport.apply(true);
+// 🔥 camera = full map
+        camera.setToOrtho(false, mapWidth, mapHeight);
 
-        camera.position.set(viewport.getWorldWidth()/2f, viewport.getWorldHeight()/2f, 0);
+// center on map
+        camera.position.set(mapWidth / 2f, mapHeight / 2f, 0);
         camera.update();
 
-        world = new GameWorld();
-        renderer = new GameRenderer(world, camera);
+        // ===== VIEWPORT (UI + INPUT) =====
+
+        viewport = new FitViewport(mapWidth, mapHeight, camera);
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
+
+        // ===== WORLD + RENDERER =====
+        world = new GameWorld(mapManager);
+        renderer = new GameRenderer(world, camera, mapManager);
         input = new InputHandler(viewport);
 
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
 
-        // 🔥 DYNAMIC FBO (QUALITY FIX)
+        // ===== FBO =====
         fbo = new FrameBuffer(
             Pixmap.Format.RGBA8888,
             Gdx.graphics.getWidth(),
@@ -72,6 +87,8 @@ public class ExplorationScreen implements Screen {
 
     @Override
     public void render(float delta) {
+
+        viewport.apply(); // IMPORTANT
 
         // ===== INPUT =====
         InputHandler.Action action = input.handle();
@@ -113,20 +130,15 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // ===== SETTINGS INPUT =====
+        // ===== SETTINGS =====
         if (state == State.SETTINGS) {
             settingsOverlay.handleInput(viewport);
-
-            if (!settingsOverlay.isActive()) {
-                state = State.PAUSE;
-            }
+            if (!settingsOverlay.isActive()) state = State.PAUSE;
         }
 
-        // ===== PAUSE INPUT =====
-        PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
-
+        // ===== PAUSE =====
         if (state == State.PAUSE) {
-            switch (pauseAction) {
+            switch (pauseOverlay.handleInput()) {
                 case RESUME: state = State.GAME; break;
                 case SETTINGS:
                     state = State.SETTINGS;
@@ -148,32 +160,23 @@ public class ExplorationScreen implements Screen {
             offsetY = MathUtils.random(-shakeIntensity, shakeIntensity);
         }
 
-        camera.position.set(
-            viewport.getWorldWidth()/2f + offsetX,
-            viewport.getWorldHeight()/2f + offsetY,
-            0
-        );
-        camera.update();
-
         // ===== RENDER =====
         if (state == State.PAUSE || state == State.SETTINGS) {
 
             fbo.begin();
-            renderer.render();
+            renderer.render(offsetX, offsetY);
             fbo.end();
 
             Texture tex = fbo.getColorBufferTexture();
 
             blurBatch.setProjectionMatrix(camera.combined);
-
             blurBatch.begin();
             blurShader.setUniformf("blur", 0.002f);
 
-            // 🔥 FIXED DRAW (NO ARTIFACTS)
             blurBatch.draw(
                 tex,
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight,
                 0, 0,
@@ -184,7 +187,6 @@ public class ExplorationScreen implements Screen {
 
             blurBatch.end();
 
-            // 🌑 SOFTER OVERLAY
             Gdx.gl.glEnable(GL20.GL_BLEND);
 
             ShapeRenderer shape = renderer.getShape();
@@ -193,8 +195,8 @@ public class ExplorationScreen implements Screen {
             shape.begin(ShapeRenderer.ShapeType.Filled);
             shape.setColor(0, 0, 0, 0.5f);
             shape.rect(
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight
             );
@@ -203,7 +205,7 @@ public class ExplorationScreen implements Screen {
             Gdx.gl.glDisable(GL20.GL_BLEND);
 
         } else {
-            renderer.render();
+            renderer.render(offsetX, offsetY);
         }
 
         // ===== UI =====
@@ -211,29 +213,19 @@ public class ExplorationScreen implements Screen {
         ShapeRenderer shape = renderer.getShape();
         BitmapFont font = renderer.getFont();
 
-        if (state == State.PAUSE) {
-            pauseOverlay.render(shape, batch, font, viewport); // 🔥 NEW SYSTEM
-        }
+        if (state == State.PAUSE)
+            pauseOverlay.render(shape, batch, font, viewport);
 
-        if (state == State.SETTINGS) {
+        if (state == State.SETTINGS)
             settingsOverlay.render(shape, batch, font, viewport);
-        }
     }
 
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
-
-        camera.position.set(
-            viewport.getWorldWidth()/2f,
-            viewport.getWorldHeight()/2f,
-            0
-        );
-        camera.update();
     }
 
-    @Override
-    public void dispose() {
+    @Override public void dispose() {
         renderer.dispose();
         world.dispose();
         fbo.dispose();
