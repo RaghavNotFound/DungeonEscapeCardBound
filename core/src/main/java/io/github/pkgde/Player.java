@@ -40,12 +40,16 @@ public class Player {
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
 
-    // 🔥 ARROW SYSTEM
-    private ArrayList<Arrow> arrows = new ArrayList<>();
+    // ===== ARROWS =====
+    private final ArrayList<Arrow> arrows = new ArrayList<>();
 
-    // 🔥 COOLDOWN
+    // ===== SHOOT COOLDOWN =====
     private float shootCooldown = 1.0f;
     private float shootTimer = 0f;
+
+    // ===== STAMINA =====
+    private float stamina = 100f;
+    private float maxStamina = 100f;
 
     public Player() {
 
@@ -95,65 +99,56 @@ public class Player {
         runAnimation = new Animation<>(0.08f, runFrames);
 
         idleAnimation = new Animation<>(0.08f, idleFrames);
-        idleAnimation.setPlayMode(Animation.PlayMode.NORMAL);
-
         idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
-        idleBlinkingAnimation.setPlayMode(Animation.PlayMode.NORMAL);
 
         currentFrame = idleFrames[0];
-        stateTime = 0f;
     }
+
+    // ===== GETTERS =====
+    public float getStamina() { return stamina; }
+    public float getMaxStamina() { return maxStamina; }
+
+    public Vector2 getPosition() { return position; }
+    public Vector2 getPos() { return position; }
+    public Rectangle getBounds() { return bounds; }
+    public ArrayList<Arrow> getArrows() { return arrows; }
 
     public void setBoundaries(ArrayList<Rectangle> boundaries) {
         this.boundaries = boundaries;
     }
 
+    // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
 
         boolean moved = handleMovement(delta);
-
         stateTime += delta;
 
         // ===== ANIMATION =====
         if (moved) {
-
             currentFrame = isRunning
                 ? runAnimation.getKeyFrame(stateTime, true)
                 : walkAnimation.getKeyFrame(stateTime, true);
-
             playBlink = false;
-
         } else {
-
-            if (!playBlink) {
-                currentFrame = idleAnimation.getKeyFrame(stateTime, false);
-
-                if (idleAnimation.isAnimationFinished(stateTime)) {
-                    stateTime = 0;
-                    playBlink = true;
-                }
-
-            } else {
-                currentFrame = idleBlinkingAnimation.getKeyFrame(stateTime, false);
-
-                if (idleBlinkingAnimation.isAnimationFinished(stateTime)) {
-                    stateTime = 0;
-                    playBlink = false;
-                }
-            }
+            currentFrame = idleAnimation.getKeyFrame(stateTime, true);
         }
+
+        // ===== STAMINA =====
+        boolean runningNow = isRunning && moved && stamina > 0;
+
+        if (runningNow) stamina -= 40f * delta;
+        else stamina += 25f * delta;
+
+        stamina = Math.max(0, Math.min(maxStamina, stamina));
 
         bounds.setPosition(position.x, position.y);
 
-        // ===== COOLDOWN =====
+        // ===== SHOOT =====
         if (shootTimer > 0) shootTimer -= delta;
 
-        // ===== SHOOT =====
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (shootTimer <= 0f) {
-                shootArrow(camera);
-                shootTimer = shootCooldown;
-            }
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && shootTimer <= 0f) {
+            shootArrow(camera);
+            shootTimer = shootCooldown;
         }
 
         // ===== UPDATE ARROWS =====
@@ -161,33 +156,13 @@ public class Player {
             Arrow arrow = arrows.get(i);
             arrow.update(delta);
 
-            if (arrow.isCollided(
-                camera.viewportWidth,
-                camera.viewportHeight,
-                new ArrayList<>()
-            )) {
+            if (arrow.isCollided(camera.viewportWidth, camera.viewportHeight, new ArrayList<>())) {
                 arrows.remove(i);
             }
         }
     }
 
-    private void shootArrow(OrthographicCamera camera) {
-
-        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouse);
-
-        Vector2 direction = new Vector2(
-            mouse.x - (position.x + WIDTH / 2f),
-            mouse.y - (position.y + HEIGHT / 2f)
-        ).nor();
-
-        arrows.add(new Arrow(
-            position.x + WIDTH / 2f,
-            position.y + HEIGHT / 2f,
-            direction
-        ));
-    }
-
+    // ===== MOVEMENT =====
     private boolean handleMovement(float delta) {
 
         float oldX = position.x;
@@ -196,89 +171,82 @@ public class Player {
         float newX = position.x;
         float newY = position.y;
 
-        boolean up = Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
-        boolean down = Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
-        boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
-        boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+        boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
+        boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
+        boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
+        boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
 
-        if (up && down) { up = false; down = false; }
-        if (left && right) { left = false; right = false; }
+        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 
-        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
-            || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+        float baseSpeed = 100f;
+        boolean canRun = isRunning && stamina > 0;
 
-        float speed = 100;
-        float currentSpeed = isRunning ? speed * 1.5f : speed;
+        float speed = canRun ? baseSpeed * 1.5f : baseSpeed;
 
-        if (up) newY += currentSpeed * delta;
-        if (down) newY -= currentSpeed * delta;
+        if (up) newY += speed * delta;
+        if (down) newY -= speed * delta;
 
         if (left) {
-            newX -= currentSpeed * delta;
-            if (facingRight) { flipFrames(); facingRight = false; }
+            newX -= speed * delta;
+            facingRight = false;
         }
 
         if (right) {
-            newX += currentSpeed * delta;
-            if (!facingRight) { flipFrames(); facingRight = true; }
+            newX += speed * delta;
+            facingRight = true;
         }
 
-        // ===== X AXIS COLLISION =====
         Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
-
-        boolean collideX = false;
         for (Rectangle wall : boundaries) {
-            if (xBounds.overlaps(wall)) {
-                collideX = true;
-                break;
-            }
+            if (xBounds.overlaps(wall)) return false;
         }
+        position.x = newX;
 
-        if (!collideX) {
-            position.x = newX;
-        }
-
-        // ===== Y AXIS COLLISION =====
         Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
-
-        boolean collideY = false;
         for (Rectangle wall : boundaries) {
-            if (yBounds.overlaps(wall)) {
-                collideY = true;
-                break;
-            }
+            if (yBounds.overlaps(wall)) return false;
         }
+        position.y = newY;
 
-        if (!collideY) {
-            position.y = newY;
-        }
-
-        return (oldX != position.x || oldY != position.y);
+        return oldX != position.x || oldY != position.y;
     }
 
-    private void flipFrames() {
-        for (TextureRegion f : walkFrames) f.flip(true, false);
-        for (TextureRegion f : runFrames) f.flip(true, false);
-        for (TextureRegion f : idleFrames) f.flip(true, false);
-        for (TextureRegion f : idleBlinkingFrames) f.flip(true, false);
+    // ===== SHOOT =====
+    private void shootArrow(OrthographicCamera camera) {
+
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mouse);
+
+        Vector2 dir = new Vector2(
+            mouse.x - (position.x + WIDTH / 2f),
+            mouse.y - (position.y + HEIGHT / 2f)
+        ).nor();
+
+        arrows.add(new Arrow(
+            position.x + WIDTH / 2f,
+            position.y + HEIGHT / 2f,
+            dir
+        ));
     }
 
+    // ===== RENDER (FIXED FLIP) =====
     public void render(SpriteBatch batch) {
-        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+
+        float drawWidth = facingRight ? WIDTH : -WIDTH;
+        float drawX = facingRight ? position.x : position.x + WIDTH;
+
+        batch.draw(currentFrame, drawX, position.y, drawWidth, HEIGHT);
 
         for (Arrow arrow : arrows) {
             arrow.render(batch);
         }
     }
 
+    // ===== CLEANUP =====
     public void dispose() {
         for (Texture t : walkingTextures) t.dispose();
         for (Texture t : runTextures) t.dispose();
         for (Texture t : idleTextures) t.dispose();
         for (Texture t : idleBlinkingTextures) t.dispose();
-    }
-
-    public Vector2 getPosition() {
-        return position;
     }
 }

@@ -16,31 +16,20 @@ public class MapManager {
     private TiledMap map;
     private OrthogonalTiledMapRenderer renderer;
 
-    // ===== SPAWN DATA =====
     private Vector2 playerSpawn = new Vector2();
     private ArrayList<Vector2> enemySpawns = new ArrayList<>();
-
-    // ===== COLLISION =====
     private ArrayList<Rectangle> collisionRects = new ArrayList<>();
 
-    // 🔥 KEEP THIS FIXED
     private static final float UNIT_SCALE = 1f;
 
-    // ================================
-    // LOAD MAP
-    // ================================
     public void load(String path) {
         map = new TmxMapLoader().load(path);
-
         renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
 
         loadCollisions();
         loadSpawns();
     }
 
-    // ================================
-    // MAP SIZE (IMPORTANT)
-    // ================================
     public float getMapWidth() {
         return map.getProperties().get("width", Integer.class) *
             map.getProperties().get("tilewidth", Integer.class);
@@ -51,102 +40,51 @@ public class MapManager {
             map.getProperties().get("tileheight", Integer.class);
     }
 
-    // ================================
-    // LOAD SPAWNS
-    // ================================
     private void loadSpawns() {
-
         MapLayer layer = map.getLayers().get("objects");
-
         if (layer == null) return;
 
         for (MapObject obj : layer.getObjects()) {
-
             if (obj instanceof RectangleMapObject) {
-
                 Rectangle rect = ((RectangleMapObject) obj).getRectangle();
-
                 String name = obj.getName();
 
-                float x = rect.x * UNIT_SCALE;
-                float y = rect.y * UNIT_SCALE;
-
                 if ("playerSpawn".equals(name)) {
-                    playerSpawn.set(x, y);
-                }
-                else if ("enemySpawn".equals(name)) {
-                    enemySpawns.add(new Vector2(x, y));
+                    playerSpawn.set(rect.x, rect.y);
+                } else if ("enemySpawn".equals(name)) {
+                    enemySpawns.add(new Vector2(rect.x, rect.y));
                 }
             }
         }
     }
 
-    // ================================
-    // LOAD COLLISIONS
-    // ================================
     private void loadCollisions() {
+        String[] layers = { "wall", "water", "centerFire" };
 
-        String[] collisionLayers = { "wall", "water", "centerFire" };
-
-        for (String layerName : collisionLayers) {
-
-            MapLayer layer = map.getLayers().get(layerName);
-
+        for (String name : layers) {
+            MapLayer layer = map.getLayers().get(name);
             if (layer == null) continue;
 
             for (MapObject obj : layer.getObjects()) {
-
                 if (obj instanceof RectangleMapObject) {
-
-                    Rectangle rect = ((RectangleMapObject) obj).getRectangle();
-
-                    collisionRects.add(new Rectangle(
-                        rect.x * UNIT_SCALE,
-                        rect.y * UNIT_SCALE,
-                        rect.width * UNIT_SCALE,
-                        rect.height * UNIT_SCALE
-                    ));
+                    Rectangle r = ((RectangleMapObject) obj).getRectangle();
+                    collisionRects.add(new Rectangle(r));
                 }
             }
         }
     }
 
-    // ================================
-    // RENDER
-    // ================================
     public void render(OrthographicCamera camera) {
-
-        renderer.setView(
-            camera.combined,
-            camera.position.x - camera.viewportWidth / 2,
-            camera.position.y - camera.viewportHeight / 2,
-            camera.viewportWidth,
-            camera.viewportHeight
-        );
-
+        renderer.setView(camera);
         renderer.render();
     }
 
-    // ================================
-    // GETTERS
-    // ================================
-    public Vector2 getPlayerSpawn() {
-        return playerSpawn;
-    }
+    public Vector2 getPlayerSpawn() { return playerSpawn; }
+    public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
+    public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
 
-    public ArrayList<Vector2> getEnemySpawns() {
-        return enemySpawns;
-    }
-
-    public ArrayList<Rectangle> getCollisionRects() {
-        return collisionRects;
-    }
-
-    // ================================
-    // CLEANUP
-    // ================================
     public void dispose() {
-        if (map != null) map.dispose();
-        if (renderer != null) renderer.dispose();
+        map.dispose();
+        renderer.dispose();
     }
 }

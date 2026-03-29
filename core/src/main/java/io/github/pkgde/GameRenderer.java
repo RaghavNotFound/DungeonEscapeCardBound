@@ -8,14 +8,13 @@ import com.badlogic.gdx.math.Rectangle;
 
 public class GameRenderer {
 
-    private GameWorld world;
+    private final GameWorld world;
+    private final SpriteBatch batch;
+    private final ShapeRenderer shape;
+    private final BitmapFont font;
 
-    private SpriteBatch batch;
-    private ShapeRenderer shape;
-    private BitmapFont font;
-
-    private OrthographicCamera camera;
-    private MapManager mapManager;
+    private final OrthographicCamera camera;
+    private final MapManager mapManager;
 
     public GameRenderer(GameWorld world, OrthographicCamera camera, MapManager mapManager) {
         this.world = world;
@@ -29,38 +28,53 @@ public class GameRenderer {
 
     public void render(float offsetX, float offsetY) {
 
-        Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // APPLY SHAKE
         camera.position.add(offsetX, offsetY, 0);
         camera.update();
 
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
-        // MAP
         mapManager.render(camera);
 
-        // ENTITIES
         batch.begin();
         world.getPlayer().render(batch);
         world.getEnemy().render(batch);
         batch.end();
 
-        // DEBUG
         shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(1, 0, 0, 1);
+        shape.setColor(Color.RED);
 
-        for (Rectangle rect : mapManager.getCollisionRects()) {
-            shape.rect(rect.x, rect.y, rect.width, rect.height);
+        for (Rectangle r : mapManager.getCollisionRects()) {
+            shape.rect(r.x, r.y, r.width, r.height);
         }
 
         shape.end();
 
-        // RESET CAMERA
+        drawUI();
+
         camera.position.sub(offsetX, offsetY, 0);
         camera.update();
+    }
+
+    private void drawUI() {
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        float stamina = world.getPlayer().getStamina();
+        float max = world.getPlayer().getMaxStamina();
+
+        float x = camera.position.x - camera.viewportWidth / 2 + 20;
+        float y = camera.position.y + camera.viewportHeight / 2 - 30;
+
+        shape.setColor(Color.DARK_GRAY);
+        shape.rect(x, y, 200, 20);
+
+        shape.setColor(Color.GREEN);
+        shape.rect(x, y, 200 * (stamina / max), 20);
+
+        shape.end();
     }
 
     public SpriteBatch getBatch() { return batch; }

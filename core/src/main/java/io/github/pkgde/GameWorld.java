@@ -3,14 +3,15 @@ package io.github.pkgde;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+
 import java.util.ArrayList;
 
 public class GameWorld {
 
-    private Player player;
-    private Enemy enemy;
+    private final Player player;
+    private final Enemy enemy;
 
-    private ArrayList<Rectangle> boundaries;
+    private final ArrayList<Rectangle> boundaries;
 
     public GameWorld(MapManager mapManager) {
 
@@ -20,10 +21,8 @@ public class GameWorld {
         boundaries = mapManager.getCollisionRects();
         player.setBoundaries(boundaries);
 
-        // 🔥 APPLY SPAWN
         player.getPosition().set(mapManager.getPlayerSpawn());
 
-        // (for now single enemy)
         if (!mapManager.getEnemySpawns().isEmpty()) {
             enemy.getBounds().setPosition(mapManager.getEnemySpawns().get(0));
         }
@@ -34,33 +33,21 @@ public class GameWorld {
         enemy.update(delta, player);
     }
 
-    // 🔥 FIXED METHOD
     public boolean isPlayerNearEnemy() {
+        Vector2 p = player.getPosition();
+        Rectangle b = enemy.getBounds();
 
-        Vector2 playerPos = player.getPosition();
-
-        // ✅ FIX: Rectangle has no getPosition()
-        Vector2 enemyPos = new Vector2(
-            enemy.getBounds().x,
-            enemy.getBounds().y
+        Vector2 e = new Vector2(
+            b.x + b.width / 2f,
+            b.y + b.height / 2f
         );
 
-        float distance = playerPos.dst(enemyPos);
-
-        return distance < 150f;
+        return p.dst(e) < 150f;
     }
 
-    public ArrayList<Rectangle> getBoundaries() {
-        return boundaries;
-    }
-
-    public Player getPlayer() {
-        return player;
-    }
-
-    public Enemy getEnemy() {
-        return enemy;
-    }
+    public Player getPlayer() { return player; }
+    public Enemy getEnemy() { return enemy; }
+    public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 
     public void dispose() {
         player.dispose();
