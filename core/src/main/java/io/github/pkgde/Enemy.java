@@ -69,7 +69,7 @@ public class Enemy {
 
         stateTime += delta;
 
-        Vector2 playerPos = player.getPosition();
+        Vector2 playerPos = player.getPos();
 
         Vector2 toPlayer = new Vector2(playerPos).sub(position);
         float distance = toPlayer.len();

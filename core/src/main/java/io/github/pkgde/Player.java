@@ -8,7 +8,8 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
 import java.util.ArrayList;
 
-public class Player {
+public class Player
+{
 
     private final Animation<TextureRegion> walkAnimation;
     private final Animation<TextureRegion> runAnimation;
@@ -29,255 +30,319 @@ public class Player {
 
     private float stateTime;
     private boolean isRunning;
-    private boolean facingRight = true;
-    private boolean playBlink = false;
+    private boolean facingRight=true;
+    private boolean playBlink=false;
 
-    private final Vector2 position;
+    private final Vector2 pos;
     public Rectangle bounds;
 
-    private final int WIDTH = 128;
-    private final int HEIGHT = 128;
+    private final int WIDTH=128;
+    private final int HEIGHT=128;
 
-    // 🔥 ARROW SYSTEM
-    private ArrayList<Arrow> arrows = new ArrayList<>();
+    //ARROW SYSTEM
+    private final ArrayList<Arrow> arrows=new ArrayList<>();
 
-    // 🔥 COOLDOWN
-    private float shootCooldown = 1.0f;
-    private float shootTimer = 0f;
+    private float shootTimer=0f;
 
     // WORLD REFERENCE
-    private GameWorld world;
+    private final GameWorld world;
 
-    public Player(GameWorld world) {
+    public Player(GameWorld world)
+    {
+        this.world=world;
+        pos =new Vector2(200,200);
+        bounds=new Rectangle(pos.x, pos.y,WIDTH,HEIGHT);
 
-        this.world = world;
+        int walkingFrameCount=23;
+        int runFrameCount=12;
+        int idleFrameCount=18;
+        int idleBlinkingFrameCount=18;
 
-        position = new Vector2(200, 200);
-        bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
+        walkingTextures=new Texture[walkingFrameCount];
+        runTextures=new Texture[runFrameCount];
+        idleTextures=new Texture[idleFrameCount];
+        idleBlinkingTextures=new Texture[idleBlinkingFrameCount];
 
-        int walkingFrameCount = 23;
-        int runFrameCount = 12;
-        int idleFrameCount = 18;
-        int idleBlinkingFrameCount = 18;
+        walkFrames=new TextureRegion[walkingFrameCount];
+        runFrames=new TextureRegion[runFrameCount];
+        idleFrames=new TextureRegion[idleFrameCount];
+        idleBlinkingFrames=new TextureRegion[idleBlinkingFrameCount];
 
-        walkingTextures = new Texture[walkingFrameCount];
-        runTextures = new Texture[runFrameCount];
-        idleTextures = new Texture[idleFrameCount];
-        idleBlinkingTextures = new Texture[idleBlinkingFrameCount];
-
-        walkFrames = new TextureRegion[walkingFrameCount];
-        runFrames = new TextureRegion[runFrameCount];
-        idleFrames = new TextureRegion[idleFrameCount];
-        idleBlinkingFrames = new TextureRegion[idleBlinkingFrameCount];
-
-        // WALK
-        for (int i = 0; i < walkingFrameCount; i++) {
-            walkingTextures[i] = new Texture("Movements/Player/walking/walking_" + (i + 1) + ".png");
-            walkFrames[i] = new TextureRegion(walkingTextures[i]);
+        //WALK
+        for (int i=0;i<walkingFrameCount;i++)
+        {
+            walkingTextures[i]=new Texture("Movements/Player/walking/walking_"+(i+1)+".png");
+            walkFrames[i]=new TextureRegion(walkingTextures[i]);
+        }
+        //RUN
+        for (int i=0;i<runFrameCount;i++)
+        {
+            runTextures[i]=new Texture("Movements/Player/running/running_"+(i+1)+".png");
+            runFrames[i]=new TextureRegion(runTextures[i]);
+        }
+        //IDLE
+        for (int i=0;i<idleFrameCount;i++)
+        {
+            idleTextures[i]=new Texture("Movements/Player/idle/idle_"+(i+1)+".png");
+            idleFrames[i]=new TextureRegion(idleTextures[i]);
+        }
+        //IDLE BLINK
+        for (int i=0;i<idleBlinkingFrameCount;i++)
+        {
+            idleBlinkingTextures[i]=new Texture("Movements/Player/idleBlinking/idleBlinking_"+(i+1)+".png");
+            idleBlinkingFrames[i]=new TextureRegion(idleBlinkingTextures[i]);
         }
 
-        // RUN
-        for (int i = 0; i < runFrameCount; i++) {
-            runTextures[i] = new Texture("Movements/Player/running/running_" + (i + 1) + ".png");
-            runFrames[i] = new TextureRegion(runTextures[i]);
-        }
+        walkAnimation=new Animation<>(0.025f,walkFrames);
+        runAnimation=new Animation<>(0.08f,runFrames);
 
-        // IDLE
-        for (int i = 0; i < idleFrameCount; i++) {
-            idleTextures[i] = new Texture("Movements/Player/idle/idle_" + (i + 1) + ".png");
-            idleFrames[i] = new TextureRegion(idleTextures[i]);
-        }
-
-        // IDLE BLINK
-        for (int i = 0; i < idleBlinkingFrameCount; i++) {
-            idleBlinkingTextures[i] = new Texture("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png");
-            idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
-        }
-
-        walkAnimation = new Animation<>(0.025f, walkFrames);
-        runAnimation = new Animation<>(0.08f, runFrames);
-
-        idleAnimation = new Animation<>(0.08f, idleFrames);
+        idleAnimation=new Animation<>(0.08f,idleFrames);
         idleAnimation.setPlayMode(Animation.PlayMode.NORMAL);
 
-        idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
+        idleBlinkingAnimation=new Animation<>(0.08f,idleBlinkingFrames);
         idleBlinkingAnimation.setPlayMode(Animation.PlayMode.NORMAL);
 
-        currentFrame = idleFrames[0];
-        stateTime = 0f;
+        currentFrame=idleFrames[0];
+        stateTime=0f;
     }
 
-    public void update(float delta, OrthographicCamera camera) {
+    public void update(float delta,OrthographicCamera camera)
+    {
+        boolean moved=handleMovement(delta);
+        stateTime+=delta;
 
-        boolean moved = handleMovement(delta);
+        //ANIMATION
+        if (moved)
+        {
+            currentFrame=isRunning?runAnimation.getKeyFrame(stateTime,true):walkAnimation.getKeyFrame(stateTime,true);
+            playBlink=false;
+        }
+        else
+        {
+            if (!playBlink)
+            {
+                currentFrame=idleAnimation.getKeyFrame(stateTime,false);
 
-        stateTime += delta;
-
-        // ===== ANIMATION =====
-        if (moved) {
-
-            currentFrame = isRunning
-                ? runAnimation.getKeyFrame(stateTime, true)
-                : walkAnimation.getKeyFrame(stateTime, true);
-
-            playBlink = false;
-
-        } else {
-
-            if (!playBlink) {
-                currentFrame = idleAnimation.getKeyFrame(stateTime, false);
-
-                if (idleAnimation.isAnimationFinished(stateTime)) {
-                    stateTime = 0;
-                    playBlink = true;
+                if (idleAnimation.isAnimationFinished(stateTime))
+                {
+                    stateTime=0;
+                    playBlink=true;
                 }
 
-            } else {
-                currentFrame = idleBlinkingAnimation.getKeyFrame(stateTime, false);
+            }
+            else
+            {
+                currentFrame=idleBlinkingAnimation.getKeyFrame(stateTime,false);
 
-                if (idleBlinkingAnimation.isAnimationFinished(stateTime)) {
-                    stateTime = 0;
-                    playBlink = false;
+                if (idleBlinkingAnimation.isAnimationFinished(stateTime))
+                {
+                    stateTime=0;
+                    playBlink=false;
                 }
             }
         }
 
-        bounds.setPosition(position.x, position.y);
+        bounds.setPosition(pos.x, pos.y);
 
-        // ===== COOLDOWN =====
-        if (shootTimer > 0) shootTimer -= delta;
-
-        // ===== SHOOT =====
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (shootTimer <= 0f) {
+        //COOLDOWN
+        if (shootTimer>0)
+        {
+            shootTimer-=delta;
+        }
+        //SHOOT
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT))
+        {
+            if (shootTimer<=0f)
+            {
                 shootArrow(camera);
-                shootTimer = shootCooldown;
+                //COOLDOWN
+                shootTimer=1.0f;
             }
         }
 
-        // ===== UPDATE ARROWS =====
-        for (int i = arrows.size() - 1; i >= 0; i--) {
-            Arrow arrow = arrows.get(i);
+        //UPDATE ARROWS
+        for (int i=arrows.size()-1;i>=0;i--)
+        {
+            Arrow arrow=arrows.get(i);
             arrow.update(delta);
 
-            if (arrow.isCollided(GameWorld.WORLD_WIDTH, GameWorld.WORLD_HEIGHT, world.getBoundaries())) {
+            if (arrow.isCollided(GameWorld.WORLD_WIDTH,GameWorld.WORLD_HEIGHT, world.getBoundaries()))
+            {
                 arrows.remove(i);
             }
         }
     }
+    private void shootArrow(OrthographicCamera camera)
+    {
 
-    private void shootArrow(OrthographicCamera camera) {
-
-        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        Vector3 mouse=new Vector3(Gdx.input.getX(),Gdx.input.getY(),0);
         camera.unproject(mouse);
 
-        Vector2 direction = new Vector2(
-            mouse.x - (position.x + WIDTH / 2f),
-            mouse.y - (position.y + HEIGHT / 2f)
+        Vector2 direction=new Vector2(
+            mouse.x-(pos.x+WIDTH/2f),
+            mouse.y-(pos.y+HEIGHT/2f)
         ).nor();
 
         arrows.add(new Arrow(
-            position.x + WIDTH / 2f,
-            position.y + HEIGHT / 2f,
+            pos.x+WIDTH/2f,
+            pos.y+HEIGHT/2f,
             direction
         ));
     }
 
-    private boolean handleMovement(float delta) {
+    private boolean handleMovement(float delta)
+    {
 
-        float oldX = position.x;
-        float oldY = position.y;
+        float oldX= pos.x;
+        float oldY= pos.y;
 
-        float newX = position.x;
-        float newY = position.y;
+        float newX= pos.x;
+        float newY= pos.y;
 
-        boolean up = Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
-        boolean down = Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
-        boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
-        boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+        boolean up=Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
+        boolean down=Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
+        boolean left=Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
+        boolean right=Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
-        if (up && down) { up = false; down = false; }
-        if (left && right) { left = false; right = false; }
-
-        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
-            || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
-
-        float speed = 100;
-        float currentSpeed = isRunning ? speed * 1.5f : speed;
-
-        if (up) newY += currentSpeed * delta;
-        if (down) newY -= currentSpeed * delta;
-
-        if (left) {
-            newX -= currentSpeed * delta;
-            if (facingRight) { flipFrames(); facingRight = false; }
+        if (up && down)
+        {
+            up=false;
+            down=false;
+        }
+        if (left && right)
+        {
+            left=false;
+            right=false;
         }
 
-        if (right) {
-            newX += currentSpeed * delta;
-            if (!facingRight) { flipFrames(); facingRight = true; }
+        isRunning=Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+
+        float speed=100;
+        float currentSpeed=isRunning?speed*1.5f:speed;
+
+        if (up)
+        {
+            newY+=currentSpeed*delta;
+        }
+        if (down)
+        {
+            newY-=currentSpeed*delta;
         }
 
-        // ===== X AXIS COLLISION =====
-        Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
+        if (left)
+        {
+            newX-=currentSpeed*delta;
+            if (facingRight)
+            {
+                flipFrames();
+                facingRight=false;
+            }
+        }
 
-        boolean collideX = false;
-        for (Rectangle wall : world.getBoundaries()) {
-            if (xBounds.overlaps(wall)) {
-                collideX = true;
+        if (right)
+        {
+            newX+=currentSpeed*delta;
+            if (!facingRight)
+            {
+                flipFrames();
+                facingRight=true;
+            }
+        }
+
+        //X AXIS COLLISION
+        Rectangle xBounds=new Rectangle(newX, pos.y,WIDTH,HEIGHT);
+
+        boolean collideX=false;
+        for (Rectangle wall:world.getBoundaries())
+        {
+            if (xBounds.overlaps(wall))
+            {
+                collideX=true;
                 break;
             }
         }
 
-        if (!collideX) {
-            position.x = newX;
+        if (!collideX)
+        {
+            pos.x=newX;
         }
 
-        // ===== Y AXIS COLLISION =====
-        Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
+        //Y AXIS COLLISION
+        Rectangle yBounds=new Rectangle(pos.x,newY,WIDTH,HEIGHT);
 
-        boolean collideY = false;
-        for (Rectangle wall : world.getBoundaries()) {
-            if (yBounds.overlaps(wall)) {
-                collideY = true;
+        boolean collideY=false;
+        for (Rectangle wall:world.getBoundaries())
+        {
+            if (yBounds.overlaps(wall))
+            {
+                collideY=true;
                 break;
             }
         }
 
-        if (!collideY) {
-            position.y = newY;
+        if (!collideY)
+        {
+            pos.y=newY;
         }
 
-        return (oldX != position.x || oldY != position.y);
+        return (oldX!= pos.x || oldY!= pos.y);
     }
 
-    private void flipFrames() {
-        for (TextureRegion f : walkFrames) f.flip(true, false);
-        for (TextureRegion f : runFrames) f.flip(true, false);
-        for (TextureRegion f : idleFrames) f.flip(true, false);
-        for (TextureRegion f : idleBlinkingFrames) f.flip(true, false);
+    private void flipFrames()
+    {
+        for (TextureRegion f:walkFrames)
+        {
+            f.flip(true,false);
+        }
+        for (TextureRegion f:runFrames)
+        {
+            f.flip(true,false);
+        }
+        for (TextureRegion f:idleFrames)
+        {
+            f.flip(true,false);
+        }
+        for (TextureRegion f:idleBlinkingFrames)
+        {
+            f.flip(true,false);
+        }
     }
 
-    public void render(SpriteBatch batch) {
-        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+    public void render(SpriteBatch batch)
+    {
+        batch.draw(currentFrame,pos.x,pos.y,WIDTH,HEIGHT);
 
-        for (Arrow arrow : arrows) {
+        for (Arrow arrow:arrows)
+        {
             arrow.render(batch);
         }
     }
 
-    public void dispose() {
-        for (Texture t : walkingTextures) t.dispose();
-        for (Texture t : runTextures) t.dispose();
-        for (Texture t : idleTextures) t.dispose();
-        for (Texture t : idleBlinkingTextures) t.dispose();
+    public void dispose()
+    {
+        for (Texture t:walkingTextures)
+        {
+            t.dispose();
+        }
+        for (Texture t:runTextures)
+        {
+            t.dispose();
+        }
+        for (Texture t:idleTextures)
+        {
+            t.dispose();
+        }
+        for (Texture t:idleBlinkingTextures)
+        {
+            t.dispose();
+        }
     }
-
-    public Vector2 getPosition() {
-        return new Vector2(bounds.x, bounds.y);
+    public Vector2 getPos()
+    {
+        return new Vector2(bounds.x,bounds.y);
     }
-
-    public ArrayList<Arrow> getArrows() {
+    public ArrayList<Arrow> getArrows()
+    {
         return arrows;
     }
 }
