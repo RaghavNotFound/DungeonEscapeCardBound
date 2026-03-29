@@ -71,42 +71,65 @@ public class ExplorationScreen implements Screen
     @Override
     public void render(float delta)
     {
-
-        //Input
-        InputHandler.Action action=input.handle();
-
-        switch (action)
+        // ===== PER-STATE INPUT =====
+        // Each state fully owns its input — no bleed between states
+        if (state==State.GAME)
         {
-            case TOGGLE_PAUSE:
-                if (state==State.GAME)
-                {
-                    state=State.PAUSE;
-                }
-                else if (state==State.PAUSE)
-                {
-                    state=State.GAME;
-                }
-                else if (state==State.SETTINGS)
-                {
-                    state=State.PAUSE;
-                    settingsOverlay.hide();
-                }
-                break;
+            InputHandler.Action action=input.handle();
 
-            case OPEN_SETTINGS:
-                if (state==State.PAUSE)
-                {
-                    state=State.SETTINGS;
-                    settingsOverlay.show();
-                }
-                break;
+            switch (action)
+            {
+                case TOGGLE_PAUSE:
+                    state=State.PAUSE;
+                    break;
 
-            case EXIT_TO_MENU:
-                ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                break;
+                case EXIT_TO_MENU:
+                    ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    break;
+            }
+        }
+        else if (state==State.PAUSE)
+        {
+            //ESC resumes game
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
+            {
+                state=State.GAME;
+            }
+            else
+            {
+                PauseOverlay.Action pauseAction=pauseOverlay.handleInput();
+
+                switch (pauseAction)
+                {
+                    case RESUME:
+                        state=State.GAME;
+                        break;
+
+                    case SETTINGS:
+                        state=State.SETTINGS;
+                        settingsOverlay.show();
+                        break;
+
+                    case EXIT:
+                        ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                        break;
+
+                    case NONE:
+                        break;
+                }
+            }
+        }
+        else if (state==State.SETTINGS)
+        {
+            settingsOverlay.handleInput(viewport);
+
+            if (!settingsOverlay.isActive())
+            {
+                state=State.PAUSE;
+            }
         }
 
-        //Update
+        // ===== UPDATE =====
         if (state==State.GAME)
         {
             world.update(delta,camera);
@@ -125,38 +148,7 @@ public class ExplorationScreen implements Screen
             }
         }
 
-        // ===== PAUSE / SETTINGS INPUT =====
-        // else-if ensures only ONE block runs per frame — prevents Enter
-        // from bleeding into the newly entered state on the same frame
-        if (state==State.PAUSE)
-        {
-            PauseOverlay.Action pauseAction=pauseOverlay.handleInput();
-
-            switch (pauseAction)
-            {
-                case RESUME:state=State.GAME;
-                break;
-                case SETTINGS:
-                    state=State.SETTINGS;
-                    settingsOverlay.show();
-                    break;
-                case EXIT:
-                    ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                    break;
-            }
-
-        }
-        else if (state==State.SETTINGS)
-        {
-            settingsOverlay.handleInput(viewport);
-
-            if (!settingsOverlay.isActive())
-            {
-                state=State.PAUSE;
-            }
-        }
-
-        //SHAKE
+        // ===== SHAKE =====
         float offsetX=0,offsetY=0;
 
         if (shakeTime>0)
@@ -174,7 +166,7 @@ public class ExplorationScreen implements Screen
         );
         camera.update();
 
-        //Render
+        // ===== RENDER =====
         if (state==State.PAUSE||state==State.SETTINGS)
         {
             fbo.begin();
@@ -188,7 +180,6 @@ public class ExplorationScreen implements Screen
             blurBatch.begin();
             blurShader.setUniformf("blur",0.002f);
 
-            //FIXED DRAW
             blurBatch.draw(
                 tex,
                 camera.position.x-camera.viewportWidth/2f,
@@ -220,14 +211,13 @@ public class ExplorationScreen implements Screen
             shape.end();
 
             Gdx.gl.glDisable(GL20.GL_BLEND);
-
         }
         else
         {
             renderer.render();
         }
 
-        //UI
+        // ===== UI =====
         SpriteBatch batch=renderer.getBatch();
         ShapeRenderer shape=renderer.getShape();
         BitmapFont font=renderer.getFont();

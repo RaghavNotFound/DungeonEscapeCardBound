@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
 public class PauseOverlay
@@ -13,9 +14,9 @@ public class PauseOverlay
 
     private final String[] options=
         {
-        "RESUME",
-        "SETTINGS",
-        "EXIT"
+            "RESUME",
+            "SETTINGS",
+            "EXIT"
         };
 
     public enum Action
@@ -31,13 +32,11 @@ public class PauseOverlay
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP))
         {
-
             selected=(selected+options.length-1)%options.length;
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
         {
-
             selected=(selected+1)%options.length;
         }
 
@@ -50,6 +49,47 @@ public class PauseOverlay
                 case 2:return Action.EXIT;
             }
         }
+
+        //MOUSE INPUT
+        if (Gdx.input.justTouched())
+        {
+            float x=Gdx.input.getX();
+            float y=Gdx.graphics.getHeight()-Gdx.input.getY();
+
+            float w=Gdx.graphics.getWidth();
+            float h=Gdx.graphics.getHeight();
+
+            float boxW=w*0.35f;
+            float boxH=h*0.08f;
+            float gap=h*0.035f;
+
+            float centerX=w/2f-boxW/2f;
+            float baseY=h*0.55f;
+
+            float[] ys=
+                {
+                    baseY,
+                    baseY-(boxH+gap),
+                    baseY-2*(boxH+gap)
+                };
+
+            for (int i=0;i<options.length;i++)
+            {
+                if (x>=centerX && x<=centerX+boxW &&
+                    y>=ys[i] && y<=ys[i]+boxH)
+                {
+                    selected=i;
+
+                    switch (i)
+                    {
+                        case 0:return Action.RESUME;
+                        case 1:return Action.SETTINGS;
+                        case 2:return Action.EXIT;
+                    }
+                }
+            }
+        }
+
         return Action.NONE;
     }
 
@@ -68,10 +108,10 @@ public class PauseOverlay
 
         float[] ys=
             {
-            baseY,
-            baseY-(boxH+gap),
-            baseY-2*(boxH+gap)
-        };
+                baseY,
+                baseY-(boxH+gap),
+                baseY-2*(boxH+gap)
+            };
 
         //SHAPES
         shape.begin(ShapeRenderer.ShapeType.Line);

@@ -44,6 +44,15 @@ public class Player
 
     private float shootTimer=0f;
 
+    //STAMINA SYSTEM
+    private float stamina=100f;
+    private float maxStamina=100f;
+
+    private float staminaDrain=30f;
+    private float staminaRegen=15f;
+
+    private boolean canRun=true;
+
     // WORLD REFERENCE
     private final GameWorld world;
 
@@ -171,6 +180,19 @@ public class Player
                 arrows.remove(i);
             }
         }
+
+        //STAMINA REGEN
+        if (!isRunning)
+        {
+            stamina+=staminaRegen*delta;
+
+            if (stamina>=maxStamina)
+            {
+                stamina=maxStamina;
+                canRun=true;
+            }
+        }
+        stamina=MathUtils.clamp(stamina,0,maxStamina);
     }
     private void shootArrow(OrthographicCamera camera)
     {
@@ -215,7 +237,26 @@ public class Player
             right=false;
         }
 
-        isRunning=Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+        boolean wantsToRun=
+            Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) ||
+                Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+
+        if (wantsToRun && canRun && stamina>0 && (up || down || left || right))
+        {
+            isRunning=true;
+            stamina-=staminaDrain*delta;
+
+            if (stamina<=0)
+            {
+                stamina=0;
+                isRunning=false;
+                canRun=false;
+            }
+        }
+        else
+        {
+            isRunning=false;
+        }
 
         float speed=100;
         float currentSpeed=isRunning?speed*1.5f:speed;
@@ -344,5 +385,17 @@ public class Player
     public ArrayList<Arrow> getArrows()
     {
         return arrows;
+    }
+    public float getStamina()
+    {
+        return stamina;
+    }
+    public float getMaxStamina()
+    {
+        return maxStamina;
+    }
+    public float getShootCooldownPercent()
+    {
+        return 1f-(shootTimer/1.0f);
     }
 }

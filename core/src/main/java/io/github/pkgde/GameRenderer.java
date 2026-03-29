@@ -77,6 +77,77 @@ public class GameRenderer
 
         batch.end();
 
+        //UI BARS
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        float stamina=world.getPlayer().getStamina();
+        float maxStamina=world.getPlayer().getMaxStamina();
+        float cooldown=world.getPlayer().getShootCooldownPercent();
+
+        float barWidth=220f;
+        float barHeight=20f;
+
+        float x=30;
+        float y=camera.viewportHeight-40;
+
+        //STAMINA (GREEN)
+        drawRoundedBar(
+            shape,
+            x,y,
+            barWidth,barHeight,
+            stamina/maxStamina,
+            new Color(0.2f,0.2f,0.2f,1),
+            new Color(0,1,0,1)
+        );
+
+        //COOLDOWN (BLUE)
+        drawRoundedBar(
+            shape,
+            x,y-30,
+            barWidth,barHeight,
+            cooldown,
+            new Color(0.2f,0.2f,0.2f,1),
+            new Color(0,0.4f,1,1)
+        );
+
+        shape.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawRoundedBar(ShapeRenderer shape,
+                                float x,float y,
+                                float width,float height,
+                                float percent,
+                                Color bgColor,
+                                Color fillColor)
+    {
+        float radius=height/2f;
+
+        //BACKGROUND (flat left, round right)
+        shape.setColor(bgColor);
+        shape.rect(x,y,width-radius,height);
+        shape.circle(x+width-radius,y+radius,radius);
+
+        //FILL
+        if (percent<=0f) return;
+
+        shape.setColor(fillColor);
+
+        float fillWidth=width*percent;
+
+        //FILL RECT (flat left)
+        if (fillWidth<=width-radius)
+        {
+            shape.rect(x,y,fillWidth,height);
+        }
+        else
+        {
+            shape.rect(x,y,width-radius,height);
+            shape.circle(x+width-radius,y+radius,radius);
+        }
     }
 
     public SpriteBatch getBatch() { return batch; }
