@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 
 public class HomeScreen implements Screen {
@@ -14,6 +15,7 @@ public class HomeScreen implements Screen {
     private ShapeRenderer shapeRenderer;
     private SpriteBatch batch;
     private BitmapFont font;
+    private GlyphLayout glyphLayout;
 
     private Texture background;
 
@@ -23,6 +25,9 @@ public class HomeScreen implements Screen {
     private SettingsOverlay settings;
 
     private int selected = 0;
+    private float menuAnimTime = 0f;
+    private final Vector3 pointer = new Vector3();
+    private final Color accent = new Color(0.25f, 0.85f, 1f, 1f);
 
     // 🌫️ BLUR SYSTEM
     private FrameBuffer fbo;
@@ -35,6 +40,7 @@ public class HomeScreen implements Screen {
         shapeRenderer = new ShapeRenderer();
         batch = new SpriteBatch();
         font = new BitmapFont();
+        glyphLayout = new GlyphLayout();
 
         // 🔥 improve font quality
         font.getRegion().getTexture().setFilter(
@@ -78,6 +84,8 @@ public class HomeScreen implements Screen {
 
     @Override
     public void render(float delta) {
+
+        menuAnimTime += delta;
 
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -123,18 +131,16 @@ public class HomeScreen implements Screen {
             }
 
             if (Gdx.input.justTouched()) {
+                int clicked = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
+                if (clicked >= 0) {
+                    selected = clicked;
+                    applySelection();
+                }
+            }
 
-                Vector3 touch = viewport.unproject(
-                    new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
-
-                float x = touch.x;
-                float y = touch.y;
-
-                if (inside(x, y, btnX, playY, btnWidth, btnHeight)) selected = 0;
-                else if (inside(x, y, btnX, settingsY, btnWidth, btnHeight)) selected = 1;
-                else if (inside(x, y, btnX, exitY, btnWidth, btnHeight)) selected = 2;
-
-                applySelection();
+            int hovered = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
+            if (hovered >= 0) {
+                selected = hovered;
             }
         }
 
@@ -184,44 +190,101 @@ public class HomeScreen implements Screen {
 
         // ===== NORMAL MENU =====
         batch.begin();
-
         batch.draw(background, 0, 0, worldW, worldH);
-
-        float scale = worldW / 800f;
-
-        font.getData().setScale(scale * 2f);
-        font.draw(batch, "DUNGEON ESCAPE", worldW * 0.05f, worldH * 0.9f);
-
-        font.getData().setScale(scale * 1.2f);
-
-        drawButton(batch, font, "PLAY", btnX, playY, selected == 0, scale);
-        drawButton(batch, font, "SETTINGS", btnX, settingsY, selected == 1, scale);
-        drawButton(batch, font, "EXIT", btnX, exitY, selected == 2, scale);
-
         batch.end();
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
 
+        // Soft dark panel improves text contrast over bright backgrounds.
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.32f);
+        shapeRenderer.rect(worldW * 0.6f, worldH * 0.2f, worldW * 0.35f, worldH * 0.5f);
+
+        drawFill(btnX, playY, btnWidth, btnHeight, selected == 0);
+        drawFill(btnX, settingsY, btnWidth, btnHeight, selected == 1);
+        drawFill(btnX, exitY, btnWidth, btnHeight, selected == 2);
+        shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         drawRect(btnX, playY, btnWidth, btnHeight, selected == 0);
         drawRect(btnX, settingsY, btnWidth, btnHeight, selected == 1);
         drawRect(btnX, exitY, btnWidth, btnHeight, selected == 2);
-
         shapeRenderer.end();
+
+        batch.begin();
+
+        float scale = worldW / 800f;
+
+        font.getData().setScale(scale * 2.1f);
+        glyphLayout.setText(font, "DUNGEON ESCAPE");
+        float titleX = worldW * 0.06f;
+        float titleY = worldH * 0.9f;
+        font.setColor(0f, 0f, 0f, 0.7f);
+        font.draw(batch, glyphLayout, titleX + 3f, titleY - 3f);
+        font.setColor(1f, 1f, 1f, 1f);
+        font.draw(batch, glyphLayout, titleX, titleY);
+
+        font.getData().setScale(scale * 1.2f);
+
+        drawButton(batch, font, "PLAY", btnX, playY, btnWidth, btnHeight, selected == 0, scale, worldW);
+        drawButton(batch, font, "SETTINGS", btnX, settingsY, btnWidth, btnHeight, selected == 1, scale, worldW);
+        drawButton(batch, font, "EXIT", btnX, exitY, btnWidth, btnHeight, selected == 2, scale, worldW);
+
+        batch.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void drawButton(SpriteBatch batch, BitmapFont font,
-                            String text, float x, float y, boolean active, float scale) {
+                            String text, float x, float y, float w, float h,
+                            boolean active, float scale, float worldW) {
+        float pulse = active ? (0.02f * MathUtils.sin(menuAnimTime * 6f)) : 0f;
+        float s = active ? 1.07f + pulse : 1f;
 
-        float offset = active ? 8f : 0f;
-        float s = active ? 1.05f : 1f;
+        font.getData().setScale(scale * 1.15f * s);
+        glyphLayout.setText(font, text);
 
-        font.getData().setScale(scale * 1.2f * s);
-        font.draw(batch, text, x + 20, y + 40 + offset);
+        float textX = x + (w - glyphLayout.width) * 0.5f;
+        float textY = y + (h + glyphLayout.height) * 0.5f;
+
+        float shadowOffset = Math.max(1.5f, worldW * 0.0013f);
+        font.setColor(0f, 0f, 0f, 0.75f);
+        font.draw(batch, glyphLayout, textX + shadowOffset, textY - shadowOffset);
+        font.setColor(active ? accent : Color.WHITE);
+        font.draw(batch, glyphLayout, textX, textY);
+        font.setColor(Color.WHITE);
     }
 
     private void drawRect(float x, float y, float w, float h, boolean active) {
-        shapeRenderer.setColor(active ? 1 : 0.6f, 1, 1, 1);
+        if (active) {
+            shapeRenderer.setColor(accent);
+        } else {
+            shapeRenderer.setColor(1f, 1f, 1f, 0.7f);
+        }
         shapeRenderer.rect(x, y, w, h);
+    }
+
+    private void drawFill(float x, float y, float w, float h, boolean active) {
+        if (active) {
+            float alpha = 0.22f + 0.10f * (0.5f + 0.5f * MathUtils.sin(menuAnimTime * 6f));
+            shapeRenderer.setColor(accent.r, accent.g, accent.b, alpha);
+        } else {
+            shapeRenderer.setColor(0f, 0f, 0f, 0.34f);
+        }
+        shapeRenderer.rect(x, y, w, h);
+    }
+
+    private int getPointerSelection(float btnX, float playY, float settingsY,
+                                    float exitY, float btnWidth, float btnHeight) {
+        pointer.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
+        viewport.unproject(pointer);
+
+        float x = pointer.x;
+        float y = pointer.y;
+
+        if (inside(x, y, btnX, playY, btnWidth, btnHeight)) return 0;
+        if (inside(x, y, btnX, settingsY, btnWidth, btnHeight)) return 1;
+        if (inside(x, y, btnX, exitY, btnWidth, btnHeight)) return 2;
+        return -1;
     }
 
     private boolean inside(float x, float y, float bx, float by, float bw, float bh) {

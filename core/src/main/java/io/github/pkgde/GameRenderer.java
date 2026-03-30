@@ -4,87 +4,272 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
 
 public class GameRenderer {
 
-    private GameWorld world;
+    private final GameWorld world;
+    private final SpriteBatch batch;
+    private final ShapeRenderer shape;
+    private final BitmapFont font;
+    private final Texture[] torchFrames;
+    private float torchAnimTime;
 
-    private SpriteBatch batch;
-    private ShapeRenderer shape;
-    private BitmapFont font;
+    private final OrthographicCamera camera;
+    private final MapManager mapManager;
 
-    private Texture background;
-    private OrthographicCamera camera;
-
-    public GameRenderer(GameWorld world, OrthographicCamera camera) {
+    public GameRenderer(GameWorld world, OrthographicCamera camera, MapManager mapManager) {
         this.world = world;
         this.camera = camera;
+        this.mapManager = mapManager;
 
         batch = new SpriteBatch();
         shape = new ShapeRenderer();
         font = new BitmapFont();
+        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
-        // 🔥 LOAD BACKGROUND WITH QUALITY SETTINGS
-        background = new Texture("background.png");
-        background.setFilter(
-            Texture.TextureFilter.Linear,
-            Texture.TextureFilter.Linear
-        );
-
-        // 🔥 SHARP TEXT
-        font.getRegion().getTexture().setFilter(
-            Texture.TextureFilter.Linear,
-            Texture.TextureFilter.Linear
-        );
+        torchFrames = new Texture[7];
+        for (int i = 0; i < torchFrames.length; i++) {
+            torchFrames[i] = new Texture("Objects/torch/torch_" + (i + 1) + ".png");
+            torchFrames[i].setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        }
     }
 
     public void render() {
+        render(0f, 0f);
+    }
 
-        // ===== CLEAR =====
-        Gdx.gl.glClearColor(0, 0, 0, 1);
+    public void render(float offsetX, float offsetY) {
+        torchAnimTime += Gdx.graphics.getDeltaTime();
+
+        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        camera.position.add(offsetX, offsetY, 0);
+        camera.update();
 
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
+        if (mapManager != null) {
+            mapManager.render(camera);
+        }
+
         batch.begin();
 
-        // ===== BACKGROUND (CAMERA FOLLOW) =====
-        float camX = camera.position.x - camera.viewportWidth / 2f;
-        float camY = camera.position.y - camera.viewportHeight / 2f;
+        drawTorches(batch);
 
-        batch.draw(
-            background,
-            camX,
-            camY,
-            camera.viewportWidth,
-            camera.viewportHeight
-        );
+        if (world.getPlayer().getPos().y > world.getEnemy().getBounds().y) {
+            world.getEnemy().render(batch);
+        }
 
-        // ===== GAME OBJECTS =====
         world.getPlayer().render(batch);
-        world.getEnemy().render(batch);
+
+        if (world.getPlayer().getPos().y <= world.getEnemy().getBounds().y) {
+            world.getEnemy().render(batch);
+        }
 
         batch.end();
 
-        // ===== OPTIONAL DEBUG / FUTURE EFFECTS =====
-        // shape.begin(ShapeRenderer.ShapeType.Line);
-        // shape.setColor(Color.RED);
-        // shape.rect(world.getPlayer().getBounds().x,
-        //            world.getPlayer().getBounds().y,
-        //            world.getPlayer().getBounds().width,
-        //            world.getPlayer().getBounds().height);
-        // shape.end();
+        drawEnemyHealthBar();
+        drawCollisionDebug();
+        drawChestBorders();
+        drawUI();
+
+        camera.position.sub(offsetX, offsetY, 0);
+        camera.update();
+    }
+
+    private void drawTorches(SpriteBatch batch) {
+        if (mapManager == null || torchFrames.length == 0) {
+            return;
+        }
+
+        int frameIndex = ((int) (torchAnimTime / 0.1f)) % torchFrames.length;
+        Texture frame = torchFrames[frameIndex];
+
+        for (Rectangle torch : mapManager.getTorchRects()) {
+            batch.draw(frame, torch.x, torch.y, torch.width, torch.height);
+        }
+    }
+
+    private void drawCollisionDebug() {
+        if (mapManager == null) {
+            return;
+        }
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(Color.RED);
+        for (Rectangle r : mapManager.getCollisionRects()) {
+            shape.rect(r.x, r.y, r.width, r.height);
+        }
+        shape.end();
+    }
+
+    private void drawChestBorders() {
+        if (mapManager == null) {
+            return;
+        }
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(Color.GOLD);
+        for (Rectangle r : mapManager.getChestRects()) {
+            shape.rect(r.x, r.y, r.width, r.height);
+        }
+        shape.end();
+    }
+
+    private void drawUI() {
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+
+        float health = world.getPlayer().getHealth();
+        float maxHealth = world.getPlayer().getMaxHealth();
+        float stamina = world.getPlayer().getStamina();
+        float maxStamina = world.getPlayer().getMaxStamina();
+        float cooldown = world.getPlayer().getShootCooldownPercent();
+
+        float x = camera.position.x - camera.viewportWidth / 2f + 30f;
+        float y = camera.position.y + camera.viewportHeight / 2f - 40f;
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        drawRoundedBar(
+            shape,
+            x,
+            y,
+            220f,
+            20f,
+            health / maxHealth,
+            new Color(0.2f, 0.2f, 0.2f, 1f),
+            new Color(1f, 0.25f, 0.25f, 1f)
+        );
+
+
+        drawRoundedBar(
+            shape,
+            x,
+            y - 30f,
+            220f,
+            20f,
+            stamina / maxStamina,
+            new Color(0.2f, 0.2f, 0.2f, 1f),
+            new Color(0.15f, 0.95f, 0.35f, 1f)
+        );
+
+        drawRoundedBar(
+            shape,
+            x,
+            y - 60f,
+            220f,
+            20f,
+            cooldown,
+            new Color(0.2f, 0.2f, 0.2f, 1f),
+            new Color(0.25f, 0.65f, 1f, 1f)
+        );
+
+        shape.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawEnemyHealthBar() {
+        Enemy enemy = world.getEnemy();
+        if (!enemy.isAlive()) {
+            return;
+        }
+
+        Rectangle b = enemy.getBounds();
+        float barW = b.width * 0.8f;
+        float barH = 11f;
+        float x = b.x + (b.width - barW) * 0.5f;
+        float y = b.y + b.height + 14f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        drawRoundedBar(
+            shape,
+            x,
+            y,
+            barW,
+            barH,
+            enemy.getHealthRatio(),
+            new Color(0.15f, 0.15f, 0.15f, 0.95f),
+            new Color(0.9f, 0.2f, 0.2f, 1f)
+        );
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+
+    private void drawRoundedBar(
+        ShapeRenderer shape,
+        float x,
+        float y,
+        float width,
+        float height,
+        float percent,
+        Color bgColor,
+        Color fillColor
+    ) {
+        float clampedPercent = MathUtils.clamp(percent, 0f, 1f);
+        float radius = height / 2f;
+
+        shape.setColor(bgColor);
+        shape.rect(x, y, width - radius, height);
+        shape.circle(x + width - radius, y + radius, radius);
+
+        if (clampedPercent <= 0f) {
+            return;
+        }
+
+        shape.setColor(fillColor);
+        float fillWidth = width * clampedPercent;
+
+        if (fillWidth <= width - radius) {
+            shape.rect(x, y, fillWidth, height);
+        } else {
+            shape.rect(x, y, width - radius, height);
+            shape.circle(x + width - radius, y + radius, radius);
+        }
     }
 
     public SpriteBatch getBatch() { return batch; }
     public ShapeRenderer getShape() { return shape; }
     public BitmapFont getFont() { return font; }
 
+    public void renderInventoryOverlay() {
+        float panelW = Math.min(420f, camera.viewportWidth * 0.6f);
+        float panelH = Math.min(280f, camera.viewportHeight * 0.55f);
+        float x = camera.position.x - panelW * 0.5f;
+        float y = camera.position.y - panelH * 0.5f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0.08f, 0.08f, 0.1f, 0.9f);
+        shape.rect(x, y, panelW, panelH);
+        shape.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(0.95f, 0.85f, 0.35f, 1f);
+        shape.rect(x, y, panelW, panelH);
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch, "Inventory", x + 18f, y + panelH - 18f);
+        font.draw(batch, "Torches: " + world.getPlayer().getTorchCount(), x + 18f, y + panelH - 58f);
+        font.draw(batch, "Press E or ESC to close", x + 18f, y + 30f);
+        batch.end();
+    }
+
     public void dispose() {
         batch.dispose();
         shape.dispose();
         font.dispose();
-        background.dispose();
+        for (Texture torchFrame : torchFrames) {
+            torchFrame.dispose();
+        }
     }
 }

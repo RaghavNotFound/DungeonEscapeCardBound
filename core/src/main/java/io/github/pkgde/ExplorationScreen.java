@@ -9,57 +9,59 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 
-public class ExplorationScreen implements Screen {
+public class ExplorationScreen implements Screen
+{
+    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
 
-    private OrthographicCamera camera;
-    private Viewport viewport;
+    private final OrthographicCamera camera;
+    private final Viewport viewport;
 
-    private GameWorld world;
-    private GameRenderer renderer;
-    private InputHandler input;
+    private final MapManager mapManager;
+    private final GameWorld world;
+    private final GameRenderer renderer;
+    private final InputHandler input;
 
-    private PauseOverlay pauseOverlay;
-    private SettingsOverlay settingsOverlay;
+    private final PauseOverlay pauseOverlay;
+    private final SettingsOverlay settingsOverlay;
 
-    public enum State { GAME, PAUSE, SETTINGS }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS }
     private State state = State.GAME;
 
-    // 💥 SHAKE
     private float shakeTime = 0f;
-    private float shakeDuration = 0.25f;
-    private float shakeIntensity = 10f;
+    private final float shakeDuration = 0.25f;
     private boolean shakeTriggered = false;
 
-    // 🌫️ BLUR
     private FrameBuffer fbo;
-    private ShaderProgram blurShader;
-    private SpriteBatch blurBatch;
+    private final ShaderProgram blurShader;
+    private final SpriteBatch blurBatch;
 
     public ExplorationScreen() {
+        mapManager = new MapManager();
+        mapManager.load(SAFE_ROOM_MAP);
+
+        float w = mapManager.getMapWidth();
+        float h = mapManager.getMapHeight();
 
         camera = new OrthographicCamera();
+        camera.setToOrtho(false, w, h);
+        camera.position.set(w / 2, h / 2, 0);
 
-        viewport = new FitViewport(1280, 720, camera);
-        viewport.apply(true);
+        viewport = new FitViewport(w, h, camera);
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
 
-        camera.position.set(viewport.getWorldWidth()/2f, viewport.getWorldHeight()/2f, 0);
-        camera.update();
-
-        world = new GameWorld();
-        renderer = new GameRenderer(world, camera);
+        world = new GameWorld(mapManager);
+        renderer = new GameRenderer(world, camera, mapManager);
         input = new InputHandler(viewport);
 
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
 
-        // 🔥 DYNAMIC FBO (QUALITY FIX)
         fbo = new FrameBuffer(
             Pixmap.Format.RGBA8888,
             Gdx.graphics.getWidth(),
             Gdx.graphics.getHeight(),
             false
         );
-
         fbo.getColorBufferTexture().setFilter(
             Texture.TextureFilter.Linear,
             Texture.TextureFilter.Linear
@@ -73,33 +75,60 @@ public class ExplorationScreen implements Screen {
     @Override
     public void render(float delta) {
 
-        // ===== INPUT =====
-        InputHandler.Action action = input.handle();
+        viewport.apply();
 
-        switch (action) {
-            case TOGGLE_PAUSE:
-                if (state == State.GAME) state = State.PAUSE;
-                else if (state == State.PAUSE) state = State.GAME;
-                else if (state == State.SETTINGS) {
+        if (state == State.GAME) {
+            InputHandler.Action action = input.handle();
+
+            switch (action) {
+                case TOGGLE_PAUSE:
                     state = State.PAUSE;
-                    settingsOverlay.hide();
-                }
-                break;
-
-            case OPEN_SETTINGS:
-                if (state == State.PAUSE) {
+                    break;
+                case TOGGLE_INVENTORY:
+                    state = State.INVENTORY;
+                    break;
+                case OPEN_SETTINGS:
                     state = State.SETTINGS;
                     settingsOverlay.show();
-                }
-                break;
+                    break;
+                case EXIT_TO_MENU:
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    return;
+                case NONE:
+                    break;
+            }
+        } else if (state == State.INVENTORY) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
+            }
+        } else if (state == State.PAUSE) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
+            } else {
+                PauseOverlay.Action pauseAction = pauseOverlay.handleInput(viewport);
 
-            case EXIT_TO_MENU:
-                ((Main) Gdx.app.getApplicationListener())
-                    .setScreen(new HomeScreen());
-                break;
+                switch (pauseAction) {
+                    case RESUME:
+                        state = State.GAME;
+                        break;
+                    case SETTINGS:
+                        state = State.SETTINGS;
+                        settingsOverlay.show();
+                        break;
+                    case EXIT:
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                        return;
+                    case NONE:
+                        break;
+                }
+            }
+        } else if (state == State.SETTINGS) {
+            settingsOverlay.handleInput(viewport);
+            if (!settingsOverlay.isActive()) {
+                state = State.PAUSE;
+            }
         }
 
-        // ===== UPDATE =====
         if (state == State.GAME) {
             world.update(delta, camera);
 
@@ -113,129 +142,95 @@ public class ExplorationScreen implements Screen {
             }
         }
 
-        // ===== SETTINGS INPUT =====
-        if (state == State.SETTINGS) {
-            settingsOverlay.handleInput(viewport);
-
-            if (!settingsOverlay.isActive()) {
-                state = State.PAUSE;
-            }
-        }
-
-        // ===== PAUSE INPUT =====
-        PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
-
-        if (state == State.PAUSE) {
-            switch (pauseAction) {
-                case RESUME: state = State.GAME; break;
-                case SETTINGS:
-                    state = State.SETTINGS;
-                    settingsOverlay.show();
-                    break;
-                case EXIT:
-                    ((Main) Gdx.app.getApplicationListener())
-                        .setScreen(new HomeScreen());
-                    break;
-            }
-        }
-
-        // ===== SHAKE =====
         float offsetX = 0, offsetY = 0;
 
         if (shakeTime > 0) {
             shakeTime -= delta;
-            offsetX = MathUtils.random(-shakeIntensity, shakeIntensity);
-            offsetY = MathUtils.random(-shakeIntensity, shakeIntensity);
+            offsetX = MathUtils.random(-10f, 10f);
+            offsetY = MathUtils.random(-10f, 10f);
         }
 
-        camera.position.set(
-            viewport.getWorldWidth()/2f + offsetX,
-            viewport.getWorldHeight()/2f + offsetY,
-            0
-        );
-        camera.update();
-
-        // ===== RENDER =====
-        if (state == State.PAUSE || state == State.SETTINGS) {
-
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY) {
             fbo.begin();
-            renderer.render();
+            renderer.render(offsetX, offsetY);
             fbo.end();
+
+            // Restore viewport on backbuffer before drawing blur + overlays.
+            viewport.apply();
+
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
             Texture tex = fbo.getColorBufferTexture();
 
             blurBatch.setProjectionMatrix(camera.combined);
-
             blurBatch.begin();
             blurShader.setUniformf("blur", 0.002f);
-
-            // 🔥 FIXED DRAW (NO ARTIFACTS)
             blurBatch.draw(
                 tex,
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight,
-                0, 0,
+                0,
+                0,
                 tex.getWidth(),
                 tex.getHeight(),
-                false, true
+                false,
+                true
             );
-
             blurBatch.end();
 
-            // 🌑 SOFTER OVERLAY
             Gdx.gl.glEnable(GL20.GL_BLEND);
-
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
-
             shape.begin(ShapeRenderer.ShapeType.Filled);
             shape.setColor(0, 0, 0, 0.5f);
             shape.rect(
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight
             );
             shape.end();
-
             Gdx.gl.glDisable(GL20.GL_BLEND);
-
         } else {
-            renderer.render();
+            renderer.render(offsetX, offsetY);
         }
 
-        // ===== UI =====
         SpriteBatch batch = renderer.getBatch();
         ShapeRenderer shape = renderer.getShape();
         BitmapFont font = renderer.getFont();
 
         if (state == State.PAUSE) {
-            pauseOverlay.render(shape, batch, font, viewport); // 🔥 NEW SYSTEM
+            pauseOverlay.render(shape, batch, font, viewport);
         }
 
         if (state == State.SETTINGS) {
             settingsOverlay.render(shape, batch, font, viewport);
         }
+
+        if (state == State.INVENTORY) {
+            renderer.renderInventoryOverlay();
+        }
     }
 
-    @Override
-    public void resize(int width, int height) {
-        viewport.update(width, height, true);
+    @Override public void resize(int w, int h) {
+        viewport.update(w, h, true);
 
-        camera.position.set(
-            viewport.getWorldWidth()/2f,
-            viewport.getWorldHeight()/2f,
-            0
+        if (fbo != null) {
+            fbo.dispose();
+        }
+        fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
+        fbo.getColorBufferTexture().setFilter(
+            Texture.TextureFilter.Linear,
+            Texture.TextureFilter.Linear
         );
-        camera.update();
     }
 
-    @Override
-    public void dispose() {
+    @Override public void dispose() {
         renderer.dispose();
         world.dispose();
+        mapManager.dispose();
         fbo.dispose();
         blurBatch.dispose();
         blurShader.dispose();
@@ -245,4 +240,5 @@ public class ExplorationScreen implements Screen {
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
+
 }
