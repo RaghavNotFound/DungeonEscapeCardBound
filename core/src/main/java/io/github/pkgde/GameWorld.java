@@ -6,7 +6,8 @@ import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
 
-public class GameWorld {
+public class GameWorld
+{
 
     private final Player player;
     private final Enemy enemy;
@@ -15,8 +16,7 @@ public class GameWorld {
 
     public GameWorld(MapManager mapManager) {
 
-        player = new Player();
-        enemy = new Enemy();
+        boundaries=new ArrayList<>();
 
         boundaries = mapManager.getCollisionRects();
         player.setBoundaries(boundaries);
@@ -28,9 +28,24 @@ public class GameWorld {
         }
     }
 
-    public void update(float delta, OrthographicCamera camera) {
-        player.update(delta, camera);
-        enemy.update(delta, player);
+    public void update(float delta,OrthographicCamera camera)
+    {
+        player.update(delta,camera);
+        enemy.update(delta,player);
+
+        //ARROW–ENEMY COLLISION
+        ArrayList<Arrow> arrows=player.getArrows();
+
+        for (int i=arrows.size()-1;i>=0;i--)
+        {
+            Arrow arrow=arrows.get(i);
+
+            if (arrow.getBounds().overlaps(enemy.getBounds()))
+            {
+                arrows.remove(i);
+                enemy.takeDamage(1);
+            }
+        }
     }
 
     public boolean isPlayerNearEnemy() {
@@ -49,7 +64,8 @@ public class GameWorld {
     public Enemy getEnemy() { return enemy; }
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 
-    public void dispose() {
+    public void dispose()
+    {
         player.dispose();
         enemy.dispose();
     }

@@ -5,10 +5,14 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 
-public class ExplorationScreen implements Screen {
+public class ExplorationScreen implements Screen
+{
+    private final OrthographicCamera camera;
+    private final Viewport viewport;
 
-    private OrthographicCamera camera;
-    private Viewport viewport;
+    private final GameWorld world;
+    private final GameRenderer renderer;
+    private final InputHandler input;
 
     private GameWorld world;
     private GameRenderer renderer;

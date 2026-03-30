@@ -6,7 +6,9 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
-public class GameRenderer {
+public class GameRenderer
+{
+    private final GameWorld world;
 
     private final GameWorld world;
     private final SpriteBatch batch;
@@ -81,7 +83,8 @@ public class GameRenderer {
     public ShapeRenderer getShape() { return shape; }
     public BitmapFont getFont() { return font; }
 
-    public void dispose() {
+    public void dispose()
+    {
         batch.dispose();
         shape.dispose();
         font.dispose();

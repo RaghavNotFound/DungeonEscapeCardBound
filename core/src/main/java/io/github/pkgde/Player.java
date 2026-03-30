@@ -8,7 +8,8 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
 import java.util.ArrayList;
 
-public class Player {
+public class Player
+{
 
     private final Animation<TextureRegion> walkAnimation;
     private final Animation<TextureRegion> runAnimation;
@@ -29,10 +30,10 @@ public class Player {
 
     private float stateTime;
     private boolean isRunning;
-    private boolean facingRight = true;
-    private boolean playBlink = false;
+    private boolean facingRight=true;
+    private boolean playBlink=false;
 
-    private final Vector2 position;
+    private final Vector2 pos;
     public Rectangle bounds;
 
     private ArrayList<Rectangle> boundaries;
@@ -53,50 +54,62 @@ public class Player {
 
     public Player() {
 
-        position = new Vector2(200, 200);
-        bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
+    private float staminaDrain=30f;
+    private float staminaRegen=15f;
 
-        int walkingFrameCount = 23;
-        int runFrameCount = 12;
-        int idleFrameCount = 18;
-        int idleBlinkingFrameCount = 18;
+    private boolean canRun=true;
 
-        walkingTextures = new Texture[walkingFrameCount];
-        runTextures = new Texture[runFrameCount];
-        idleTextures = new Texture[idleFrameCount];
-        idleBlinkingTextures = new Texture[idleBlinkingFrameCount];
+    // WORLD REFERENCE
+    private final GameWorld world;
 
-        walkFrames = new TextureRegion[walkingFrameCount];
-        runFrames = new TextureRegion[runFrameCount];
-        idleFrames = new TextureRegion[idleFrameCount];
-        idleBlinkingFrames = new TextureRegion[idleBlinkingFrameCount];
+    public Player(GameWorld world)
+    {
+        this.world=world;
+        pos =new Vector2(200,200);
+        bounds=new Rectangle(pos.x, pos.y,WIDTH,HEIGHT);
 
-        // WALK
-        for (int i = 0; i < walkingFrameCount; i++) {
-            walkingTextures[i] = new Texture("Movements/Player/walking/walking_" + (i + 1) + ".png");
-            walkFrames[i] = new TextureRegion(walkingTextures[i]);
+        int walkingFrameCount=23;
+        int runFrameCount=12;
+        int idleFrameCount=18;
+        int idleBlinkingFrameCount=18;
+
+        walkingTextures=new Texture[walkingFrameCount];
+        runTextures=new Texture[runFrameCount];
+        idleTextures=new Texture[idleFrameCount];
+        idleBlinkingTextures=new Texture[idleBlinkingFrameCount];
+
+        walkFrames=new TextureRegion[walkingFrameCount];
+        runFrames=new TextureRegion[runFrameCount];
+        idleFrames=new TextureRegion[idleFrameCount];
+        idleBlinkingFrames=new TextureRegion[idleBlinkingFrameCount];
+
+        //WALK
+        for (int i=0;i<walkingFrameCount;i++)
+        {
+            walkingTextures[i]=new Texture("Movements/Player/walking/walking_"+(i+1)+".png");
+            walkFrames[i]=new TextureRegion(walkingTextures[i]);
+        }
+        //RUN
+        for (int i=0;i<runFrameCount;i++)
+        {
+            runTextures[i]=new Texture("Movements/Player/running/running_"+(i+1)+".png");
+            runFrames[i]=new TextureRegion(runTextures[i]);
+        }
+        //IDLE
+        for (int i=0;i<idleFrameCount;i++)
+        {
+            idleTextures[i]=new Texture("Movements/Player/idle/idle_"+(i+1)+".png");
+            idleFrames[i]=new TextureRegion(idleTextures[i]);
+        }
+        //IDLE BLINK
+        for (int i=0;i<idleBlinkingFrameCount;i++)
+        {
+            idleBlinkingTextures[i]=new Texture("Movements/Player/idleBlinking/idleBlinking_"+(i+1)+".png");
+            idleBlinkingFrames[i]=new TextureRegion(idleBlinkingTextures[i]);
         }
 
-        // RUN
-        for (int i = 0; i < runFrameCount; i++) {
-            runTextures[i] = new Texture("Movements/Player/running/running_" + (i + 1) + ".png");
-            runFrames[i] = new TextureRegion(runTextures[i]);
-        }
-
-        // IDLE
-        for (int i = 0; i < idleFrameCount; i++) {
-            idleTextures[i] = new Texture("Movements/Player/idle/idle_" + (i + 1) + ".png");
-            idleFrames[i] = new TextureRegion(idleTextures[i]);
-        }
-
-        // IDLE BLINK
-        for (int i = 0; i < idleBlinkingFrameCount; i++) {
-            idleBlinkingTextures[i] = new Texture("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png");
-            idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
-        }
-
-        walkAnimation = new Animation<>(0.025f, walkFrames);
-        runAnimation = new Animation<>(0.08f, runFrames);
+        walkAnimation=new Animation<>(0.025f,walkFrames);
+        runAnimation=new Animation<>(0.08f,runFrames);
 
         idleAnimation = new Animation<>(0.08f, idleFrames);
         idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
@@ -151,25 +164,25 @@ public class Player {
             shootTimer = shootCooldown;
         }
 
-        // ===== UPDATE ARROWS =====
-        for (int i = arrows.size() - 1; i >= 0; i--) {
-            Arrow arrow = arrows.get(i);
+        //UPDATE ARROWS
+        for (int i=arrows.size()-1;i>=0;i--)
+        {
+            Arrow arrow=arrows.get(i);
             arrow.update(delta);
 
             if (arrow.isCollided(camera.viewportWidth, camera.viewportHeight, new ArrayList<>())) {
                 arrows.remove(i);
             }
         }
-    }
 
     // ===== MOVEMENT =====
     private boolean handleMovement(float delta) {
 
-        float oldX = position.x;
-        float oldY = position.y;
+        float oldX= pos.x;
+        float oldY= pos.y;
 
-        float newX = position.x;
-        float newY = position.y;
+        float newX= pos.x;
+        float newY= pos.y;
 
         boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
         boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
@@ -237,7 +250,8 @@ public class Player {
 
         batch.draw(currentFrame, drawX, position.y, drawWidth, HEIGHT);
 
-        for (Arrow arrow : arrows) {
+        for (Arrow arrow:arrows)
+        {
             arrow.render(batch);
         }
     }
