@@ -7,22 +7,22 @@ import java.util.ArrayList;
 
 public class Enemy {
 
-    private Vector2 position;
-    private Rectangle bounds;
+    private final Vector2 position;
+    private final Rectangle bounds;
 
-    private Animation<TextureRegion> walkAnim;
+    private final Animation<TextureRegion> walkAnim;
     private TextureRegion currentFrame;
 
-    private ArrayList<Texture> textures = new ArrayList<>();
+    private final ArrayList<Texture> textures = new ArrayList<>();
 
     private float stateTime = 0f;
 
-    // ===== AI STATES =====
+    //AI STATES
     private enum State { IDLE, CHASE }
-    private State state = State.IDLE;
+    private State state=State.IDLE;
 
     // ===== SETTINGS =====
-    private float speed = 120f;
+    private float speed=120f;
 
     private float baseRange = 200f;
     private float alertRange = baseRange * 2f;
@@ -34,13 +34,13 @@ public class Enemy {
     private final float WIDTH = 128;
     private final float HEIGHT = 128;
 
-    // 🔥 RANDOM MOVEMENT
+    //RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private float moveDuration = 0f;
     private boolean isMoving = false;
 
-    // 🔥 HEALTH
+    //HEALTH
     private int hp = 3;
 
     public Enemy() {
@@ -133,24 +133,26 @@ public class Enemy {
                 break;
         }
 
-        // ===== CLAMP =====
+        //CLAMP
         position.x = MathUtils.clamp(position.x, 0, 1280 - WIDTH);
         position.y = MathUtils.clamp(position.y, 120f, 720 - HEIGHT);
 
         bounds.setPosition(position.x, position.y);
 
-        currentFrame = walkAnim.getKeyFrame(stateTime, true);
+        currentFrame=walkAnim.getKeyFrame(stateTime, true);
     }
 
-    // 🔥 RANDOM ACTION PICKER
-    private void pickNewRandomAction() {
+    //RANDOM ACTION PICKER
+    private void pickNewRandomAction()
+    {
 
-        isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
+        isMoving=MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
 
-        moveDuration = MathUtils.random(1f, 3f);
-        moveTimer = moveDuration;
+        moveDuration=MathUtils.random(1f, 3f);
+        moveTimer=moveDuration;
 
-        if (isMoving) {
+        if (isMoving)
+        {
             randomDir.set(
                 MathUtils.random(-1f, 1f),
                 MathUtils.random(-1f, 1f)
@@ -158,25 +160,31 @@ public class Enemy {
         }
     }
 
-    public void render(SpriteBatch batch) {
+    public void render(SpriteBatch batch)
+    {
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
     }
 
-    public Rectangle getBounds() {
+    public Rectangle getBounds()
+    {
         return bounds;
     }
 
-    // 🔥 HEALTH METHODS
-    public void takeDamage(int dmg) {
-        hp -= dmg;
+    //HEALTH METHODS
+    public void takeDamage(int dmg)
+    {
+        hp-=dmg;
     }
 
-    public boolean isDead() {
-        return hp <= 0;
+    public boolean isDead()
+    {
+        return hp<=0;
     }
 
-    public void dispose() {
-        for (Texture t : textures) {
+    public void dispose()
+    {
+        for (Texture t : textures)
+        {
             t.dispose();
         }
     }

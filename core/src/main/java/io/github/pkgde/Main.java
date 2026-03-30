@@ -8,7 +8,7 @@ public class Main extends Game
     @Override
     public void create()
     {
-        Gdx.graphics.setWindowedMode(1280,720);
+        Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
         setScreen(new HomeScreen());
     }
 }

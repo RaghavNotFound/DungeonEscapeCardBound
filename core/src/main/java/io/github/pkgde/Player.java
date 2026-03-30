@@ -46,7 +46,7 @@ public class Player
 
     //STAMINA SYSTEM
     private float stamina=100f;
-    private float maxStamina=100f;
+    private final float maxStamina=100f;
 
     private float staminaDrain=30f;
     private float staminaRegen=15f;
