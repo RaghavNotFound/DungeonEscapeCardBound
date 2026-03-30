@@ -10,13 +10,17 @@ public class GameWorld {
 
     private static final float NEAR_ENEMY_DISTANCE = 150f;
     private static final float NEAR_ENEMY_DISTANCE_SQ = NEAR_ENEMY_DISTANCE * NEAR_ENEMY_DISTANCE;
+    private static final float ARROW_DAMAGE = 20f;
 
+    private final MapManager mapManager;
     private final Player player;
     private final Enemy enemy;
 
     private final ArrayList<Rectangle> boundaries;
 
     public GameWorld(MapManager mapManager) {
+
+        this.mapManager = mapManager;
 
         player = new Player();
         enemy = new Enemy();
@@ -39,6 +43,25 @@ public class GameWorld {
         player.update(delta, camera);
         enemy.update(delta, player);
 
+        ArrayList<Rectangle> torches = mapManager.getTorchRects();
+        for (int i = torches.size() - 1; i >= 0; i--) {
+            if (player.getBounds().overlaps(torches.get(i))) {
+                torches.remove(i);
+                player.addTorch();
+            }
+        }
+
+        if (player.canDealSwordDamage() && enemy.isAlive()
+            && player.getSwordHitbox().overlaps(enemy.getBounds())) {
+            enemy.takeDamage(player.getSwordDamage());
+            player.consumeSwordDamage();
+        }
+
+        if (enemy.canDealDamage() && enemy.getBounds().overlaps(player.getBounds())) {
+            player.takeDamage(enemy.getDamage());
+            enemy.consumeAttackDamage();
+        }
+
         ArrayList<Arrow> arrows = player.getArrows();
         if (arrows.isEmpty()) {
             return;
@@ -47,13 +70,18 @@ public class GameWorld {
         Rectangle enemyBounds = enemy.getBounds();
         for (int i = arrows.size() - 1; i >= 0; i--) {
             Arrow arrow = arrows.get(i);
-            if (arrow.getBounds().overlaps(enemyBounds)) {
+            if (enemy.isAlive() && arrow.getBounds().overlaps(enemyBounds)) {
                 arrows.remove(i);
+                enemy.takeDamage(ARROW_DAMAGE);
             }
         }
     }
 
     public boolean isPlayerNearEnemy() {
+        if (!enemy.isAlive()) {
+            return false;
+        }
+
         Vector2 p = player.getPosition();
         Rectangle b = enemy.getBounds();
         float ex = b.x + b.width * 0.5f;

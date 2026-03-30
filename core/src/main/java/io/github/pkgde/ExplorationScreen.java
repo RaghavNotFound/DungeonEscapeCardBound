@@ -11,6 +11,8 @@ import com.badlogic.gdx.math.MathUtils;
 
 public class ExplorationScreen implements Screen
 {
+    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
+
     private final OrthographicCamera camera;
     private final Viewport viewport;
 
@@ -22,7 +24,7 @@ public class ExplorationScreen implements Screen
     private final PauseOverlay pauseOverlay;
     private final SettingsOverlay settingsOverlay;
 
-    public enum State { GAME, PAUSE, SETTINGS }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS }
     private State state = State.GAME;
 
     private float shakeTime = 0f;
@@ -34,9 +36,8 @@ public class ExplorationScreen implements Screen
     private final SpriteBatch blurBatch;
 
     public ExplorationScreen() {
-
         mapManager = new MapManager();
-        mapManager.load("Maps/safeRoom.tmx");
+        mapManager.load(SAFE_ROOM_MAP);
 
         float w = mapManager.getMapWidth();
         float h = mapManager.getMapHeight();
@@ -83,6 +84,9 @@ public class ExplorationScreen implements Screen
                 case TOGGLE_PAUSE:
                     state = State.PAUSE;
                     break;
+                case TOGGLE_INVENTORY:
+                    state = State.INVENTORY;
+                    break;
                 case OPEN_SETTINGS:
                     state = State.SETTINGS;
                     settingsOverlay.show();
@@ -92,6 +96,10 @@ public class ExplorationScreen implements Screen
                     return;
                 case NONE:
                     break;
+            }
+        } else if (state == State.INVENTORY) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
             }
         } else if (state == State.PAUSE) {
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
@@ -142,7 +150,7 @@ public class ExplorationScreen implements Screen
             offsetY = MathUtils.random(-10f, 10f);
         }
 
-        if (state == State.PAUSE || state == State.SETTINGS) {
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY) {
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
@@ -200,6 +208,10 @@ public class ExplorationScreen implements Screen
         if (state == State.SETTINGS) {
             settingsOverlay.render(shape, batch, font, viewport);
         }
+
+        if (state == State.INVENTORY) {
+            renderer.renderInventoryOverlay();
+        }
     }
 
     @Override public void resize(int w, int h) {
@@ -228,4 +240,5 @@ public class ExplorationScreen implements Screen
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
+
 }

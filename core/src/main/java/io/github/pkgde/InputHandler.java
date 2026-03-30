@@ -9,6 +9,7 @@ public class InputHandler {
     public enum Action {
         NONE,
         TOGGLE_PAUSE,
+        TOGGLE_INVENTORY,
         OPEN_SETTINGS,
         EXIT_TO_MENU
     }
@@ -27,6 +28,10 @@ public class InputHandler {
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
             return Action.OPEN_SETTINGS;
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            return Action.TOGGLE_INVENTORY;
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
