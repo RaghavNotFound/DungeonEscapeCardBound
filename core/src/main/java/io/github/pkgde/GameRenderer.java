@@ -7,9 +7,10 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 
-public class GameRenderer {
-
+public class GameRenderer
+{
     private final GameWorld world;
+
     private final SpriteBatch batch;
     private final ShapeRenderer shape;
     private final BitmapFont font;
@@ -17,12 +18,12 @@ public class GameRenderer {
     private float torchAnimTime;
 
     private final OrthographicCamera camera;
-    private final MapManager mapManager;
+    private final MapManager mapManager = new MapManager();
 
-    public GameRenderer(GameWorld world, OrthographicCamera camera, MapManager mapManager) {
+    public GameRenderer(GameWorld world, OrthographicCamera camera)
+    {
         this.world = world;
         this.camera = camera;
-        this.mapManager = mapManager;
 
         batch = new SpriteBatch();
         shape = new ShapeRenderer();
@@ -56,6 +57,7 @@ public class GameRenderer {
             mapManager.render(camera);
         }
 
+        // ===== DEPTH LAYERING =====
         batch.begin();
 
         drawTorches(batch);

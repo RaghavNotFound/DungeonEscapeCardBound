@@ -9,7 +9,8 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class PauseOverlay {
+public class PauseOverlay
+{
 
     private static final String[] OPTIONS = {
         "RESUME",
@@ -148,7 +149,7 @@ public class PauseOverlay {
 
         shape.end();
 
-        // ===== TEXT =====
+        //TEXT
         batch.begin();
 
         float scale = w / 800f;

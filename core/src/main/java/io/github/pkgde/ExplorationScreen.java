@@ -39,15 +39,25 @@ public class ExplorationScreen implements Screen
         mapManager = new MapManager();
         mapManager.load(SAFE_ROOM_MAP);
 
-        float w = mapManager.getMapWidth();
-        float h = mapManager.getMapHeight();
+        viewport = new FitViewport(1280, 720, camera);
+        viewport.apply(true);
 
-        camera = new OrthographicCamera();
-        camera.setToOrtho(false, w, h);
-        camera.position.set(w / 2, h / 2, 0);
+        camera.position.set(viewport.getWorldWidth()/2f, viewport.getWorldHeight()/2f, 0);
+        camera.update();
 
-        viewport = new FitViewport(w, h, camera);
-        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
+        world = new GameWorld();
+        renderer = new GameRenderer(world, camera);
+        input = new InputHandler(viewport);
+
+        pauseOverlay = new PauseOverlay();
+        settingsOverlay = new SettingsOverlay();
+
+        fbo = new FrameBuffer(
+            Pixmap.Format.RGBA8888,
+            Gdx.graphics.getWidth(),
+            Gdx.graphics.getHeight(),
+            false
+        );
 
         world = new GameWorld(mapManager);
         renderer = new GameRenderer(world, camera, mapManager);
@@ -73,9 +83,35 @@ public class ExplorationScreen implements Screen
     }
 
     @Override
-    public void render(float delta) {
+    public void render(float delta)
+    {
+        // INPUT
+        if (state == State.GAME)
+        {
+            InputHandler.Action action = input.handle();
 
-        viewport.apply();
+            switch (action)
+            {
+                case TOGGLE_PAUSE:
+                    state = State.PAUSE;
+                    break;
+
+                case EXIT_TO_MENU:
+                    ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    break;
+
+                case NONE:
+                    break;
+            }
+        }
+        else if (state == State.PAUSE)
+        {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
+            {
+                state = State.GAME;
+            }
+
+            PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
 
         if (state == State.GAME) {
             InputHandler.Action action = input.handle();
@@ -144,7 +180,8 @@ public class ExplorationScreen implements Screen
 
         float offsetX = 0, offsetY = 0;
 
-        if (shakeTime > 0) {
+        if (shakeTime > 0)
+        {
             shakeTime -= delta;
             offsetX = MathUtils.random(-10f, 10f);
             offsetY = MathUtils.random(-10f, 10f);
@@ -227,7 +264,9 @@ public class ExplorationScreen implements Screen
         );
     }
 
-    @Override public void dispose() {
+    @Override
+    public void dispose()
+    {
         renderer.dispose();
         world.dispose();
         mapManager.dispose();
