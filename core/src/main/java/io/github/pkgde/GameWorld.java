@@ -3,7 +3,6 @@ package io.github.pkgde;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-
 import java.util.ArrayList;
 
 public class GameWorld {
@@ -16,9 +15,11 @@ public class GameWorld {
     private final Player player;
     private final Enemy enemy;
 
-    private final ArrayList<Rectangle> boundaries;
+    public static final float WORLD_WIDTH = 1280;
+    public static final float WORLD_HEIGHT = 720;
+    public static final float FLOOR_OFFSET = 120f;
 
-    public GameWorld(MapManager mapManager) {
+    private final ArrayList<Rectangle> boundaries;
 
         this.mapManager = mapManager;
 
@@ -31,7 +32,7 @@ public class GameWorld {
         enemy.setBoundaries(boundaries);
         enemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
 
-        player.getPosition().set(mapManager.getPlayerSpawn());
+        float t = 10f;
 
         if (!mapManager.getEnemySpawns().isEmpty()) {
             Vector2 enemySpawn = mapManager.getEnemySpawns().get(0);
@@ -92,11 +93,12 @@ public class GameWorld {
         return dx * dx + dy * dy < NEAR_ENEMY_DISTANCE_SQ;
     }
 
+    public ArrayList<Rectangle> getBoundaries() { return boundaries; }
     public Player getPlayer() { return player; }
     public Enemy getEnemy() { return enemy; }
-    public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 
-    public void dispose() {
+    public void dispose()
+    {
         player.dispose();
         enemy.dispose();
     }

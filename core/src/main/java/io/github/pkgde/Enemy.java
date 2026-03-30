@@ -8,8 +8,8 @@ import java.util.ArrayList;
 
 public class Enemy {
 
-    private Vector2 position;
-    private Rectangle bounds;
+    private final Vector2 position;
+    private final Rectangle bounds;
 
     private enum Facing { FRONT, BACK, LEFT, RIGHT }
 
@@ -41,14 +41,13 @@ public class Enemy {
     private Facing facing = Facing.FRONT;
     private TextureRegion currentFrame;
 
-    private ArrayList<Texture> textures = new ArrayList<>();
+    private final ArrayList<Texture> textures = new ArrayList<>();
 
     private float stateTime = 0f;
     private float hurtStateTime = 0f;
     private float attackStateTime = 0f;
     private float deathStateTime = 0f;
 
-    // ===== AI STATES =====
     private enum State { IDLE, CHASE }
     private State state = State.IDLE;
 
@@ -90,6 +89,8 @@ public class Enemy {
     private float moveTimer = 0f;
     private float moveDuration = 0f;
     private boolean isMoving = false;
+
+    private int hp = 3;
 
     public Enemy() {
         position = new Vector2(400, 300);
@@ -194,7 +195,7 @@ public class Enemy {
             }
         }
 
-        Vector2 playerPos = player.getPosition();
+        Vector2 playerPos = player.getPos();
 
         Vector2 toPlayer = new Vector2(playerPos).sub(position);
         float distance = toPlayer.len();
@@ -202,14 +203,12 @@ public class Enemy {
         boolean inRange;
         boolean inCone = false;
 
-        // ===== RANGE =====
         if (state == State.CHASE) {
             inRange = distance <= alertRange;
         } else {
             inRange = distance <= baseRange;
         }
 
-        // ===== VISION =====
         if (inRange) {
             toPlayer.nor();
             float dot = forward.dot(toPlayer);
@@ -217,7 +216,6 @@ public class Enemy {
             inCone = dot >= threshold;
         }
 
-        // ===== STATE =====
         if (inRange && inCone) {
             state = State.CHASE;
         }
@@ -455,10 +453,10 @@ public class Enemy {
         return true;
     }
 
-    // 🔥 RANDOM ACTION PICKER
-    private void pickNewRandomAction() {
+    private void pickNewRandomAction()
+    {
 
-        isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
+        isMoving = MathUtils.randomBoolean(0.7f);
 
         moveDuration = MathUtils.random(1f, 3f);
         moveTimer = moveDuration;
@@ -470,6 +468,9 @@ public class Enemy {
             ).nor();
         }
     }
+    public void render(SpriteBatch batch)
+    {
+        if (currentFrame==null) return;
 
     public void render(SpriteBatch batch) {
         if (disposed) {
@@ -478,9 +479,18 @@ public class Enemy {
 
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
     }
-
-    public Rectangle getBounds() {
+    public Rectangle getBounds()
+    {
         return bounds;
+    }
+
+    public void takeDamage(int dmg)
+    {
+        hp -= dmg;
+    }
+
+    public boolean isDead() {
+        return hp <= 0;
     }
 
     public void dispose() {
