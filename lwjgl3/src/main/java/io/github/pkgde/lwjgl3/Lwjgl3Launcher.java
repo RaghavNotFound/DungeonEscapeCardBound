@@ -31,7 +31,8 @@ public class Lwjgl3Launcher
         configuration.setWindowedMode(mode.width,mode.height);
         configuration.setDecorated(true);   // keeps window frame
         configuration.setMaximized(true);   // fills screen like fullscreen
-        configuration.setResizable(false);  // prevents resizing
+        configuration.setForegroundFPS(60);
+        configuration.setResizable(false);
 
         // Icons
         configuration.setWindowIcon(

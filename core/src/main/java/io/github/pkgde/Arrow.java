@@ -27,14 +27,12 @@ public class Arrow {
     public Arrow(float x, float y, Vector2 direction) {
         this.position = new Vector2(x, y);
         this.direction = new Vector2(direction).nor();
-        this.bounds = new Rectangle(x, y, SIZE, SIZE);
+        this.bounds = new Rectangle(x - SIZE / 2f, y - SIZE / 2f, SIZE, SIZE);
     }
 
     public void update(float delta) {
         // Move arrow
         position.mulAdd(direction, SPEED * delta);
-
-        // Correct collision alignment (fixed)
         bounds.setPosition(position.x - SIZE / 2f, position.y - SIZE / 2f);
     }
 

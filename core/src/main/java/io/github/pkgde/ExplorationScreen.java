@@ -11,9 +11,12 @@ import com.badlogic.gdx.math.MathUtils;
 
 public class ExplorationScreen implements Screen
 {
+    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
+
     private final OrthographicCamera camera;
     private final Viewport viewport;
 
+    private final MapManager mapManager;
     private final GameWorld world;
     private final GameRenderer renderer;
     private final InputHandler input;
@@ -21,19 +24,20 @@ public class ExplorationScreen implements Screen
     private final PauseOverlay pauseOverlay;
     private final SettingsOverlay settingsOverlay;
 
-    public enum State { GAME, PAUSE, SETTINGS }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS }
     private State state = State.GAME;
 
     private float shakeTime = 0f;
+    private final float shakeDuration = 0.25f;
     private boolean shakeTriggered = false;
 
-    private final FrameBuffer fbo;
+    private FrameBuffer fbo;
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
 
-    public ExplorationScreen()
-    {
-        camera = new OrthographicCamera();
+    public ExplorationScreen() {
+        mapManager = new MapManager();
+        mapManager.load(SAFE_ROOM_MAP);
 
         viewport = new FitViewport(1280, 720, camera);
         viewport.apply(true);
@@ -55,6 +59,19 @@ public class ExplorationScreen implements Screen
             false
         );
 
+        world = new GameWorld(mapManager);
+        renderer = new GameRenderer(world, camera, mapManager);
+        input = new InputHandler(viewport);
+
+        pauseOverlay = new PauseOverlay();
+        settingsOverlay = new SettingsOverlay();
+
+        fbo = new FrameBuffer(
+            Pixmap.Format.RGBA8888,
+            Gdx.graphics.getWidth(),
+            Gdx.graphics.getHeight(),
+            false
+        );
         fbo.getColorBufferTexture().setFilter(
             Texture.TextureFilter.Linear,
             Texture.TextureFilter.Linear
@@ -96,50 +113,67 @@ public class ExplorationScreen implements Screen
 
             PauseOverlay.Action pauseAction = pauseOverlay.handleInput();
 
-            switch (pauseAction)
-            {
-                case RESUME:
-                    state = State.GAME;
-                    break;
+        if (state == State.GAME) {
+            InputHandler.Action action = input.handle();
 
-                case SETTINGS:
+            switch (action) {
+                case TOGGLE_PAUSE:
+                    state = State.PAUSE;
+                    break;
+                case TOGGLE_INVENTORY:
+                    state = State.INVENTORY;
+                    break;
+                case OPEN_SETTINGS:
                     state = State.SETTINGS;
                     settingsOverlay.show();
                     break;
-
-                case EXIT:
-                    ((Main)Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                    break;
-
+                case EXIT_TO_MENU:
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    return;
                 case NONE:
                     break;
             }
-        }
-        else if (state == State.SETTINGS)
-        {
-            settingsOverlay.handleInput(viewport);
+        } else if (state == State.INVENTORY) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
+            }
+        } else if (state == State.PAUSE) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
+            } else {
+                PauseOverlay.Action pauseAction = pauseOverlay.handleInput(viewport);
 
-            if (!settingsOverlay.isActive())
-            {
+                switch (pauseAction) {
+                    case RESUME:
+                        state = State.GAME;
+                        break;
+                    case SETTINGS:
+                        state = State.SETTINGS;
+                        settingsOverlay.show();
+                        break;
+                    case EXIT:
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                        return;
+                    case NONE:
+                        break;
+                }
+            }
+        } else if (state == State.SETTINGS) {
+            settingsOverlay.handleInput(viewport);
+            if (!settingsOverlay.isActive()) {
                 state = State.PAUSE;
             }
         }
 
-        // UPDATE
-        if (state == State.GAME)
-        {
+        if (state == State.GAME) {
             world.update(delta, camera);
 
-            if (world.isPlayerNearEnemy())
-            {
-                if (!shakeTriggered)
-                {
-                    shakeTime = 0.25f;
+            if (world.isPlayerNearEnemy()) {
+                if (!shakeTriggered) {
+                    shakeTime = shakeDuration;
                     shakeTriggered = true;
                 }
-            }
-            else
-            {
+            } else {
                 shakeTriggered = false;
             }
         }
@@ -149,94 +183,85 @@ public class ExplorationScreen implements Screen
         if (shakeTime > 0)
         {
             shakeTime -= delta;
-            float shakeIntensity = 10f;
-            offsetX = MathUtils.random(-shakeIntensity, shakeIntensity);
-            offsetY = MathUtils.random(-shakeIntensity, shakeIntensity);
+            offsetX = MathUtils.random(-10f, 10f);
+            offsetY = MathUtils.random(-10f, 10f);
         }
 
-        camera.position.set(
-            viewport.getWorldWidth()/2f + offsetX,
-            viewport.getWorldHeight()/2f + offsetY,
-            0
-        );
-        camera.update();
-
-        // RENDER
-        if (state == State.PAUSE || state == State.SETTINGS)
-        {
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY) {
             fbo.begin();
-            renderer.render();
+            renderer.render(offsetX, offsetY);
             fbo.end();
+
+            // Restore viewport on backbuffer before drawing blur + overlays.
+            viewport.apply();
+
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
             Texture tex = fbo.getColorBufferTexture();
 
             blurBatch.setProjectionMatrix(camera.combined);
-
             blurBatch.begin();
             blurShader.setUniformf("blur", 0.002f);
-
             blurBatch.draw(
                 tex,
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight,
-                0,0,
+                0,
+                0,
                 tex.getWidth(),
                 tex.getHeight(),
-                false,true
+                false,
+                true
             );
-
             blurBatch.end();
 
             Gdx.gl.glEnable(GL20.GL_BLEND);
-
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
-
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0,0,0,0.5f);
+            shape.setColor(0, 0, 0, 0.5f);
             shape.rect(
-                camera.position.x - camera.viewportWidth/2f,
-                camera.position.y - camera.viewportHeight/2f,
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
                 camera.viewportWidth,
                 camera.viewportHeight
             );
             shape.end();
-
             Gdx.gl.glDisable(GL20.GL_BLEND);
-        }
-        else
-        {
-            renderer.render();
+        } else {
+            renderer.render(offsetX, offsetY);
         }
 
         SpriteBatch batch = renderer.getBatch();
         ShapeRenderer shape = renderer.getShape();
         BitmapFont font = renderer.getFont();
 
-        if (state == State.PAUSE)
-        {
+        if (state == State.PAUSE) {
             pauseOverlay.render(shape, batch, font, viewport);
         }
 
-        if (state == State.SETTINGS)
-        {
+        if (state == State.SETTINGS) {
             settingsOverlay.render(shape, batch, font, viewport);
+        }
+
+        if (state == State.INVENTORY) {
+            renderer.renderInventoryOverlay();
         }
     }
 
-    @Override
-    public void resize(int width, int height)
-    {
-        viewport.update(width, height, true);
+    @Override public void resize(int w, int h) {
+        viewport.update(w, h, true);
 
-        camera.position.set(
-            viewport.getWorldWidth()/2f,
-            viewport.getWorldHeight()/2f,
-            0
+        if (fbo != null) {
+            fbo.dispose();
+        }
+        fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
+        fbo.getColorBufferTexture().setFilter(
+            Texture.TextureFilter.Linear,
+            Texture.TextureFilter.Linear
         );
-        camera.update();
     }
 
     @Override
@@ -244,6 +269,7 @@ public class ExplorationScreen implements Screen
     {
         renderer.dispose();
         world.dispose();
+        mapManager.dispose();
         fbo.dispose();
         blurBatch.dispose();
         blurShader.dispose();
@@ -253,4 +279,5 @@ public class ExplorationScreen implements Screen
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
+
 }

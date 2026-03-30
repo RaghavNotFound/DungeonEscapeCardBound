@@ -14,6 +14,9 @@ public class Player {
     private final Animation<TextureRegion> runAnimation;
     private final Animation<TextureRegion> idleAnimation;
     private final Animation<TextureRegion> idleBlinkingAnimation;
+    private final Animation<TextureRegion> hurtAnimation;
+    private final Animation<TextureRegion> swordAnimation;
+    private final Animation<TextureRegion> deathAnimation;
 
     private final TextureRegion[] walkFrames;
     private final TextureRegion[] runFrames;
@@ -24,6 +27,11 @@ public class Player {
     private final Texture[] runTextures;
     private final Texture[] idleTextures;
     private final Texture[] idleBlinkingTextures;
+    private final Texture[] hurtTextures;
+    private final Texture[] swordTextures;
+    private final Texture[] deathTextures;
+
+    private final Texture swordTexture;
 
     private TextureRegion currentFrame;
 
@@ -31,6 +39,7 @@ public class Player {
     private float idleLoopTime;
     private boolean isRunning;
     private boolean facingRight = true;
+    private boolean swordDamageConsumed;
 
     private final Vector2 position;
     public Rectangle bounds;
@@ -43,12 +52,17 @@ public class Player {
 
     private final int WIDTH = 128;
     private final int HEIGHT = 128;
+    private static final float HITBOX_WIDTH = 55f;
+    private static final float HITBOX_HEIGHT = 80f;
+    private static final float HITBOX_OFFSET_X = 36f;
+    private static final float HITBOX_OFFSET_Y = 19f;
 
     // ===== ARROWS =====
     private final ArrayList<Arrow> arrows = new ArrayList<>();
 
     private static final float SHOOT_COOLDOWN = 1.0f;
     private float shootTimer = 0f;
+    private int torchCount = 0;
 
     // ===== STAMINA =====
     private static final float STAMINA_DRAIN_RATE = 40f;
@@ -60,20 +74,43 @@ public class Player {
     private float maxStamina = 100f;
     private boolean runLocked;
 
+    // ===== HEALTH / DAMAGE =====
+    private static final float MAX_HEALTH = 100f;
+    private static final float DAMAGE_INVULNERABILITY = 0.45f;
+    private static final float HURT_ANIM_TIME = 0.28f;
+    private float health = MAX_HEALTH;
+    private float damageInvulnTimer;
+    private float hurtTimer;
+    private float hurtStateTime;
+
+    // ===== SWORD =====
+    private static final float SWORD_DAMAGE = 35f;
+    private static final float SWORD_COOLDOWN = 0.55f;
+    private float swordAttackTimer;
+    private float swordAttackStateTime;
+    private float swordCooldownTimer;
+    private float deathStateTime;
+
     public Player() {
 
         position = new Vector2(200, 200);
-        bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
+        bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
         int walkingFrameCount = 23;
         int runFrameCount = 12;
         int idleFrameCount = 18;
         int idleBlinkingFrameCount = 18;
+        int hurtFrameCount = 12;
+        int swordFrameCount = 12;
+        int deathFrameCount = 15;
 
         walkingTextures = new Texture[walkingFrameCount];
         runTextures = new Texture[runFrameCount];
         idleTextures = new Texture[idleFrameCount];
         idleBlinkingTextures = new Texture[idleBlinkingFrameCount];
+        hurtTextures = new Texture[hurtFrameCount];
+        swordTextures = new Texture[swordFrameCount];
+        deathTextures = new Texture[deathFrameCount];
 
         walkFrames = new TextureRegion[walkingFrameCount];
         runFrames = new TextureRegion[runFrameCount];
@@ -104,11 +141,35 @@ public class Player {
             idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
+        TextureRegion[] hurtFrames = new TextureRegion[hurtFrameCount];
+        for (int i = 0; i < hurtFrameCount; i++) {
+            hurtTextures[i] = new Texture("Movements/Player/hurt/hurt_" + (i + 1) + ".png");
+            hurtFrames[i] = new TextureRegion(hurtTextures[i]);
+        }
+
+        TextureRegion[] swordFrames = new TextureRegion[swordFrameCount];
+        for (int i = 0; i < swordFrameCount; i++) {
+            swordTextures[i] = new Texture("Movements/Player/kicking/kicking_" + (i + 1) + ".png");
+            swordFrames[i] = new TextureRegion(swordTextures[i]);
+        }
+
+        TextureRegion[] deathFrames = new TextureRegion[deathFrameCount];
+        for (int i = 0; i < deathFrameCount; i++) {
+            deathTextures[i] = new Texture("Movements/Player/dying/dying_" + (i + 1) + ".png");
+            deathFrames[i] = new TextureRegion(deathTextures[i]);
+        }
+
         walkAnimation = new Animation<>(0.025f, walkFrames);
         runAnimation = new Animation<>(0.08f, runFrames);
 
         idleAnimation = new Animation<>(0.08f, idleFrames);
         idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
+        hurtAnimation = new Animation<>(0.05f, hurtFrames);
+        swordAnimation = new Animation<>(0.045f, swordFrames);
+        deathAnimation = new Animation<>(0.07f, deathFrames);
+
+        swordTexture = new Texture("Vectors/Sword.png");
+        swordTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         currentFrame = idleFrames[0];
     }
@@ -116,12 +177,21 @@ public class Player {
     // ===== GETTERS =====
     public float getStamina() { return stamina; }
     public float getMaxStamina() { return maxStamina; }
-    public float getShootCooldownPercent() { return MathUtils.clamp(shootTimer / SHOOT_COOLDOWN, 0f, 1f); }
+    public float getShootCooldownPercent() { return MathUtils.clamp(1f - (shootTimer / SHOOT_COOLDOWN), 0f, 1f); }
+    public float getHealth() { return health; }
+    public float getMaxHealth() { return MAX_HEALTH; }
+    public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
+    public float getSwordDamage() { return SWORD_DAMAGE; }
 
     public Vector2 getPosition() { return position; }
     public Vector2 getPos() { return position; }
     public Rectangle getBounds() { return bounds; }
     public ArrayList<Arrow> getArrows() { return arrows; }
+    public int getTorchCount() { return torchCount; }
+
+    public void addTorch() {
+        torchCount++;
+    }
 
     public void setBoundaries(ArrayList<Rectangle> boundaries) {
         this.boundaries = boundaries;
@@ -137,12 +207,55 @@ public class Player {
     // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
 
+        if (!isAlive()) {
+            deathStateTime += delta;
+            currentFrame = deathAnimation.getKeyFrame(deathStateTime, false);
+            updateBoundsPosition();
+            return;
+        }
+
+        if (damageInvulnTimer > 0f) {
+            damageInvulnTimer -= delta;
+        }
+
+        if (hurtTimer > 0f) {
+            hurtTimer -= delta;
+            hurtStateTime += delta;
+        }
+
+        if (swordCooldownTimer > 0f) {
+            swordCooldownTimer -= delta;
+        }
+
+        if (swordAttackTimer > 0f) {
+            swordAttackTimer -= delta;
+            swordAttackStateTime += delta;
+
+            if (swordAttackTimer <= 0f) {
+                swordDamageConsumed = false;
+            }
+        }
+
+        if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)
+            || Gdx.input.isKeyJustPressed(Input.Keys.F))
+            && swordCooldownTimer <= 0f && swordAttackTimer <= 0f) {
+
+            swordAttackTimer = swordAnimation.getAnimationDuration();
+            swordAttackStateTime = 0f;
+            swordCooldownTimer = SWORD_COOLDOWN;
+            swordDamageConsumed = false;
+        }
+
         updateRunLockState();
         boolean moved = handleMovement(delta);
         stateTime += delta;
 
         // ===== ANIMATION =====
-        if (moved) {
+        if (hurtTimer > 0f) {
+            currentFrame = hurtAnimation.getKeyFrame(hurtStateTime, false);
+        } else if (swordAttackTimer > 0f) {
+            currentFrame = swordAnimation.getKeyFrame(swordAttackStateTime, false);
+        } else if (moved) {
             idleLoopTime = 0f;
             currentFrame = isRunning
                 ? runAnimation.getKeyFrame(stateTime, true)
@@ -166,7 +279,7 @@ public class Player {
         stamina = Math.max(0, Math.min(maxStamina, stamina));
         updateRunLockState();
 
-        bounds.setPosition(position.x, position.y);
+        updateBoundsPosition();
 
         // ===== SHOOT =====
         if (shootTimer > 0) shootTimer -= delta;
@@ -185,6 +298,50 @@ public class Player {
                 arrows.remove(i);
             }
         }
+    }
+
+    public void takeDamage(float damage) {
+        if (damage <= 0f || !isAlive() || damageInvulnTimer > 0f) {
+            return;
+        }
+
+        health = Math.max(0f, health - damage);
+
+        if (!isAlive()) {
+            hurtTimer = 0f;
+            deathStateTime = 0f;
+            return;
+        }
+
+        damageInvulnTimer = DAMAGE_INVULNERABILITY;
+        hurtTimer = HURT_ANIM_TIME;
+        hurtStateTime = 0f;
+    }
+
+    public boolean isAlive() {
+        return health > 0f;
+    }
+
+    public boolean canDealSwordDamage() {
+        if (swordAttackTimer <= 0f || swordDamageConsumed) {
+            return false;
+        }
+
+        float duration = swordAnimation.getAnimationDuration();
+        float progress = 1f - (swordAttackTimer / duration);
+        return progress >= 0.28f && progress <= 0.62f;
+    }
+
+    public void consumeSwordDamage() {
+        swordDamageConsumed = true;
+    }
+
+    public Rectangle getSwordHitbox() {
+        float hitW = 78f;
+        float hitH = 60f;
+        float hitX = facingRight ? position.x + WIDTH * 0.62f : position.x - hitW + WIDTH * 0.38f;
+        float hitY = position.y + HEIGHT * 0.24f;
+        return new Rectangle(hitX, hitY, hitW, hitH);
     }
 
     private void updateRunLockState() {
@@ -250,7 +407,7 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
-        Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
+        Rectangle xBounds = new Rectangle(newX + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
                 if (xBounds.overlaps(wall)) return false;
@@ -258,7 +415,7 @@ public class Player {
         }
         position.x = newX;
 
-        Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
+        Rectangle yBounds = new Rectangle(position.x + HITBOX_OFFSET_X, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
                 if (yBounds.overlaps(wall)) return false;
@@ -286,12 +443,52 @@ public class Player {
         ));
     }
 
+    private void updateBoundsPosition() {
+        bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
+    }
+
     public void render(SpriteBatch batch) {
 
         float drawWidth = facingRight ? WIDTH : -WIDTH;
         float drawX = facingRight ? position.x : position.x + WIDTH;
 
         batch.draw(currentFrame, drawX, position.y, drawWidth, HEIGHT);
+
+        if (swordAttackTimer > 0f) {
+            float duration = swordAnimation.getAnimationDuration();
+            float progress = 1f - (swordAttackTimer / duration);
+
+            float originX = 14f;
+            float originY = 8f;
+            float swordW = 70f;
+            float swordH = 22f;
+
+            float anchorX = facingRight ? position.x + WIDTH * 0.68f : position.x + WIDTH * 0.32f;
+            float anchorY = position.y + HEIGHT * 0.56f;
+
+            float startAngle = facingRight ? -80f : 260f;
+            float endAngle = facingRight ? 40f : 140f;
+            float angle = MathUtils.lerp(startAngle, endAngle, MathUtils.clamp(progress, 0f, 1f));
+
+            batch.draw(
+                swordTexture,
+                anchorX - originX,
+                anchorY - originY,
+                originX,
+                originY,
+                swordW,
+                swordH,
+                facingRight ? 1f : -1f,
+                1f,
+                angle,
+                0,
+                0,
+                swordTexture.getWidth(),
+                swordTexture.getHeight(),
+                false,
+                false
+            );
+        }
 
         for (Arrow arrow : arrows) {
             arrow.render(batch);
@@ -304,5 +501,9 @@ public class Player {
         for (Texture t : runTextures) t.dispose();
         for (Texture t : idleTextures) t.dispose();
         for (Texture t : idleBlinkingTextures) t.dispose();
+        for (Texture t : hurtTextures) t.dispose();
+        for (Texture t : swordTextures) t.dispose();
+        for (Texture t : deathTextures) t.dispose();
+        swordTexture.dispose();
     }
 }
