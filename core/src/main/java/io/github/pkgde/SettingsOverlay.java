@@ -103,7 +103,7 @@ public class SettingsOverlay
                 break;
             case 2:
                 var mode=Gdx.graphics.getDisplayMode();
-                Gdx.graphics.setWindowedMode(mode.width,mode.height);
+                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
                 break;
             case 3:
                 hide();

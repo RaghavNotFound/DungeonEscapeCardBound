@@ -17,12 +17,10 @@ public class Enemy {
 
     private float stateTime = 0f;
 
-    //AI STATES
     private enum State { IDLE, CHASE }
-    private State state=State.IDLE;
+    private State state = State.IDLE;
 
-    // ===== SETTINGS =====
-    private float speed=120f;
+    private float speed = 120f;
 
     private float baseRange = 200f;
     private float alertRange = baseRange * 2f;
@@ -34,13 +32,11 @@ public class Enemy {
     private final float WIDTH = 128;
     private final float HEIGHT = 128;
 
-    //RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private float moveDuration = 0f;
     private boolean isMoving = false;
 
-    //HEALTH
     private int hp = 3;
 
     public Enemy() {
@@ -77,14 +73,12 @@ public class Enemy {
         boolean inRange;
         boolean inCone = false;
 
-        // ===== RANGE =====
         if (state == State.CHASE) {
             inRange = distance <= alertRange;
         } else {
             inRange = distance <= baseRange;
         }
 
-        // ===== VISION =====
         if (inRange) {
             toPlayer.nor();
             float dot = forward.dot(toPlayer);
@@ -92,7 +86,6 @@ public class Enemy {
             inCone = dot >= threshold;
         }
 
-        // ===== STATE =====
         if (inRange && inCone) {
             state = State.CHASE;
         }
@@ -103,7 +96,6 @@ public class Enemy {
             state = State.IDLE;
         }
 
-        // ===== BEHAVIOR =====
         switch (state) {
 
             case IDLE:
@@ -133,56 +125,50 @@ public class Enemy {
                 break;
         }
 
-        //CLAMP
         position.x = MathUtils.clamp(position.x, 0, 1280 - WIDTH);
         position.y = MathUtils.clamp(position.y, 120f, 720 - HEIGHT);
 
         bounds.setPosition(position.x, position.y);
 
-        currentFrame=walkAnim.getKeyFrame(stateTime, true);
+        currentFrame = walkAnim.getKeyFrame(stateTime, true);
     }
 
-    //RANDOM ACTION PICKER
     private void pickNewRandomAction()
     {
 
-        isMoving=MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
+        isMoving = MathUtils.randomBoolean(0.7f);
 
-        moveDuration=MathUtils.random(1f, 3f);
-        moveTimer=moveDuration;
+        moveDuration = MathUtils.random(1f, 3f);
+        moveTimer = moveDuration;
 
-        if (isMoving)
-        {
+        if (isMoving) {
             randomDir.set(
                 MathUtils.random(-1f, 1f),
                 MathUtils.random(-1f, 1f)
             ).nor();
         }
     }
-
     public void render(SpriteBatch batch)
     {
-        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
-    }
+        if (currentFrame==null) return;
 
+        batch.draw(currentFrame,position.x,position.y,WIDTH,HEIGHT);
+    }
     public Rectangle getBounds()
     {
         return bounds;
     }
 
-    //HEALTH METHODS
     public void takeDamage(int dmg)
     {
-        hp-=dmg;
+        hp -= dmg;
     }
 
-    public boolean isDead()
-    {
-        return hp<=0;
+    public boolean isDead() {
+        return hp <= 0;
     }
 
-    public void dispose()
-    {
+    public void dispose() {
         for (Texture t : textures)
         {
             t.dispose();

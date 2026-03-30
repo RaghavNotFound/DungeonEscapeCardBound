@@ -31,8 +31,11 @@ public class Arrow {
     }
 
     public void update(float delta) {
+        // Move arrow
         position.mulAdd(direction, SPEED * delta);
-        bounds.setPosition((position.x - SIZE) / 2f, (position.y - SIZE) / 2f);
+
+        // Correct collision alignment (fixed)
+        bounds.setPosition(position.x - SIZE / 2f, position.y - SIZE / 2f);
     }
 
     public Rectangle getBounds() {
