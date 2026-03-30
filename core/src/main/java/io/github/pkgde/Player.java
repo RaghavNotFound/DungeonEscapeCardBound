@@ -36,17 +36,23 @@ public class Player
     private final Vector2 pos;
     public Rectangle bounds;
 
-    private final int WIDTH=128;
-    private final int HEIGHT=128;
+    private ArrayList<Rectangle> boundaries;
 
-    //ARROW SYSTEM
-    private final ArrayList<Arrow> arrows=new ArrayList<>();
+    private final int WIDTH = 128;
+    private final int HEIGHT = 128;
 
-    private float shootTimer=0f;
+    // ===== ARROWS =====
+    private final ArrayList<Arrow> arrows = new ArrayList<>();
 
-    //STAMINA SYSTEM
-    private float stamina=100f;
-    private final float maxStamina=100f;
+    // ===== SHOOT COOLDOWN =====
+    private float shootCooldown = 1.0f;
+    private float shootTimer = 0f;
+
+    // ===== STAMINA =====
+    private float stamina = 100f;
+    private float maxStamina = 100f;
+
+    public Player() {
 
     private float staminaDrain=30f;
     private float staminaRegen=15f;
@@ -105,68 +111,57 @@ public class Player
         walkAnimation=new Animation<>(0.025f,walkFrames);
         runAnimation=new Animation<>(0.08f,runFrames);
 
-        idleAnimation=new Animation<>(0.08f,idleFrames);
-        idleAnimation.setPlayMode(Animation.PlayMode.NORMAL);
+        idleAnimation = new Animation<>(0.08f, idleFrames);
+        idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
 
-        idleBlinkingAnimation=new Animation<>(0.08f,idleBlinkingFrames);
-        idleBlinkingAnimation.setPlayMode(Animation.PlayMode.NORMAL);
-
-        currentFrame=idleFrames[0];
-        stateTime=0f;
+        currentFrame = idleFrames[0];
     }
 
-    public void update(float delta,OrthographicCamera camera)
-    {
-        boolean moved=handleMovement(delta);
-        stateTime+=delta;
+    // ===== GETTERS =====
+    public float getStamina() { return stamina; }
+    public float getMaxStamina() { return maxStamina; }
 
-        //ANIMATION
-        if (moved)
-        {
-            currentFrame=isRunning?runAnimation.getKeyFrame(stateTime,true):walkAnimation.getKeyFrame(stateTime,true);
-            playBlink=false;
-        }
-        else
-        {
-            if (!playBlink)
-            {
-                currentFrame=idleAnimation.getKeyFrame(stateTime,false);
+    public Vector2 getPosition() { return position; }
+    public Vector2 getPos() { return position; }
+    public Rectangle getBounds() { return bounds; }
+    public ArrayList<Arrow> getArrows() { return arrows; }
 
-                if (idleAnimation.isAnimationFinished(stateTime))
-                {
-                    stateTime=0;
-                    playBlink=true;
-                }
+    public void setBoundaries(ArrayList<Rectangle> boundaries) {
+        this.boundaries = boundaries;
+    }
 
-            }
-            else
-            {
-                currentFrame=idleBlinkingAnimation.getKeyFrame(stateTime,false);
+    // ===== UPDATE =====
+    public void update(float delta, OrthographicCamera camera) {
 
-                if (idleBlinkingAnimation.isAnimationFinished(stateTime))
-                {
-                    stateTime=0;
-                    playBlink=false;
-                }
-            }
+        boolean moved = handleMovement(delta);
+        stateTime += delta;
+
+        // ===== ANIMATION =====
+        if (moved) {
+            currentFrame = isRunning
+                ? runAnimation.getKeyFrame(stateTime, true)
+                : walkAnimation.getKeyFrame(stateTime, true);
+            playBlink = false;
+        } else {
+            currentFrame = idleAnimation.getKeyFrame(stateTime, true);
         }
 
-        bounds.setPosition(pos.x, pos.y);
+        // ===== STAMINA =====
+        boolean runningNow = isRunning && moved && stamina > 0;
 
-        //COOLDOWN
-        if (shootTimer>0)
-        {
-            shootTimer-=delta;
-        }
-        //SHOOT
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT))
-        {
-            if (shootTimer<=0f)
-            {
-                shootArrow(camera);
-                //COOLDOWN
-                shootTimer=1.0f;
-            }
+        if (runningNow) stamina -= 40f * delta;
+        else stamina += 25f * delta;
+
+        stamina = Math.max(0, Math.min(maxStamina, stamina));
+
+        bounds.setPosition(position.x, position.y);
+
+        // ===== SHOOT =====
+        if (shootTimer > 0) shootTimer -= delta;
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && shootTimer <= 0f) {
+            shootArrow(camera);
+            shootTimer = shootCooldown;
         }
 
         //UPDATE ARROWS
@@ -175,45 +170,13 @@ public class Player
             Arrow arrow=arrows.get(i);
             arrow.update(delta);
 
-            if (arrow.isCollided(GameWorld.WORLD_WIDTH,GameWorld.WORLD_HEIGHT, world.getBoundaries()))
-            {
+            if (arrow.isCollided(camera.viewportWidth, camera.viewportHeight, new ArrayList<>())) {
                 arrows.remove(i);
             }
         }
 
-        //STAMINA REGEN
-        if (!isRunning)
-        {
-            stamina+=staminaRegen*delta;
-
-            if (stamina>=maxStamina)
-            {
-                stamina=maxStamina;
-                canRun=true;
-            }
-        }
-        stamina=MathUtils.clamp(stamina,0,maxStamina);
-    }
-    private void shootArrow(OrthographicCamera camera)
-    {
-
-        Vector3 mouse=new Vector3(Gdx.input.getX(),Gdx.input.getY(),0);
-        camera.unproject(mouse);
-
-        Vector2 direction=new Vector2(
-            mouse.x-(pos.x+WIDTH/2f),
-            mouse.y-(pos.y+HEIGHT/2f)
-        ).nor();
-
-        arrows.add(new Arrow(
-            pos.x+WIDTH/2f,
-            pos.y+HEIGHT/2f,
-            direction
-        ));
-    }
-
-    private boolean handleMovement(float delta)
-    {
+    // ===== MOVEMENT =====
+    private boolean handleMovement(float delta) {
 
         float oldX= pos.x;
         float oldY= pos.y;
@@ -221,137 +184,71 @@ public class Player
         float newX= pos.x;
         float newY= pos.y;
 
-        boolean up=Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
-        boolean down=Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
-        boolean left=Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
-        boolean right=Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+        boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
+        boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
+        boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
+        boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
 
-        if (up && down)
-        {
-            up=false;
-            down=false;
-        }
-        if (left && right)
-        {
-            left=false;
-            right=false;
-        }
+        isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 
-        boolean wantsToRun=
-            Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) ||
-                Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+        float baseSpeed = 100f;
+        boolean canRun = isRunning && stamina > 0;
 
-        if (wantsToRun && canRun && stamina>0 && (up || down || left || right))
-        {
-            isRunning=true;
-            stamina-=staminaDrain*delta;
+        float speed = canRun ? baseSpeed * 1.5f : baseSpeed;
 
-            if (stamina<=0)
-            {
-                stamina=0;
-                isRunning=false;
-                canRun=false;
-            }
-        }
-        else
-        {
-            isRunning=false;
+        if (up) newY += speed * delta;
+        if (down) newY -= speed * delta;
+
+        if (left) {
+            newX -= speed * delta;
+            facingRight = false;
         }
 
-        float speed=100;
-        float currentSpeed=isRunning?speed*1.5f:speed;
-
-        if (up)
-        {
-            newY+=currentSpeed*delta;
-        }
-        if (down)
-        {
-            newY-=currentSpeed*delta;
+        if (right) {
+            newX += speed * delta;
+            facingRight = true;
         }
 
-        if (left)
-        {
-            newX-=currentSpeed*delta;
-            if (facingRight)
-            {
-                flipFrames();
-                facingRight=false;
-            }
+        Rectangle xBounds = new Rectangle(newX, position.y, WIDTH, HEIGHT);
+        for (Rectangle wall : boundaries) {
+            if (xBounds.overlaps(wall)) return false;
         }
+        position.x = newX;
 
-        if (right)
-        {
-            newX+=currentSpeed*delta;
-            if (!facingRight)
-            {
-                flipFrames();
-                facingRight=true;
-            }
+        Rectangle yBounds = new Rectangle(position.x, newY, WIDTH, HEIGHT);
+        for (Rectangle wall : boundaries) {
+            if (yBounds.overlaps(wall)) return false;
         }
+        position.y = newY;
 
-        //X AXIS COLLISION
-        Rectangle xBounds=new Rectangle(newX, pos.y,WIDTH,HEIGHT);
-
-        boolean collideX=false;
-        for (Rectangle wall:world.getBoundaries())
-        {
-            if (xBounds.overlaps(wall))
-            {
-                collideX=true;
-                break;
-            }
-        }
-
-        if (!collideX)
-        {
-            pos.x=newX;
-        }
-
-        //Y AXIS COLLISION
-        Rectangle yBounds=new Rectangle(pos.x,newY,WIDTH,HEIGHT);
-
-        boolean collideY=false;
-        for (Rectangle wall:world.getBoundaries())
-        {
-            if (yBounds.overlaps(wall))
-            {
-                collideY=true;
-                break;
-            }
-        }
-
-        if (!collideY)
-        {
-            pos.y=newY;
-        }
-
-        return (oldX!= pos.x || oldY!= pos.y);
+        return oldX != position.x || oldY != position.y;
     }
 
-    private void flipFrames()
-    {
-        for (TextureRegion f:walkFrames)
-        {
-            f.flip(true,false);
-        }
-        for (TextureRegion f:runFrames)
-        {
-            f.flip(true,false);
-        }
-        for (TextureRegion f:idleFrames)
-        {
-            f.flip(true,false);
-        }
-        for (TextureRegion f:idleBlinkingFrames)
-        {
-            f.flip(true,false);
-        }
+    // ===== SHOOT =====
+    private void shootArrow(OrthographicCamera camera) {
+
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mouse);
+
+        Vector2 dir = new Vector2(
+            mouse.x - (position.x + WIDTH / 2f),
+            mouse.y - (position.y + HEIGHT / 2f)
+        ).nor();
+
+        arrows.add(new Arrow(
+            position.x + WIDTH / 2f,
+            position.y + HEIGHT / 2f,
+            dir
+        ));
     }
 
-    public void render(SpriteBatch batch)
-    {
-        batch.draw(currentFrame,pos.x,pos.y,WIDTH,HEIGHT);
+    // ===== RENDER (FIXED FLIP) =====
+    public void render(SpriteBatch batch) {
+
+        float drawWidth = facingRight ? WIDTH : -WIDTH;
+        float drawX = facingRight ? position.x : position.x + WIDTH;
+
+        batch.draw(currentFrame, drawX, position.y, drawWidth, HEIGHT);
 
         for (Arrow arrow:arrows)
         {
@@ -359,43 +256,11 @@ public class Player
         }
     }
 
-    public void dispose()
-    {
-        for (Texture t:walkingTextures)
-        {
-            t.dispose();
-        }
-        for (Texture t:runTextures)
-        {
-            t.dispose();
-        }
-        for (Texture t:idleTextures)
-        {
-            t.dispose();
-        }
-        for (Texture t:idleBlinkingTextures)
-        {
-            t.dispose();
-        }
-    }
-    public Vector2 getPos()
-    {
-        return new Vector2(bounds.x,bounds.y);
-    }
-    public ArrayList<Arrow> getArrows()
-    {
-        return arrows;
-    }
-    public float getStamina()
-    {
-        return stamina;
-    }
-    public float getMaxStamina()
-    {
-        return maxStamina;
-    }
-    public float getShootCooldownPercent()
-    {
-        return 1f-(shootTimer/1.0f);
+    // ===== CLEANUP =====
+    public void dispose() {
+        for (Texture t : walkingTextures) t.dispose();
+        for (Texture t : runTextures) t.dispose();
+        for (Texture t : idleTextures) t.dispose();
+        for (Texture t : idleBlinkingTextures) t.dispose();
     }
 }

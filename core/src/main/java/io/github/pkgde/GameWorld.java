@@ -3,6 +3,7 @@ package io.github.pkgde;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+
 import java.util.ArrayList;
 
 public class GameWorld
@@ -11,34 +12,20 @@ public class GameWorld
     private final Player player;
     private final Enemy enemy;
 
-    //WORLD SIZE
-    public static final float WORLD_WIDTH=1280;
-    public static final float WORLD_HEIGHT=720;
-    public static final float FLOOR_OFFSET=120f;
-
-    //BOUNDARIES
     private final ArrayList<Rectangle> boundaries;
 
-    public GameWorld()
-    {
-        player=new Player(this);
-        enemy=new Enemy();
+    public GameWorld(MapManager mapManager) {
 
         boundaries=new ArrayList<>();
 
-        float t=10f; // thickness
+        boundaries = mapManager.getCollisionRects();
+        player.setBoundaries(boundaries);
 
-        //LEFT
-        boundaries.add(new Rectangle(-t,0,t,WORLD_HEIGHT));
+        player.getPosition().set(mapManager.getPlayerSpawn());
 
-        //RIGHT
-        boundaries.add(new Rectangle(WORLD_WIDTH,0,t,WORLD_HEIGHT));
-
-        //BOTTOM
-        boundaries.add(new Rectangle(0,0,WORLD_WIDTH,FLOOR_OFFSET));
-
-        //TOP
-        boundaries.add(new Rectangle(0,WORLD_HEIGHT,WORLD_WIDTH,t));
+        if (!mapManager.getEnemySpawns().isEmpty()) {
+            enemy.getBounds().setPosition(mapManager.getEnemySpawns().get(0));
+        }
     }
 
     public void update(float delta,OrthographicCamera camera)
@@ -61,38 +48,21 @@ public class GameWorld
         }
     }
 
-    //center-based distance check
-    public boolean isPlayerNearEnemy()
-    {
-        Vector2 playerPos=player.getPos();
+    public boolean isPlayerNearEnemy() {
+        Vector2 p = player.getPosition();
+        Rectangle b = enemy.getBounds();
 
-        Rectangle b=enemy.getBounds();
-
-        Vector2 enemyPos=new Vector2(
-            b.x+b.width/2f,
-            b.y+b.height/2f
+        Vector2 e = new Vector2(
+            b.x + b.width / 2f,
+            b.y + b.height / 2f
         );
 
-        float distance=playerPos.dst(enemyPos);
-
-        return distance<150f;
+        return p.dst(e) < 150f;
     }
 
-    //non-static
-    public ArrayList<Rectangle> getBoundaries()
-    {
-        return boundaries;
-    }
-
-    public Player getPlayer()
-    {
-        return player;
-    }
-
-    public Enemy getEnemy()
-    {
-        return enemy;
-    }
+    public Player getPlayer() { return player; }
+    public Enemy getEnemy() { return enemy; }
+    public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 
     public void dispose()
     {
