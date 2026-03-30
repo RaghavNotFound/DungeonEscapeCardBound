@@ -34,6 +34,12 @@ public class Enemy {
     private final float WIDTH = 128;
     private final float HEIGHT = 128;
 
+    private ArrayList<Rectangle> boundaries;
+    private float worldMinX = 0f;
+    private float worldMinY = 0f;
+    private float worldMaxX = Float.MAX_VALUE;
+    private float worldMaxY = Float.MAX_VALUE;
+
     // 🔥 RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
@@ -48,6 +54,22 @@ public class Enemy {
         currentFrame = walkAnim.getKeyFrame(0);
 
         pickNewRandomAction();
+    }
+
+    public void setBoundaries(ArrayList<Rectangle> boundaries) {
+        this.boundaries = boundaries;
+    }
+
+    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
+        this.worldMinX = minX;
+        this.worldMinY = minY;
+        this.worldMaxX = maxX;
+        this.worldMaxY = maxY;
+    }
+
+    public void setPosition(float x, float y) {
+        position.set(x, y);
+        bounds.setPosition(x, y);
     }
 
     private Animation<TextureRegion> load(String path, int count) {
@@ -112,7 +134,7 @@ public class Enemy {
                 }
 
                 if (isMoving) {
-                    position.mulAdd(randomDir, speed * 0.5f * delta);
+                    moveBy(randomDir.x * speed * 0.5f * delta, randomDir.y * speed * 0.5f * delta);
                     forward.set(randomDir);
                 }
 
@@ -124,19 +146,46 @@ public class Enemy {
                     .sub(position)
                     .nor();
 
-                position.mulAdd(direction, speed * delta);
+                moveBy(direction.x * speed * delta, direction.y * speed * delta);
                 forward.set(direction);
 
                 break;
         }
 
-        // ===== CLAMP =====
-        position.x = MathUtils.clamp(position.x, 0, 1280 - WIDTH);
-        position.y = MathUtils.clamp(position.y, 120f, 720 - HEIGHT);
+        // Keep enemy inside map bounds.
+        position.x = MathUtils.clamp(position.x, worldMinX, worldMaxX - WIDTH);
+        position.y = MathUtils.clamp(position.y, worldMinY, worldMaxY - HEIGHT);
 
         bounds.setPosition(position.x, position.y);
 
         currentFrame = walkAnim.getKeyFrame(stateTime, true);
+    }
+
+    private void moveBy(float dx, float dy) {
+        float newX = position.x + dx;
+        float newY = position.y + dy;
+
+        if (canMoveTo(newX, position.y)) {
+            position.x = newX;
+        }
+
+        if (canMoveTo(position.x, newY)) {
+            position.y = newY;
+        }
+    }
+
+    private boolean canMoveTo(float x, float y) {
+        Rectangle next = new Rectangle(x, y, WIDTH, HEIGHT);
+
+        if (boundaries != null) {
+            for (Rectangle wall : boundaries) {
+                if (next.overlaps(wall)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     // 🔥 RANDOM ACTION PICKER
