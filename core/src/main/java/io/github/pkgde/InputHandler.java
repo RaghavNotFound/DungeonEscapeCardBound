@@ -4,9 +4,11 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class InputHandler {
+public class InputHandler
+{
 
-    public enum Action {
+    public enum Action
+    {
         NONE,
         TOGGLE_PAUSE,
         TOGGLE_INVENTORY,
@@ -14,15 +16,13 @@ public class InputHandler {
         EXIT_TO_MENU
     }
 
-    private Viewport viewport;
+    public InputHandler(Viewport viewport) {}
 
-    public InputHandler(Viewport viewport) {
-        this.viewport = viewport;
-    }
+    public Action handle()
+    {
 
-    public Action handle() {
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
+        {
             return Action.TOGGLE_PAUSE;
         }
 

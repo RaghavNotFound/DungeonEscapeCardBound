@@ -50,15 +50,18 @@ public class SettingsOverlay {
         selected = 0;
     }
 
-    public void hide() {
-        active = false;
+    public void hide()
+    {
+        active=false;
     }
 
-    public boolean isActive() {
+    public boolean isActive()
+    {
         return active;
     }
 
-    public void handleInput(Viewport viewport) {
+    public void handleInput(Viewport viewport)
+    {
 
         if (!active) return;
 
@@ -70,6 +73,8 @@ public class SettingsOverlay {
             hide();
             return;
         }
+        float w=viewport.getWorldWidth();
+        float h=viewport.getWorldHeight();
 
         // ===== KEYBOARD NAV =====
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
@@ -84,7 +89,8 @@ public class SettingsOverlay {
             selected = (selected + 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
+        {
             applySelection();
             return;
         }
@@ -185,11 +191,11 @@ public class SettingsOverlay {
             shape.setColor(selected == i ? accent : inactiveOutline);
             shape.rect(centerX, ys[i], boxW, boxH);
         }
-
         shape.end();
-
-        // ===== TEXT =====
+        //TEXT
         batch.begin();
+        float scale=w/800f;
+        font.getData().setScale(scale*1.2f);
 
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
