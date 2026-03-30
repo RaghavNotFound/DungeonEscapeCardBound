@@ -11,6 +11,42 @@ public class Enemy {
     private final Vector2 position;
     private final Rectangle bounds;
 
+    public boolean canDealDamage()
+    {
+        return attackTimer > 0f && !attackDamageConsumed;
+    }
+
+    public float getDamage() {
+        return ATTACK_DAMAGE;
+    }
+
+    public void consumeAttackDamage() {
+        attackDamageConsumed = true;
+    }
+
+    public float getHealthRatio() {
+        return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f);
+    }
+
+    public boolean isAlive() {
+        return health > 0f;
+    }
+
+    public void setPosition(float x, float y) {
+        position.set(x, y);
+    }
+
+    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
+        worldMinX = minX;
+        worldMinY = minY;
+        worldMaxX = maxX;
+        worldMaxY = maxY;
+    }
+
+    public void setBoundaries(ArrayList<Rectangle> boundaries) {
+        this.boundaries = boundaries;
+    }
+
     private enum Facing { FRONT, BACK, LEFT, RIGHT }
 
     private Animation<TextureRegion> frontIdleAnim;
@@ -36,6 +72,7 @@ public class Enemy {
     private Animation<TextureRegion> rightRunAnim;
     private Animation<TextureRegion> rightHurtAnim;
     private Animation<TextureRegion> rightAttackAnim;
+
     private Animation<TextureRegion> deathAnim;
 
     private Facing facing = Facing.FRONT;
@@ -51,7 +88,6 @@ public class Enemy {
     private enum State { IDLE, CHASE }
     private State state = State.IDLE;
 
-    // ===== SETTINGS =====
     private static final float SPEED = 95f;
 
     private float baseRange = 200f;
@@ -64,7 +100,6 @@ public class Enemy {
     private final float WIDTH = 128;
     private final float HEIGHT = 128;
 
-    // ===== COMBAT =====
     private static final float MAX_HEALTH = 100f;
     private static final float ATTACK_DAMAGE = 14f;
     private static final float ATTACK_RANGE = 76f;
@@ -84,7 +119,6 @@ public class Enemy {
     private float worldMaxX = Float.MAX_VALUE;
     private float worldMaxY = Float.MAX_VALUE;
 
-    // 🔥 RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private float moveDuration = 0f;
@@ -119,6 +153,7 @@ public class Enemy {
         rightRunAnim = load("Movements/Enemy/Right/Running/Right - Running_", 0.07f);
         rightHurtAnim = load("Movements/Enemy/Right/Hurt/Right - Hurt_", 0.05f);
         rightAttackAnim = load("Movements/Enemy/Right/Attacking/Right - Attacking_", 0.05f);
+
         deathAnim = load("Movements/Enemy/Dying/Dying_", 0.08f);
 
         currentFrame = frontIdleAnim.getKeyFrame(0f, true);
@@ -126,30 +161,12 @@ public class Enemy {
         pickNewRandomAction();
     }
 
-    public void setBoundaries(ArrayList<Rectangle> boundaries) {
-        this.boundaries = boundaries;
-    }
-
-    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
-        this.worldMinX = minX;
-        this.worldMinY = minY;
-        this.worldMaxX = maxX;
-        this.worldMaxY = maxY;
-    }
-
-    public void setPosition(float x, float y) {
-        position.set(x, y);
-        bounds.setPosition(x, y);
-    }
-
     private Animation<TextureRegion> load(String pathPrefix, float frameDuration) {
         ArrayList<TextureRegion> frames = new ArrayList<>();
 
         for (int i = 0; ; i++) {
             String path = pathPrefix + String.format("%03d", i) + ".png";
-            if (!Gdx.files.internal(path).exists()) {
-                break;
-            }
+            if (!Gdx.files.internal(path).exists()) break;
 
             Texture tex = new Texture(path);
             textures.add(tex);
@@ -164,9 +181,10 @@ public class Enemy {
     }
 
     public void update(float delta, Player player) {
-        if (disposed) {
-            return;
-        }
+        if (disposed) return;
+
+        stateTime += delta;
+        bounds.setPosition(position.x, position.y);
 
         if (!isAlive()) {
             deathStateTime += delta;
@@ -174,290 +192,123 @@ public class Enemy {
             return;
         }
 
-        stateTime += delta;
-        float prevX = position.x;
-        float prevY = position.y;
-
-        if (hurtTimer > 0f) {
-            hurtTimer -= delta;
-            hurtStateTime += delta;
-        }
-
-        if (attackCooldownTimer > 0f) {
-            attackCooldownTimer -= delta;
-        }
+        if (attackCooldownTimer > 0f) attackCooldownTimer -= delta;
 
         if (attackTimer > 0f) {
             attackTimer -= delta;
             attackStateTime += delta;
-            if (attackTimer <= 0f) {
-                attackDamageConsumed = false;
-            }
+            currentFrame = getFacingAnim("attack").getKeyFrame(attackStateTime, false);
+            return;
         }
 
-        Vector2 playerPos = player.getPos();
-
-        Vector2 toPlayer = new Vector2(playerPos).sub(position);
-        float distance = toPlayer.len();
-
-        boolean inRange;
-        boolean inCone = false;
-
-        if (state == State.CHASE) {
-            inRange = distance <= alertRange;
-        } else {
-            inRange = distance <= baseRange;
-        }
-
-        if (inRange) {
-            toPlayer.nor();
-            float dot = forward.dot(toPlayer);
-            float threshold = MathUtils.cosDeg(fovAngle / 2f);
-            inCone = dot >= threshold;
-        }
-
-        if (inRange && inCone) {
-            state = State.CHASE;
-        }
-        else if (state == State.CHASE && distance <= alertRange) {
-            state = State.CHASE;
-        }
-        else {
-            state = State.IDLE;
-        }
-
-        // ===== BEHAVIOR =====
-        boolean isAttacking = attackTimer > 0f;
-
-        switch (state) {
-
-            case IDLE:
-
-                moveTimer -= delta;
-
-                if (moveTimer <= 0) {
-                    pickNewRandomAction();
-                }
-
-                if (isMoving && !isAttacking) {
-                    moveBy(randomDir.x * SPEED * 0.5f * delta, randomDir.y * SPEED * 0.5f * delta);
-                    forward.set(randomDir);
-                }
-
-                break;
-
-            case CHASE:
-
-                if (!isAttacking) {
-                    Vector2 direction = new Vector2(playerPos)
-                        .sub(position)
-                        .nor();
-
-                    forward.set(direction);
-
-                    if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
-                        attackTimer = getAttackAnimation().getAnimationDuration();
-                        attackStateTime = 0f;
-                        attackDamageConsumed = false;
-                        attackCooldownTimer = ATTACK_COOLDOWN;
-                    } else {
-                        moveBy(direction.x * SPEED * delta, direction.y * SPEED * delta);
-                    }
-                }
-
-                break;
-        }
-
-        // Keep enemy inside map bounds.
-        position.x = MathUtils.clamp(position.x, worldMinX, worldMaxX - WIDTH);
-        position.y = MathUtils.clamp(position.y, worldMinY, worldMaxY - HEIGHT);
-
-        boolean movedThisFrame = !MathUtils.isEqual(prevX, position.x, 0.0001f)
-            || !MathUtils.isEqual(prevY, position.y, 0.0001f);
-        updateFacing();
-
-        bounds.setPosition(position.x, position.y);
         if (hurtTimer > 0f) {
-            currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
-        } else if (attackTimer > 0f) {
-            currentFrame = getAttackAnimation().getKeyFrame(attackStateTime, false);
-        } else {
-            currentFrame = pickAnimation(state, movedThisFrame).getKeyFrame(stateTime, true);
-        }
-    }
-
-    public void takeDamage(float damage) {
-        if (damage <= 0f || !isAlive() || disposed) {
+            hurtTimer -= delta;
+            hurtStateTime += delta;
+            currentFrame = getFacingAnim("hurt").getKeyFrame(hurtStateTime, false);
             return;
         }
 
-        health = Math.max(0f, health - damage);
+        float myX = position.x + WIDTH / 2f;
+        float myY = position.y + HEIGHT / 2f;
 
-        if (!isAlive()) {
-            deathStateTime = 0f;
-            attackTimer = 0f;
-            attackCooldownTimer = 0f;
-            attackDamageConsumed = true;
-            hurtTimer = 0f;
-            currentFrame = deathAnim.getKeyFrame(0f, false);
-            return;
-        }
+        Rectangle pb = player.getBounds();
+        float px = pb.x + pb.width / 2f;
+        float py = pb.y + pb.height / 2f;
 
-        hurtTimer = HURT_TIME;
-        hurtStateTime = 0f;
-    }
+        float dx = px - myX;
+        float dy = py - myY;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
-    public boolean canDealDamage() {
-        if (attackTimer <= 0f || attackDamageConsumed || !isAlive()) {
-            return false;
-        }
+        updateFacing(dx, dy);
 
-        float duration = getAttackAnimation().getAnimationDuration();
-        float progress = 1f - (attackTimer / duration);
-        return progress >= 0.35f && progress <= 0.6f;
-    }
-
-    public void consumeAttackDamage() {
-        attackDamageConsumed = true;
-    }
-
-    public float getDamage() {
-        return ATTACK_DAMAGE;
-    }
-
-    public float getHealth() {
-        return health;
-    }
-
-    public float getMaxHealth() {
-        return MAX_HEALTH;
-    }
-
-    public float getHealthRatio() {
-        return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f);
-    }
-
-    public boolean isAlive() {
-        return health > 0f;
-    }
-
-    public boolean isDeathAnimationFinished() {
-        return !isAlive() && deathStateTime >= deathAnim.getAnimationDuration();
-    }
-
-    private void updateFacing() {
-        float ax = Math.abs(forward.x);
-        float ay = Math.abs(forward.y);
-
-        if (ax > ay) {
-            facing = forward.x >= 0f ? Facing.RIGHT : Facing.LEFT;
-        } else {
-            facing = forward.y >= 0f ? Facing.BACK : Facing.FRONT;
-        }
-    }
-
-    private Animation<TextureRegion> pickAnimation(State state, boolean moved) {
-        if (!moved) {
-            switch (facing) {
-                case BACK:
-                    return backIdleAnim;
-                case LEFT:
-                    return leftIdleAnim;
-                case RIGHT:
-                    return rightIdleAnim;
-                case FRONT:
-                default:
-                    return frontIdleAnim;
-            }
-        }
+        if (state == State.IDLE && dist < alertRange) state = State.CHASE;
+        if (state == State.CHASE && dist > alertRange * 1.5f) state = State.IDLE;
 
         if (state == State.CHASE) {
-            switch (facing) {
-                case BACK:
-                    return backRunAnim;
-                case LEFT:
-                    return leftRunAnim;
-                case RIGHT:
-                    return rightRunAnim;
-                case FRONT:
-                default:
-                    return frontRunAnim;
+            if (dist <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
+                attackTimer = getFacingAnim("attack").getAnimationDuration();
+                attackStateTime = 0f;
+                attackCooldownTimer = ATTACK_COOLDOWN;
+                attackDamageConsumed = false;
+                currentFrame = getFacingAnim("attack").getKeyFrame(0f, false);
+                return;
+            }
+
+            if (dist > 1f) {
+                float nx = position.x + (dx / dist) * SPEED * delta;
+                float ny = position.y + (dy / dist) * SPEED * delta;
+                position.x = MathUtils.clamp(nx, worldMinX, worldMaxX - WIDTH);
+                position.y = MathUtils.clamp(ny, worldMinY, worldMaxY - HEIGHT);
+            }
+
+            String anim = dist < 150f ? "run" : "walk";
+            currentFrame = getFacingAnim(anim).getKeyFrame(stateTime, true);
+        } else {
+            moveTimer -= delta;
+            if (moveTimer <= 0f) pickNewRandomAction();
+
+            if (isMoving) {
+                float nx = position.x + randomDir.x * SPEED * 0.4f * delta;
+                float ny = position.y + randomDir.y * SPEED * 0.4f * delta;
+                position.x = MathUtils.clamp(nx, worldMinX, worldMaxX - WIDTH);
+                position.y = MathUtils.clamp(ny, worldMinY, worldMaxY - HEIGHT);
+                currentFrame = getFacingAnim("walk").getKeyFrame(stateTime, true);
+            } else {
+                currentFrame = getFacingAnim("idle").getKeyFrame(stateTime, true);
             }
         }
+    }
 
-        switch (facing) {
-            case BACK:
-                return backWalkAnim;
-            case LEFT:
-                return leftWalkAnim;
-            case RIGHT:
-                return rightWalkAnim;
-            case FRONT:
-            default:
-                return frontWalkAnim;
+    private void updateFacing(float dx, float dy) {
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            facing = dx < 0 ? Facing.LEFT : Facing.RIGHT;
+        } else {
+            facing = dy < 0 ? Facing.FRONT : Facing.BACK;
         }
     }
 
-    private Animation<TextureRegion> getHurtAnimation() {
-        switch (facing) {
-            case BACK:
-                return backHurtAnim;
-            case LEFT:
-                return leftHurtAnim;
-            case RIGHT:
-                return rightHurtAnim;
-            case FRONT:
-            default:
-                return frontHurtAnim;
-        }
-    }
-
-    private Animation<TextureRegion> getAttackAnimation() {
-        switch (facing) {
-            case BACK:
-                return backAttackAnim;
-            case LEFT:
-                return leftAttackAnim;
-            case RIGHT:
-                return rightAttackAnim;
-            case FRONT:
-            default:
-                return frontAttackAnim;
-        }
-    }
-
-    private void moveBy(float dx, float dy) {
-        float newX = position.x + dx;
-        float newY = position.y + dy;
-
-        if (canMoveTo(newX, position.y)) {
-            position.x = newX;
-        }
-
-        if (canMoveTo(position.x, newY)) {
-            position.y = newY;
-        }
-    }
-
-    private boolean canMoveTo(float x, float y) {
-        Rectangle next = new Rectangle(x, y, WIDTH, HEIGHT);
-
-        if (boundaries != null) {
-            for (Rectangle wall : boundaries) {
-                if (next.overlaps(wall)) {
-                    return false;
+    private Animation<TextureRegion> getFacingAnim(String type) {
+        switch (type) {
+            case "walk":
+                switch (facing) {
+                    case BACK:  return backWalkAnim;
+                    case LEFT:  return leftWalkAnim;
+                    case RIGHT: return rightWalkAnim;
+                    default:    return frontWalkAnim;
                 }
-            }
+            case "run":
+                switch (facing) {
+                    case BACK:  return backRunAnim;
+                    case LEFT:  return leftRunAnim;
+                    case RIGHT: return rightRunAnim;
+                    default:    return frontRunAnim;
+                }
+            case "attack":
+                switch (facing) {
+                    case BACK:  return backAttackAnim;
+                    case LEFT:  return leftAttackAnim;
+                    case RIGHT: return rightAttackAnim;
+                    default:    return frontAttackAnim;
+                }
+            case "hurt":
+                switch (facing) {
+                    case BACK:  return backHurtAnim;
+                    case LEFT:  return leftHurtAnim;
+                    case RIGHT: return rightHurtAnim;
+                    default:    return frontHurtAnim;
+                }
+            default:
+                switch (facing) {
+                    case BACK:  return backIdleAnim;
+                    case LEFT:  return leftIdleAnim;
+                    case RIGHT: return rightIdleAnim;
+                    default:    return frontIdleAnim;
+                }
         }
-
-        return true;
     }
 
-    private void pickNewRandomAction()
-    {
-
+    private void pickNewRandomAction() {
         isMoving = MathUtils.randomBoolean(0.7f);
-
         moveDuration = MathUtils.random(1f, 3f);
         moveTimer = moveDuration;
 
@@ -468,35 +319,36 @@ public class Enemy {
             ).nor();
         }
     }
-    public void render(SpriteBatch batch)
-    {
-        if (currentFrame==null) return;
 
     public void render(SpriteBatch batch) {
-        if (disposed) {
-            return;
-        }
+        if (disposed) return;
+        if (currentFrame == null) return;
 
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
     }
-    public Rectangle getBounds()
-    {
+
+    public Rectangle getBounds() {
         return bounds;
     }
 
     public void takeDamage(int dmg)
     {
-        hp -= dmg;
+        if (disposed || !isAlive()) return;
+        health = Math.max(0f, health - dmg);
+        if (isAlive()) {
+            hurtTimer = HURT_TIME;
+            hurtStateTime = 0f;
+        } else {
+            deathStateTime = 0f;
+        }
     }
 
     public boolean isDead() {
-        return hp <= 0;
+        return !isAlive();
     }
 
     public void dispose() {
-        if (disposed) {
-            return;
-        }
+        if (disposed) return;
 
         for (Texture t : textures) {
             t.dispose();

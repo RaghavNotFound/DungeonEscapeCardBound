@@ -46,23 +46,25 @@ public class PauseOverlay
         updateLayout(viewport);
         updatePointer(viewport);
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
-            Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP))
+        {
 
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
-            Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
+        {
 
             selected = (selected + 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
+        {
             return toAction(selected);
         }
 
-        if (Gdx.input.justTouched()) {
+        if (Gdx.input.justTouched())
+        {
             int clicked = pointerIndex();
             if (clicked >= 0) {
                 selected = clicked;
@@ -71,7 +73,8 @@ public class PauseOverlay
         }
 
         int hovered = pointerIndex();
-        if (hovered >= 0) {
+        if (hovered >=0)
+        {
             selected = hovered;
         }
 
@@ -79,16 +82,13 @@ public class PauseOverlay
     }
 
     private Action toAction(int optionIndex) {
-        switch (optionIndex) {
-            case 0:
-                return Action.RESUME;
-            case 1:
-                return Action.SETTINGS;
-            case 2:
-                return Action.EXIT;
-            default:
-                return Action.NONE;
-        }
+        return switch (optionIndex)
+        {
+            case 0 -> Action.RESUME;
+            case 1 -> Action.SETTINGS;
+            case 2 -> Action.EXIT;
+            default -> Action.NONE;
+        };
     }
 
     private void updateLayout(Viewport viewport) {
@@ -190,7 +190,8 @@ public class PauseOverlay
         return -1;
     }
 
-    private void updatePointer(Viewport viewport) {
+    private void updatePointer(Viewport viewport)
+    {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
     }

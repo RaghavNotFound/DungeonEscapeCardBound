@@ -407,21 +407,23 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
+        boolean xBlocked = false;
         Rectangle xBounds = new Rectangle(newX + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
-                if (xBounds.overlaps(wall)) return false;
+                if (xBounds.overlaps(wall)) { xBlocked = true; break; }
             }
         }
-        position.x = newX;
+        if (!xBlocked) position.x = newX;
 
+        boolean yBlocked = false;
         Rectangle yBounds = new Rectangle(position.x + HITBOX_OFFSET_X, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
-                if (yBounds.overlaps(wall)) return false;
+                if (yBounds.overlaps(wall)) { yBlocked = true; break; }
             }
         }
-        position.y = newY;
+        if (!yBlocked) position.y = newY;
 
         return oldX != position.x || oldY != position.y;
     }

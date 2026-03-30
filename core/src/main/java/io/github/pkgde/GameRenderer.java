@@ -7,8 +7,8 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 
-public class GameRenderer
-{
+public class GameRenderer {
+
     private final GameWorld world;
 
     private final SpriteBatch batch;
@@ -18,22 +18,29 @@ public class GameRenderer
     private float torchAnimTime;
 
     private final OrthographicCamera camera;
-    private final MapManager mapManager = new MapManager();
+    private final MapManager mapManager;
 
-    public GameRenderer(GameWorld world, OrthographicCamera camera)
-    {
+    public GameRenderer(GameWorld world, OrthographicCamera camera) {
         this.world = world;
         this.camera = camera;
+        this.mapManager = world.getMapManager();
 
         batch = new SpriteBatch();
         shape = new ShapeRenderer();
         font = new BitmapFont();
-        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        font.getRegion().getTexture().setFilter(
+            Texture.TextureFilter.Linear,
+            Texture.TextureFilter.Linear
+        );
 
         torchFrames = new Texture[7];
         for (int i = 0; i < torchFrames.length; i++) {
             torchFrames[i] = new Texture("Objects/torch/torch_" + (i + 1) + ".png");
-            torchFrames[i].setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+            torchFrames[i].setFilter(
+                Texture.TextureFilter.Linear,
+                Texture.TextureFilter.Linear
+            );
         }
     }
 
@@ -57,7 +64,6 @@ public class GameRenderer
             mapManager.render(camera);
         }
 
-        // ===== DEPTH LAYERING =====
         batch.begin();
 
         drawTorches(batch);
@@ -84,9 +90,7 @@ public class GameRenderer
     }
 
     private void drawTorches(SpriteBatch batch) {
-        if (mapManager == null || torchFrames.length == 0) {
-            return;
-        }
+        if (mapManager == null || torchFrames.length == 0) return;
 
         int frameIndex = ((int) (torchAnimTime / 0.1f)) % torchFrames.length;
         Texture frame = torchFrames[frameIndex];
@@ -97,28 +101,28 @@ public class GameRenderer
     }
 
     private void drawCollisionDebug() {
-        if (mapManager == null) {
-            return;
-        }
+        if (mapManager == null) return;
 
         shape.begin(ShapeRenderer.ShapeType.Line);
         shape.setColor(Color.RED);
+
         for (Rectangle r : mapManager.getCollisionRects()) {
             shape.rect(r.x, r.y, r.width, r.height);
         }
+
         shape.end();
     }
 
     private void drawChestBorders() {
-        if (mapManager == null) {
-            return;
-        }
+        if (mapManager == null) return;
 
         shape.begin(ShapeRenderer.ShapeType.Line);
         shape.setColor(Color.GOLD);
+
         for (Rectangle r : mapManager.getChestRects()) {
             shape.rect(r.x, r.y, r.width, r.height);
         }
+
         shape.end();
     }
 
@@ -136,39 +140,20 @@ public class GameRenderer
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        drawRoundedBar(
-            shape,
-            x,
-            y,
-            220f,
-            20f,
+        drawRoundedBar(shape, x, y, 220f, 20f,
             health / maxHealth,
             new Color(0.2f, 0.2f, 0.2f, 1f),
-            new Color(1f, 0.25f, 0.25f, 1f)
-        );
+            new Color(1f, 0.25f, 0.25f, 1f));
 
-
-        drawRoundedBar(
-            shape,
-            x,
-            y - 30f,
-            220f,
-            20f,
+        drawRoundedBar(shape, x, y - 30f, 220f, 20f,
             stamina / maxStamina,
             new Color(0.2f, 0.2f, 0.2f, 1f),
-            new Color(0.15f, 0.95f, 0.35f, 1f)
-        );
+            new Color(0.15f, 0.95f, 0.35f, 1f));
 
-        drawRoundedBar(
-            shape,
-            x,
-            y - 60f,
-            220f,
-            20f,
+        drawRoundedBar(shape, x, y - 60f, 220f, 20f,
             cooldown,
             new Color(0.2f, 0.2f, 0.2f, 1f),
-            new Color(0.25f, 0.65f, 1f, 1f)
-        );
+            new Color(0.25f, 0.65f, 1f, 1f));
 
         shape.end();
 
@@ -177,32 +162,28 @@ public class GameRenderer
 
     private void drawEnemyHealthBar() {
         Enemy enemy = world.getEnemy();
-        if (!enemy.isAlive()) {
-            return;
-        }
+        if (!enemy.isAlive()) return;
 
         Rectangle b = enemy.getBounds();
+
         float barW = b.width * 0.8f;
         float barH = 11f;
         float x = b.x + (b.width - barW) * 0.5f;
         float y = b.y + b.height + 14f;
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
+
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        drawRoundedBar(
-            shape,
-            x,
-            y,
-            barW,
-            barH,
+
+        drawRoundedBar(shape, x, y, barW, barH,
             enemy.getHealthRatio(),
             new Color(0.15f, 0.15f, 0.15f, 0.95f),
-            new Color(0.9f, 0.2f, 0.2f, 1f)
-        );
+            new Color(0.9f, 0.2f, 0.2f, 1f));
+
         shape.end();
+
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
-
 
     private void drawRoundedBar(
         ShapeRenderer shape,
@@ -212,8 +193,8 @@ public class GameRenderer
         float height,
         float percent,
         Color bgColor,
-        Color fillColor
-    ) {
+        Color fillColor) {
+
         float clampedPercent = MathUtils.clamp(percent, 0f, 1f);
         float radius = height / 2f;
 
@@ -221,9 +202,7 @@ public class GameRenderer
         shape.rect(x, y, width - radius, height);
         shape.circle(x + width - radius, y + radius, radius);
 
-        if (clampedPercent <= 0f) {
-            return;
-        }
+        if (clampedPercent <= 0f) return;
 
         shape.setColor(fillColor);
         float fillWidth = width * clampedPercent;
@@ -240,38 +219,13 @@ public class GameRenderer
     public ShapeRenderer getShape() { return shape; }
     public BitmapFont getFont() { return font; }
 
-    public void renderInventoryOverlay() {
-        float panelW = Math.min(420f, camera.viewportWidth * 0.6f);
-        float panelH = Math.min(280f, camera.viewportHeight * 0.55f);
-        float x = camera.position.x - panelW * 0.5f;
-        float y = camera.position.y - panelH * 0.5f;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0.08f, 0.08f, 0.1f, 0.9f);
-        shape.rect(x, y, panelW, panelH);
-        shape.end();
-
-        shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(0.95f, 0.85f, 0.35f, 1f);
-        shape.rect(x, y, panelW, panelH);
-        shape.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-
-        batch.begin();
-        font.setColor(Color.WHITE);
-        font.draw(batch, "Inventory", x + 18f, y + panelH - 18f);
-        font.draw(batch, "Torches: " + world.getPlayer().getTorchCount(), x + 18f, y + panelH - 58f);
-        font.draw(batch, "Press E or ESC to close", x + 18f, y + 30f);
-        batch.end();
-    }
-
     public void dispose() {
         batch.dispose();
         shape.dispose();
         font.dispose();
-        for (Texture torchFrame : torchFrames) {
-            torchFrame.dispose();
-        }
+        for (Texture t : torchFrames) t.dispose();
+    }
+
+    public void renderInventoryOverlay() {
     }
 }

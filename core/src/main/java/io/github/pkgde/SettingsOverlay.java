@@ -50,33 +50,26 @@ public class SettingsOverlay {
         selected = 0;
     }
 
-    public void hide()
-    {
-        active=false;
+    public void hide() {
+        active = false;
     }
 
-    public boolean isActive()
-    {
+    public boolean isActive() {
         return active;
     }
 
-    public void handleInput(Viewport viewport)
-    {
+    public void handleInput(Viewport viewport) {
 
         if (!active) return;
 
         updateLayout(viewport);
         updatePointer(viewport);
 
-        // 🔥 ESC BACK (instant + clean)
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             hide();
             return;
         }
-        float w=viewport.getWorldWidth();
-        float h=viewport.getWorldHeight();
 
-        // ===== KEYBOARD NAV =====
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
             Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
 
@@ -89,13 +82,11 @@ public class SettingsOverlay {
             selected = (selected + 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
-        {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             applySelection();
             return;
         }
 
-        // ===== MOUSE =====
         if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
@@ -137,9 +128,7 @@ public class SettingsOverlay {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        if (w == lastLayoutWidth && h == lastLayoutHeight) {
-            return;
-        }
+        if (w == lastLayoutWidth && h == lastLayoutHeight) return;
 
         lastLayoutWidth = w;
         lastLayoutHeight = h;
@@ -165,13 +154,14 @@ public class SettingsOverlay {
         float w = viewport.getWorldWidth();
         animTime += Gdx.graphics.getDeltaTime();
 
-        // ===== SHAPES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
         shape.setColor(0f, 0f, 0f, 0.45f);
+
         float panelW = boxW * 1.35f;
         float panelH = boxH * 4.9f;
         float panelX = centerX - (panelW - boxW) * 0.5f;
         float panelY = ys[OPTION_COUNT - 1] - boxH * 0.6f;
+
         shape.rect(panelX, panelY, panelW, panelH);
 
         for (int i = 0; i < OPTION_COUNT; i++) {
@@ -183,6 +173,7 @@ public class SettingsOverlay {
             }
             shape.rect(centerX, ys[i], boxW, boxH);
         }
+
         shape.end();
 
         shape.begin(ShapeRenderer.ShapeType.Line);
@@ -191,19 +182,20 @@ public class SettingsOverlay {
             shape.setColor(selected == i ? accent : inactiveOutline);
             shape.rect(centerX, ys[i], boxW, boxH);
         }
+
         shape.end();
-        //TEXT
+
         batch.begin();
-        float scale=w/800f;
-        font.getData().setScale(scale*1.2f);
+
+        float scale = w / 800f; // ✅ fixed (only once)
 
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
-        float scale = w / 800f;
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float textScale = scale * 1.18f * (selected == i ? 1.05f + pulse : 1f);
+
             font.getData().setScale(textScale);
             glyphLayout.setText(font, LABELS[i]);
 
@@ -213,6 +205,7 @@ public class SettingsOverlay {
 
             font.setColor(0f, 0f, 0f, 0.72f);
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
+
             font.setColor(1f, 1f, 1f, selected == i ? 1f : 0.9f);
             font.draw(batch, glyphLayout, textX, textY);
         }

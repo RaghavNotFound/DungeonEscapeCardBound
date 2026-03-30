@@ -19,20 +19,24 @@ public class GameWorld {
     public static final float WORLD_HEIGHT = 720;
     public static final float FLOOR_OFFSET = 120f;
 
+    // ✅ FIX: moved to class level
     private final ArrayList<Rectangle> boundaries;
+
+    public GameWorld(MapManager mapManager) {
 
         this.mapManager = mapManager;
 
         player = new Player();
         enemy = new Enemy();
 
+        // ✅ FIX: now assigning to class field
         boundaries = mapManager.getCollisionRects();
+
         player.setBoundaries(boundaries);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+
         enemy.setBoundaries(boundaries);
         enemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-
-        float t = 10f;
 
         if (!mapManager.getEnemySpawns().isEmpty()) {
             Vector2 enemySpawn = mapManager.getEnemySpawns().get(0);
@@ -54,7 +58,7 @@ public class GameWorld {
 
         if (player.canDealSwordDamage() && enemy.isAlive()
             && player.getSwordHitbox().overlaps(enemy.getBounds())) {
-            enemy.takeDamage(player.getSwordDamage());
+            enemy.takeDamage((int) player.getSwordDamage());
             player.consumeSwordDamage();
         }
 
@@ -73,32 +77,32 @@ public class GameWorld {
             Arrow arrow = arrows.get(i);
             if (enemy.isAlive() && arrow.getBounds().overlaps(enemyBounds)) {
                 arrows.remove(i);
-                enemy.takeDamage(ARROW_DAMAGE);
+                enemy.takeDamage((int) ARROW_DAMAGE);
             }
         }
     }
 
     public boolean isPlayerNearEnemy() {
-        if (!enemy.isAlive()) {
-            return false;
-        }
+        if (!enemy.isAlive()) return false;
 
         Vector2 p = player.getPosition();
         Rectangle b = enemy.getBounds();
+
         float ex = b.x + b.width * 0.5f;
         float ey = b.y + b.height * 0.5f;
 
         float dx = p.x - ex;
         float dy = p.y - ey;
+
         return dx * dx + dy * dy < NEAR_ENEMY_DISTANCE_SQ;
     }
 
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
     public Player getPlayer() { return player; }
     public Enemy getEnemy() { return enemy; }
+    public MapManager getMapManager() { return mapManager; }
 
-    public void dispose()
-    {
+    public void dispose() {
         player.dispose();
         enemy.dispose();
     }
