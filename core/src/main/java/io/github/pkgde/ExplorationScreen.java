@@ -24,7 +24,7 @@ public class ExplorationScreen implements Screen
     private final PauseOverlay pauseOverlay;
     private final SettingsOverlay settingsOverlay;
 
-    public enum State { GAME, INVENTORY, PAUSE, SETTINGS }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAMEOVER, VICTORY }
     private State state = State.GAME;
 
     private float shakeTime = 0f;
@@ -127,12 +127,40 @@ public class ExplorationScreen implements Screen
             if (!settingsOverlay.isActive()) {
                 state = State.PAUSE;
             }
+        } else if (state == State.GAMEOVER || state == State.VICTORY) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+                ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                return;
+            }
         }
 
         if (state == State.GAME) {
-            world.update(delta, camera);
+            float gameDelta = delta;
 
-            if (world.isPlayerNearEnemy()) {
+            boolean playerDead = !world.getPlayer().isAlive();
+            boolean formatVictory = !world.getEnemies().isEmpty();
+            boolean allAnimsFinished = true;
+
+            for (Enemy e : world.getEnemies()) {
+                if (e.isAlive()) formatVictory = false;
+                if (!e.isDeathAnimationFinished()) allAnimsFinished = false;
+            }
+
+            if (playerDead) {
+                gameDelta *= 0.3f;
+                if (world.getPlayer().isDeathAnimationFinished()) {
+                    state = State.GAMEOVER;
+                }
+            } else if (formatVictory) {
+                gameDelta *= 0.3f;
+                if (allAnimsFinished) {
+                    state = State.VICTORY;
+                }
+            }
+
+            world.update(gameDelta, camera);
+
+            if (world.isPlayerNearEnemy() && !playerDead && !formatVictory) {
                 if (!shakeTriggered) {
                     shakeTime = shakeDuration;
                     shakeTriggered = true;
@@ -150,7 +178,7 @@ public class ExplorationScreen implements Screen
             offsetY = MathUtils.random(-10f, 10f);
         }
 
-        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY) {
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY || state == State.GAMEOVER || state == State.VICTORY) {
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
@@ -184,7 +212,15 @@ public class ExplorationScreen implements Screen
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0, 0, 0, 0.5f);
+            
+            if (state == State.GAMEOVER) {
+                shape.setColor(0.5f, 0, 0, 0.65f);
+            } else if (state == State.VICTORY) {
+                shape.setColor(0.8f, 0.6f, 0.1f, 0.6f);
+            } else {
+                shape.setColor(0, 0, 0, 0.5f);
+            }
+
             shape.rect(
                 camera.position.x - camera.viewportWidth / 2f,
                 camera.position.y - camera.viewportHeight / 2f,
@@ -211,6 +247,26 @@ public class ExplorationScreen implements Screen
 
         if (state == State.INVENTORY) {
             renderer.renderInventoryOverlay();
+        }
+
+        if (state == State.GAMEOVER || state == State.VICTORY) {
+            batch.setProjectionMatrix(camera.combined);
+            batch.begin();
+            
+            font.getData().setScale(3f);
+            font.setColor(Color.WHITE);
+            String text = (state == State.GAMEOVER) ? "YOU DIED" : "VICTORY ACHIEVED";
+            
+            // Extremely simple rough text centering 
+            float textW = state == State.GAMEOVER ? 160f : 320f;
+            font.draw(batch, text, camera.position.x - textW / 2f, camera.position.y + 70f);
+            
+            font.getData().setScale(1.5f);
+            float subtitleW = 280f;
+            font.draw(batch, "Press ESCAPE to return to Menu", camera.position.x - subtitleW / 2f, camera.position.y - 10f);
+            
+            font.getData().setScale(1f);
+            batch.end();
         }
     }
 

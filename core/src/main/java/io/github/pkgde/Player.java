@@ -41,6 +41,7 @@ public class Player {
     private boolean facingRight = true;
     private boolean swordDamageConsumed;
 
+    private Rectangle swordHitbox = new Rectangle();
     private final Vector2 position;
     public Rectangle bounds;
 
@@ -58,6 +59,10 @@ public class Player {
     private static final float HITBOX_OFFSET_X = 36f;
     private static final float HITBOX_OFFSET_Y = 19f;
 
+    // ===== KNOCKBACK =====
+    private Vector2 knockbackVelocity = new Vector2();
+    private static final float KNOCKBACK_FRICTION = 600f;
+
     // ===== ARROWS =====
     private final ArrayList<Arrow> arrows = new ArrayList<>();
 
@@ -70,6 +75,16 @@ public class Player {
     private static final float STAMINA_IDLE_REGEN_RATE = STAMINA_DRAIN_RATE * 0.8f;
     private static final float STAMINA_WALK_REGEN_RATE = STAMINA_DRAIN_RATE * 0.4f;
     private static final float RUN_UNLOCK_THRESHOLD_RATIO = 0.5f;
+    
+    // ===== DASH =====
+    private static final float DASH_DURATION = 0.22f;
+    private static final float DASH_SPEED_MULT = 3.8f;
+    private static final float DASH_STAMINA_COST = 30f;
+    private static final float DASH_COOLDOWN = 0.6f;
+    private float dashTimer;
+    private float dashCooldownTimer;
+    private Vector2 dashDirection = new Vector2();
+    private boolean isDashing;
 
     private float stamina = 100f;
     private float maxStamina = 100f;
@@ -182,6 +197,7 @@ public class Player {
     public float getHealth() { return health; }
     public float getMaxHealth() { return MAX_HEALTH; }
     public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
+    public void addHealth(float amount) { health = Math.min(health + amount, MAX_HEALTH); }
     public float getSwordDamage() { return SWORD_DAMAGE; }
 
     public Vector2 getPosition() { return position; }
@@ -232,13 +248,51 @@ public class Player {
             swordCooldownTimer -= delta;
         }
 
+        if (dashCooldownTimer > 0f) {
+            dashCooldownTimer -= delta;
+        }
+        
+        if (dashTimer > 0f) {
+            dashTimer -= delta;
+            if (dashTimer <= 0f) {
+                isDashing = false;
+            } else {
+                damageInvulnTimer = Math.max(damageInvulnTimer, 0.1f);
+            }
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) 
+            && stamina >= DASH_STAMINA_COST 
+            && dashTimer <= 0f 
+            && dashCooldownTimer <= 0f 
+            && hurtTimer <= 0f 
+            && !isDashing) {
+            
+            stamina -= DASH_STAMINA_COST;
+            dashTimer = DASH_DURATION;
+            dashCooldownTimer = DASH_COOLDOWN;
+            isDashing = true;
+
+            float dx = 0, dy = 0;
+            if (Gdx.input.isKeyPressed(Input.Keys.W)) dy = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S)) dy = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A)) dx = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D)) dx = 1;
+            
+            if (dx == 0 && dy == 0) {
+                dx = facingRight ? 1 : -1;
+            }
+            dashDirection.set(dx, dy).nor();
+        }
+
         if (swordAttackTimer > 0f) {
             swordAttackTimer -= delta;
             swordAttackStateTime += delta;
 
-            if (swordAttackTimer <= 0f) {
-                swordDamageConsumed = false;
-            }
+            swordAttackTimer = swordAnimation.getAnimationDuration();
+            swordAttackStateTime = 0f;
+            swordCooldownTimer = SWORD_COOLDOWN;
+            swordDamageConsumed = false; // ✅ KEEP ONLY HERE
         }
 
         if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)
@@ -273,7 +327,9 @@ public class Player {
         // ===== STAMINA =====
         boolean runningNow = isRunning && moved && stamina > 0;
 
-        if (runningNow) {
+        if (isDashing) {
+            // No regen while dashing
+        } else if (runningNow) {
             stamina -= STAMINA_DRAIN_RATE * delta;
         } else if (moved) {
             stamina += STAMINA_WALK_REGEN_RATE * delta;
@@ -325,8 +381,18 @@ public class Player {
         hurtStateTime = 0f;
     }
 
+    public void applyKnockback(Vector2 forceDir, float forceAmt) {
+        if (!isAlive()) return;
+        Vector2 normalized = new Vector2(forceDir).nor();
+        knockbackVelocity.add(normalized.scl(forceAmt));
+    }
+
     public boolean isAlive() {
         return health > 0f;
+    }
+
+    public boolean isDeathAnimationFinished() {
+        return !isAlive() && deathStateTime >= deathAnimation.getAnimationDuration();
     }
 
     public boolean canDealSwordDamage() {
@@ -344,11 +410,19 @@ public class Player {
     }
 
     public Rectangle getSwordHitbox() {
+
         float hitW = 78f;
         float hitH = 60f;
-        float hitX = facingRight ? position.x + WIDTH * 0.62f : position.x - hitW + WIDTH * 0.38f;
+
+        float hitX = facingRight
+            ? position.x + WIDTH * 0.62f
+            : position.x - hitW + WIDTH * 0.38f;
+
         float hitY = position.y + HEIGHT * 0.24f;
-        return new Rectangle(hitX, hitY, hitW, hitH);
+
+        swordHitbox.set(hitX, hitY, hitW, hitH);
+
+        return swordHitbox;
     }
 
     private void updateRunLockState() {
@@ -376,7 +450,6 @@ public class Player {
         return idleBlinkingAnimation.getKeyFrame(cycleTime - idleDuration, false);
     }
 
-    // ===== MOVEMENT =====
     private boolean handleMovement(float delta) {
         float oldX = position.x;
         float oldY = position.y;
@@ -384,30 +457,54 @@ public class Player {
         float newX = position.x;
         float newY = position.y;
 
-        boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
-        boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
-        boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
-        boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
-
-        boolean runKeyPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
-
-        float baseSpeed = 100f;
-        boolean canRun = runKeyPressed && !runLocked;
-        isRunning = canRun;
-
-        float speed = canRun ? baseSpeed * 1.5f : baseSpeed;
-
-        if (up) newY += speed * delta;
-        if (down) newY -= speed * delta;
-
-        if (left) {
-            newX -= speed * delta;
-            facingRight = false;
+        // Apply knockback
+        if (knockbackVelocity.len2() > 0) {
+            float currentSpeed = knockbackVelocity.len();
+            currentSpeed -= KNOCKBACK_FRICTION * delta;
+            if (currentSpeed <= 0) {
+                knockbackVelocity.setZero();
+            } else {
+                knockbackVelocity.setLength(currentSpeed);
+                newX += knockbackVelocity.x * delta;
+                newY += knockbackVelocity.y * delta;
+            }
         }
 
-        if (right) {
-            newX += speed * delta;
-            facingRight = true;
+        // Standard movement locked out during hit-stun, unless dashing
+        if (isDashing) {
+            newX += dashDirection.x * 100f * DASH_SPEED_MULT * delta;
+            newY += dashDirection.y * 100f * DASH_SPEED_MULT * delta;
+            if (dashDirection.x < 0) facingRight = false;
+            else if (dashDirection.x > 0) facingRight = true;
+            isRunning = true;
+        } else if (hurtTimer <= 0f) {
+            boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
+            boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
+            boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
+            boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
+
+            boolean runKeyPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+
+            float baseSpeed = 100f;
+            boolean canRun = runKeyPressed && !runLocked;
+            isRunning = canRun;
+
+            float speed = canRun ? baseSpeed * 1.5f : baseSpeed;
+
+            if (up) newY += speed * delta;
+            if (down) newY -= speed * delta;
+
+            if (left) {
+                newX -= speed * delta;
+                facingRight = false;
+            }
+
+            if (right) {
+                newX += speed * delta;
+                facingRight = true;
+            }
+        } else {
+            isRunning = false; // Cannot run when hurt
         }
 
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);

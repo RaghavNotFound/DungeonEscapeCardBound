@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
+import io.github.pkgde.Enemy;
 
 public class GameRenderer {
 
@@ -60,19 +61,30 @@ public class GameRenderer {
 
         drawTorches(batch);
 
-        if (world.getPlayer().getPos().y > world.getEnemy().getBounds().y) {
-            world.getEnemy().render(batch);
+        for (Enemy enemy : world.getEnemies()) {
+            if (world.getPlayer().getPos().y > enemy.getBounds().y) {
+                enemy.render(batch);
+            }
         }
 
         world.getPlayer().render(batch);
 
-        if (world.getPlayer().getPos().y <= world.getEnemy().getBounds().y) {
-            world.getEnemy().render(batch);
+        for (Enemy enemy : world.getEnemies()) {
+            if (world.getPlayer().getPos().y <= enemy.getBounds().y) {
+                enemy.render(batch);
+            }
         }
 
         batch.end();
 
-        drawEnemyHealthBar();
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        for (LootDrop drop : world.getLootDrops()) {
+            drop.render(batch, shape);
+        }
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
         drawCollisionDebug();
         drawUI();
 
@@ -123,8 +135,10 @@ public class GameRenderer {
 
         // Draw Enemy boundaries
         shape.setColor(Color.MAGENTA);
-        Rectangle eBounds = world.getEnemy().getBounds();
-        shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
+        for (Enemy enemy : world.getEnemies()) {
+            Rectangle eBounds = enemy.getBounds();
+            shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
+        }
 
         // Draw Arrows
         shape.setColor(Color.CYAN);
@@ -189,33 +203,6 @@ public class GameRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void drawEnemyHealthBar() {
-        Enemy enemy = world.getEnemy();
-        if (!enemy.isAlive()) {
-            return;
-        }
-
-        Rectangle b = enemy.getBounds();
-        float barW = b.width * 0.8f;
-        float barH = 11f;
-        float x = b.x + (b.width - barW) * 0.5f;
-        float y = b.y + b.height + 14f;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        shape.begin(ShapeRenderer.ShapeType.Filled);
-        drawRoundedBar(
-            shape,
-            x,
-            y,
-            barW,
-            barH,
-            enemy.getHealthRatio(),
-            new Color(0.15f, 0.15f, 0.15f, 0.95f),
-            new Color(0.9f, 0.2f, 0.2f, 1f)
-        );
-        shape.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-    }
 
 
     private void drawRoundedBar(

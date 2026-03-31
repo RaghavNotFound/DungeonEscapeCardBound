@@ -4,6 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer; // 🔥 ADDED
+import com.badlogic.gdx.graphics.GL20;
 import java.util.ArrayList;
 
 public class Enemy {
@@ -48,17 +50,17 @@ public class Enemy {
     private float attackStateTime = 0f;
     private float deathStateTime = 0f;
 
-    // ===== AI STATES =====
     private enum State { IDLE, CHASE }
     private State state = State.IDLE;
 
-    // ===== SETTINGS =====
     private static final float SPEED = 95f;
 
     private float baseRange = 200f;
     private float alertRange = baseRange * 2f;
 
     private float fovAngle = 90f;
+
+    private float forcedAggroTimer = 0f;
 
     private Vector2 forward = new Vector2(1, 0);
 
@@ -70,7 +72,6 @@ public class Enemy {
     private static final float HITBOX_OFFSET_X = 49f;
     private static final float HITBOX_OFFSET_Y = 40f;
 
-    // ===== COMBAT =====
     private static final float MAX_HEALTH = 100f;
     private static final float ATTACK_DAMAGE = 14f;
     private static final float ATTACK_RANGE = 76f;
@@ -92,11 +93,17 @@ public class Enemy {
 
     private ArrayList<Polygon> collisionPolygons;
 
-    // Ÿ” RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private float moveDuration = 0f;
     private boolean isMoving = false;
+
+    // 🔥 Knockback
+    private Vector2 knockbackVelocity = new Vector2(0, 0);
+    private static final float KNOCKBACK_FRICTION = 600f; // decel
+
+    // 🔥 UI RENDERER ADDED
+    private ShapeRenderer shape = new ShapeRenderer();
 
     public Enemy() {
         position = new Vector2(400, 300);
@@ -130,6 +137,10 @@ public class Enemy {
         currentFrame = frontIdleAnim.getKeyFrame(0f, true);
 
         pickNewRandomAction();
+    }
+
+    public Rectangle getBounds() {
+        return bounds;
     }
 
     public void setBoundaries(ArrayList<Rectangle> boundaries) {
@@ -176,6 +187,17 @@ public class Enemy {
     public void update(float delta, Player player) {
         if (disposed) {
             return;
+        }
+
+        if (knockbackVelocity.len2() > 0) {
+            float currentSpeed = knockbackVelocity.len();
+            currentSpeed -= KNOCKBACK_FRICTION * delta;
+            if (currentSpeed <= 0) {
+                knockbackVelocity.setZero();
+            } else {
+                knockbackVelocity.setLength(currentSpeed);
+                moveBy(knockbackVelocity.x * delta, knockbackVelocity.y * delta);
+            }
         }
 
         if (!isAlive()) {
@@ -229,14 +251,19 @@ public class Enemy {
         }
 
         // ===== STATE =====
-        if (inRange && inCone) {
+        if (forcedAggroTimer > 0f) {
+            forcedAggroTimer -= delta;
             state = State.CHASE;
-        }
-        else if (state == State.CHASE && distance <= alertRange) {
-            state = State.CHASE;
-        }
-        else {
-            state = State.IDLE;
+        } else {
+            if (inRange && inCone) {
+                state = State.CHASE;
+            }
+            else if (state == State.CHASE && distance <= alertRange) {
+                state = State.CHASE;
+            }
+            else {
+                state = State.IDLE;
+            }
         }
 
         // ===== BEHAVIOR =====
@@ -252,7 +279,7 @@ public class Enemy {
                     pickNewRandomAction();
                 }
 
-                if (isMoving && !isAttacking) {
+                if (isMoving && !isAttacking && hurtTimer <= 0f) {
                     moveBy(randomDir.x * SPEED * 0.5f * delta, randomDir.y * SPEED * 0.5f * delta);
                     forward.set(randomDir);
                 }
@@ -261,7 +288,7 @@ public class Enemy {
 
             case CHASE:
 
-                if (!isAttacking) {
+                if (!isAttacking && hurtTimer <= 0f) {
                     Vector2 direction = new Vector2(playerPos)
                         .sub(position)
                         .nor();
@@ -320,6 +347,26 @@ public class Enemy {
         hurtStateTime = 0f;
     }
 
+    public void applyKnockback(Vector2 forceDir, float forceAmt) {
+        if (!isAlive() || disposed) return;
+        Vector2 normalized = new Vector2(forceDir).nor();
+        knockbackVelocity.add(normalized.scl(forceAmt));
+    }
+
+    public boolean isPlayerInAttackRadius(Player p) {
+        float centerX = bounds.x + bounds.width / 2f;
+        float centerY = bounds.y + bounds.height / 2f;
+        Rectangle pBounds = p.getBounds();
+
+        float closestX = MathUtils.clamp(centerX, pBounds.x, pBounds.x + pBounds.width);
+        float closestY = MathUtils.clamp(centerY, pBounds.y, pBounds.y + pBounds.height);
+
+        float dx = centerX - closestX;
+        float dy = centerY - closestY;
+
+        return (dx * dx + dy * dy) <= (ATTACK_RANGE * ATTACK_RANGE);
+    }
+
     public boolean canDealDamage() {
         if (attackTimer <= 0f || attackDamageConsumed || !isAlive()) {
             return false;
@@ -328,6 +375,16 @@ public class Enemy {
         float duration = getAttackAnimation().getAnimationDuration();
         float progress = 1f - (attackTimer / duration);
         return progress >= 0.35f && progress <= 0.6f;
+    }
+
+    public boolean isChasing() {
+        return state == State.CHASE;
+    }
+
+    public void forceChase(float duration) {
+        if (!isAlive() || disposed) return;
+        forcedAggroTimer = Math.max(forcedAggroTimer, duration);
+        state = State.CHASE;
     }
 
     public void consumeAttackDamage() {
@@ -501,11 +558,80 @@ public class Enemy {
             return;
         }
 
-        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
-    }
+        // 🔴 HURT FLASH
+        if (hurtTimer > 0f) {
+            batch.setColor(1f, 0.5f, 0.5f, 1f);
+        }
 
-    public Rectangle getBounds() {
-        return bounds;
+        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+
+        batch.setColor(1f, 1f, 1f, 1f);
+
+        batch.end();
+
+        // 🔥 UI DRAW
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        
+        shape.setProjectionMatrix(batch.getProjectionMatrix());
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        float barWidth = bounds.width * 1.5f;
+        float barHeight = 8f;
+        float x = bounds.x + (bounds.width - barWidth) / 2f;
+        float y = bounds.y + bounds.height + 14f;
+
+        float ratio = getHealthRatio();
+
+        // Health bar background & border
+        shape.setColor(0.15f, 0.15f, 0.15f, 0.95f);
+        shape.rect(x - 2, y - 2, barWidth + 4, barHeight + 4);
+        
+        shape.setColor(0.3f, 0f, 0f, 1f);
+        shape.rect(x, y, barWidth, barHeight);
+
+        // Health remaining
+        if (ratio > 0.6f) shape.setColor(0.2f, 0.9f, 0.2f, 1f);
+        else if (ratio > 0.3f) shape.setColor(0.9f, 0.9f, 0.2f, 1f);
+        else shape.setColor(0.9f, 0.2f, 0.2f, 1f);
+
+        shape.rect(x, y, barWidth * ratio, barHeight);
+
+        // State indicator
+        float exX = x + barWidth / 2f;
+        float exY = y + barHeight + 12f;
+
+        if (state == State.CHASE) {
+            shape.setColor(1f, 0.2f, 0.2f, 1f);
+            shape.rect(exX - 2.5f, exY, 5f, 14f);
+            shape.circle(exX, exY - 4f, 2.5f);
+        } else {
+            shape.setColor(0.6f, 0.6f, 0.6f, 0.6f);
+            shape.circle(exX, exY, 4f);
+        }
+
+        // Attack telegraphing
+        if (attackTimer > 0f) {
+            float duration = getAttackAnimation().getAnimationDuration();
+            float progress = 1f - (attackTimer / duration);
+            
+            float centerX = bounds.x + bounds.width / 2f;
+            float centerY = bounds.y + bounds.height / 2f;
+
+            // Faint outer range
+            shape.setColor(1f, 0.1f, 0.1f, 0.15f);
+            shape.circle(centerX, centerY, ATTACK_RANGE);
+
+            // Expanding inner danger zone
+            float expandRadius = ATTACK_RANGE * progress;
+            shape.setColor(1f, 0f, 0f, 0.4f * progress);
+            shape.circle(centerX, centerY, expandRadius);
+        }
+
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
     }
 
     public void dispose() {
@@ -516,6 +642,9 @@ public class Enemy {
         for (Texture t : textures) {
             t.dispose();
         }
+
+        shape.dispose(); // 🔥 ADDED
+
         disposed = true;
     }
 }
