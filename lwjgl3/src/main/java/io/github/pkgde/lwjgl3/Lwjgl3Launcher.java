@@ -23,12 +23,10 @@ public class Lwjgl3Launcher
         Lwjgl3ApplicationConfiguration configuration=new Lwjgl3ApplicationConfiguration();
         configuration.setTitle("DungeonEscapeCardbound");
         configuration.useVsync(true);
-        configuration.setForegroundFPS(
-            Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate+1
-        );
-
-        var mode=Lwjgl3ApplicationConfiguration.getDisplayMode();
-        configuration.setWindowedMode(mode.width,mode.height);
+        
+        // Start maximized, but with a sensible window size for when it's not maximized.
+        // 1280x720 is the game's native aspect ratio and a selectable option.
+        configuration.setWindowedMode(1280, 720);
         configuration.setDecorated(true);   // keeps window frame
         configuration.setMaximized(true);   // fills screen like fullscreen
         configuration.setForegroundFPS(60);

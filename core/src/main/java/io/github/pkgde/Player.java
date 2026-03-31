@@ -236,8 +236,7 @@ public class Player {
             }
         }
 
-        if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)
-            || Gdx.input.isKeyJustPressed(Input.Keys.F))
+        if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.F))
             && swordCooldownTimer <= 0f && swordAttackTimer <= 0f) {
 
             swordAttackTimer = swordAnimation.getAnimationDuration();
@@ -378,10 +377,10 @@ public class Player {
         float newX = position.x;
         float newY = position.y;
 
-        boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
-        boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
-        boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
-        boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
+        boolean up = (Gdx.input.isKeyPressed(Input.Keys.W)|| Gdx.input.isKeyPressed(Input.Keys.UP));
+        boolean down = (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN));
+        boolean left = (Gdx.input.isKeyPressed(Input.Keys.A)|| Gdx.input.isKeyPressed(Input.Keys.LEFT));
+        boolean right = (Gdx.input.isKeyPressed(Input.Keys.D)|| Gdx.input.isKeyPressed(Input.Keys.RIGHT));
 
         boolean runKeyPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 

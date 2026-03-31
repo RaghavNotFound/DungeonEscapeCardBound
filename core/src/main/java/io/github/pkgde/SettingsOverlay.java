@@ -155,14 +155,6 @@ public class SettingsOverlay {
         animTime += Gdx.graphics.getDeltaTime();
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0f, 0f, 0f, 0.45f);
-
-        float panelW = boxW * 1.35f;
-        float panelH = boxH * 4.9f;
-        float panelX = centerX - (panelW - boxW) * 0.5f;
-        float panelY = ys[OPTION_COUNT - 1] - boxH * 0.6f;
-
-        shape.rect(panelX, panelY, panelW, panelH);
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {

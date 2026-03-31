@@ -23,6 +23,7 @@ public class ExplorationScreen implements Screen {
 
     private final PauseOverlay pauseOverlay;
     private final SettingsOverlay settingsOverlay;
+    private final InventoryOverlay inventoryOverlay;
 
     public enum State { GAME, INVENTORY, PAUSE, SETTINGS }
     private State state = State.GAME;
@@ -54,6 +55,7 @@ public class ExplorationScreen implements Screen {
 
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
+        inventoryOverlay = new InventoryOverlay();
 
         fbo = new FrameBuffer(
             Pixmap.Format.RGBA8888,
@@ -104,6 +106,7 @@ public class ExplorationScreen implements Screen {
 
         } else if (state == State.INVENTORY) {
 
+            inventoryOverlay.handleInput();
             if (Gdx.input.isKeyJustPressed(Input.Keys.E) ||
                 Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 state = State.GAME;
@@ -197,15 +200,6 @@ public class ExplorationScreen implements Screen {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0, 0, 0, 0.5f);
-            shape.rect(
-                camera.position.x - camera.viewportWidth / 2f,
-                camera.position.y - camera.viewportHeight / 2f,
-                camera.viewportWidth,
-                camera.viewportHeight
-            );
-            shape.end();
             Gdx.gl.glDisable(GL20.GL_BLEND);
 
         } else {
@@ -225,7 +219,7 @@ public class ExplorationScreen implements Screen {
         }
 
         if (state == State.INVENTORY) {
-            renderer.renderInventoryOverlay();
+            inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
         }
     }
 
@@ -250,6 +244,7 @@ public class ExplorationScreen implements Screen {
         fbo.dispose();
         blurBatch.dispose();
         blurShader.dispose();
+        inventoryOverlay.dispose();
     }
 
     @Override public void show() {}
