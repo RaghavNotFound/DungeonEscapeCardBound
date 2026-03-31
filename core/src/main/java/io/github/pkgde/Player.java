@@ -321,6 +321,10 @@ public class Player {
         return health > 0f;
     }
 
+    public boolean isDeathAnimationFinished() {
+        return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime);
+    }
+
     public boolean canDealSwordDamage() {
         if (swordAttackTimer <= 0f || swordDamageConsumed) {
             return false;

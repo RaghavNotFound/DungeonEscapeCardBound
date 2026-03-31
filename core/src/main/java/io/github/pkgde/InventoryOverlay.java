@@ -57,8 +57,8 @@ public class InventoryOverlay
     }
 
     private void updateLayout(Viewport viewport) {
-        float totalGridWidth = viewport.getWorldWidth() * 0.5f;
-        float totalGridHeight = viewport.getWorldHeight() * 0.6f;
+        float totalGridWidth = viewport.getWorldWidth() * 0.6f;
+        float totalGridHeight = viewport.getWorldHeight() * 0.7f;
         float slotSize = Math.min(totalGridWidth / GRID_COLS, totalGridHeight / GRID_ROWS) * 0.9f;
         float gap = slotSize * 0.1f;
 
@@ -141,9 +141,11 @@ public class InventoryOverlay
         int torchCount = player.getTorchCount();
         if (torchCount > 0) {
             Rectangle slot = slots[0];
-            float iconSize = slot.height * 0.8f;
+            // Make icon smaller to leave space for text below it.
+            float iconSize = slot.height * 0.6f;
             float iconX = slot.x + (slot.width - iconSize) / 2f;
-            float iconY = slot.y + (slot.height - iconSize) / 2f;
+            // Position icon in the upper part of the slot.
+            float iconY = slot.y + slot.height * 0.35f;
             batch.draw(torchIcon, iconX, iconY, iconSize, iconSize);
 
             // Draw quantity
@@ -165,8 +167,9 @@ public class InventoryOverlay
             font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.0f);
             glyphLayout.setText(font, tooltipText);
 
-            float tooltipX = selectedSlot.x + (selectedSlot.width - glyphLayout.width) / 2;
-            float tooltipY = selectedSlot.y - 15;
+            // Position the tooltip text inside the bottom of the selected slot.
+            float tooltipX = selectedSlot.x + (selectedSlot.width - glyphLayout.width) / 2f;
+            float tooltipY = selectedSlot.y + glyphLayout.height + selectedSlot.height * 0.1f;
 
             font.setColor(0f, 0f, 0f, 0.72f);
             font.draw(batch, glyphLayout, tooltipX + shadow, tooltipY - shadow);

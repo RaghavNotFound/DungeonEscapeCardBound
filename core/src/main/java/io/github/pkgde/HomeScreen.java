@@ -108,8 +108,9 @@ public class HomeScreen implements Screen
         float exitY=settingsY-btnHeight-gap;
 
         //INPUT
-        if (settings.isActive())
+        if (settings.isOverlayVisible())
         {
+            settings.update(delta);
             settings.handleInput(viewport);
         }
         else
@@ -150,7 +151,7 @@ public class HomeScreen implements Screen
         }
 
         //SETTINGS MODE
-        if (settings.isActive())
+        if (settings.isOverlayVisible())
         {
             fbo.begin();
 
@@ -165,8 +166,9 @@ public class HomeScreen implements Screen
             blurBatch.setProjectionMatrix(camera.combined);
 
             blurBatch.begin();
-            blurShader.setUniformf("blur",0.002f);
-
+            float progress = settings.getTransitionProgress();
+            blurShader.setUniformf("blur", progress * 0.002f);
+            
             blurBatch.draw(
                 tex,
                 0,0,
@@ -181,7 +183,7 @@ public class HomeScreen implements Screen
             Gdx.gl.glEnable(GL20.GL_BLEND);
 
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            shapeRenderer.setColor(0,0,0,0.5f);
+            shapeRenderer.setColor(0, 0, 0, progress * 0.5f);
             shapeRenderer.rect(0,0,worldW,worldH);
             shapeRenderer.end();
 
