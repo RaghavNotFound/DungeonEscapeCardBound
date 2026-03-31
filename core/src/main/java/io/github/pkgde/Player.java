@@ -45,6 +45,7 @@ public class Player {
     public Rectangle bounds;
 
     private ArrayList<Rectangle> boundaries;
+    private ArrayList<Polygon> collisionPolygons;
     private float worldMinX = 0f;
     private float worldMinY = 0f;
     private float worldMaxX = Float.MAX_VALUE;
@@ -197,6 +198,10 @@ public class Player {
         this.boundaries = boundaries;
     }
 
+    public void setCollisionPolygons(ArrayList<Polygon> polygons) {
+        this.collisionPolygons = polygons;
+    }
+
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
         this.worldMinX = minX;
         this.worldMinY = minY;
@@ -294,7 +299,9 @@ public class Player {
             Arrow arrow = arrows.get(i);
             arrow.update(delta);
 
-            if (arrow.isCollided(worldMaxX, worldMaxY, boundaries == null ? new ArrayList<>() : boundaries)) {
+            if (arrow.isCollided(worldMaxX, worldMaxY,
+                                 boundaries == null ? new ArrayList<>() : boundaries,
+                                 collisionPolygons == null ? new ArrayList<>() : collisionPolygons)) {
                 arrows.remove(i);
             }
         }
@@ -371,7 +378,6 @@ public class Player {
 
     // ===== MOVEMENT =====
     private boolean handleMovement(float delta) {
-
         float oldX = position.x;
         float oldY = position.y;
 
@@ -408,22 +414,44 @@ public class Player {
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
         Rectangle xBounds = new Rectangle(newX + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
-        if (boundaries != null) {
-            for (Rectangle wall : boundaries) {
-                if (xBounds.overlaps(wall)) return false;
-            }
+        if (!collides(xBounds)) {
+            position.x = newX;
         }
-        position.x = newX;
 
         Rectangle yBounds = new Rectangle(position.x + HITBOX_OFFSET_X, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        if (!collides(yBounds)) {
+            position.y = newY;
+        }
+
+        return !MathUtils.isEqual(oldX, position.x, 0.0001f)
+            || !MathUtils.isEqual(oldY, position.y, 0.0001f);
+    }
+
+    private boolean collides(Rectangle nextBounds) {
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
-                if (yBounds.overlaps(wall)) return false;
+                if (nextBounds.overlaps(wall)) {
+                    return true;
+                }
             }
         }
-        position.y = newY;
 
-        return oldX != position.x || oldY != position.y;
+        if (collisionPolygons != null) {
+            Polygon rectPoly = new Polygon(new float[] {
+                nextBounds.x, nextBounds.y,
+                nextBounds.x + nextBounds.width, nextBounds.y,
+                nextBounds.x + nextBounds.width, nextBounds.y + nextBounds.height,
+                nextBounds.x, nextBounds.y + nextBounds.height
+            });
+
+            for (Polygon poly : collisionPolygons) {
+                if (Intersector.overlapConvexPolygons(rectPoly, poly)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void shootArrow(OrthographicCamera camera) {

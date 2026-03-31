@@ -2,6 +2,7 @@ package io.github.pkgde;
 
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public class GameWorld {
     private final Enemy enemy;
 
     private final ArrayList<Rectangle> boundaries;
+    private final ArrayList<Polygon> collisionPolygons;
 
     public GameWorld(MapManager mapManager) {
 
@@ -26,9 +28,14 @@ public class GameWorld {
         enemy = new Enemy();
 
         boundaries = mapManager.getCollisionRects();
+        collisionPolygons = mapManager.getCollisionPolygons();
+
         player.setBoundaries(boundaries);
+        player.setCollisionPolygons(collisionPolygons);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+
         enemy.setBoundaries(boundaries);
+        enemy.setCollisionPolygons(collisionPolygons);
         enemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
 
         player.getPosition().set(mapManager.getPlayerSpawn());

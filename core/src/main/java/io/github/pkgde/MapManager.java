@@ -6,6 +6,7 @@ import com.badlogic.gdx.maps.tiled.*;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.maps.objects.*;
 import com.badlogic.gdx.math.Circle;
@@ -21,6 +22,7 @@ public class MapManager {
     private Vector2 playerSpawn = new Vector2();
     private ArrayList<Vector2> enemySpawns = new ArrayList<>();
     private ArrayList<Rectangle> collisionRects = new ArrayList<>();
+    private ArrayList<Polygon> collisionPolygons = new ArrayList<>();
     private ArrayList<Rectangle> torchRects = new ArrayList<>();
     private ArrayList<Rectangle> chestRects = new ArrayList<>();
 
@@ -32,6 +34,7 @@ public class MapManager {
 
         enemySpawns.clear();
         collisionRects.clear();
+        collisionPolygons.clear();
         torchRects.clear();
         chestRects.clear();
 
@@ -73,9 +76,13 @@ public class MapManager {
             for (MapObject obj : objectLayer.getObjects()) {
 
                 if (isObjectTag(obj, "wall") || isObjectTag(obj, "water") || isObjectTag(obj, "centerFire")) {
-                    Rectangle r = extractObjectBounds(obj);
-                    if (r != null) {
-                        collisionRects.add(r);
+                    if (obj instanceof PolygonMapObject) {
+                        collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
+                    } else {
+                        Rectangle r = extractObjectBounds(obj);
+                        if (r != null) {
+                            collisionRects.add(r);
+                        }
                     }
                 }
             }
@@ -89,9 +96,13 @@ public class MapManager {
             if (layer == null) continue;
 
             for (MapObject obj : layer.getObjects()) {
-                Rectangle r = extractObjectBounds(obj);
-                if (r != null) {
-                    collisionRects.add(r);
+                if (obj instanceof PolygonMapObject) {
+                    collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
+                } else {
+                    Rectangle r = extractObjectBounds(obj);
+                    if (r != null) {
+                        collisionRects.add(r);
+                    }
                 }
             }
         }
@@ -219,6 +230,7 @@ public class MapManager {
     public Vector2 getPlayerSpawn() { return playerSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
+    public ArrayList<Polygon> getCollisionPolygons() { return collisionPolygons; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
 

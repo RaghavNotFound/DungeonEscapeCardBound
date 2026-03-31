@@ -74,7 +74,6 @@ public class GameRenderer {
 
         drawEnemyHealthBar();
         drawCollisionDebug();
-        drawChestBorders();
         drawUI();
 
         camera.position.sub(offsetX, offsetY, 0);
@@ -95,28 +94,45 @@ public class GameRenderer {
     }
 
     private void drawCollisionDebug() {
-        if (mapManager == null) {
-            return;
-        }
-
         shape.begin(ShapeRenderer.ShapeType.Line);
+
+        // Draw map boundaries
         shape.setColor(Color.RED);
-        for (Rectangle r : mapManager.getCollisionRects()) {
-            shape.rect(r.x, r.y, r.width, r.height);
+        if (mapManager != null) {
+            for (Rectangle r : mapManager.getCollisionRects()) {
+                shape.rect(r.x, r.y, r.width, r.height);
+            }
+            if (mapManager.getCollisionPolygons() != null) {
+                for (com.badlogic.gdx.math.Polygon p : mapManager.getCollisionPolygons()) {
+                    shape.polygon(p.getTransformedVertices());
+                }
+            }
         }
-        shape.end();
-    }
 
-    private void drawChestBorders() {
-        if (mapManager == null) {
-            return;
+        // Draw Player boundaries
+        shape.setColor(Color.GREEN);
+        Rectangle pBounds = world.getPlayer().getBounds();
+        shape.rect(pBounds.x, pBounds.y, pBounds.width, pBounds.height);
+
+        // Draw Player Sword Hitbox if active
+        if (world.getPlayer().canDealSwordDamage()) {
+            shape.setColor(Color.YELLOW);
+            Rectangle sBounds = world.getPlayer().getSwordHitbox();
+            shape.rect(sBounds.x, sBounds.y, sBounds.width, sBounds.height);
         }
 
-        shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(Color.GOLD);
-        for (Rectangle r : mapManager.getChestRects()) {
-            shape.rect(r.x, r.y, r.width, r.height);
+        // Draw Enemy boundaries
+        shape.setColor(Color.MAGENTA);
+        Rectangle eBounds = world.getEnemy().getBounds();
+        shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
+
+        // Draw Arrows
+        shape.setColor(Color.CYAN);
+        for (Arrow arrow : world.getPlayer().getArrows()) {
+            Rectangle aBounds = arrow.getBounds();
+            shape.rect(aBounds.x, aBounds.y, aBounds.width, aBounds.height);
         }
+
         shape.end();
     }
 

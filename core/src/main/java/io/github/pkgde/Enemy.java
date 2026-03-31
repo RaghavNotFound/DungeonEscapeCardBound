@@ -65,6 +65,11 @@ public class Enemy {
     private final float WIDTH = 128;
     private final float HEIGHT = 128;
 
+    private static final float HITBOX_WIDTH = 30f;
+    private static final float HITBOX_HEIGHT = 40f;
+    private static final float HITBOX_OFFSET_X = 49f;
+    private static final float HITBOX_OFFSET_Y = 40f;
+
     // ===== COMBAT =====
     private static final float MAX_HEALTH = 100f;
     private static final float ATTACK_DAMAGE = 14f;
@@ -85,7 +90,9 @@ public class Enemy {
     private float worldMaxX = Float.MAX_VALUE;
     private float worldMaxY = Float.MAX_VALUE;
 
-    // 🔥 RANDOM MOVEMENT
+    private ArrayList<Polygon> collisionPolygons;
+
+    // Ÿ” RANDOM MOVEMENT
     private Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private float moveDuration = 0f;
@@ -93,7 +100,7 @@ public class Enemy {
 
     public Enemy() {
         position = new Vector2(400, 300);
-        bounds = new Rectangle(position.x, position.y, WIDTH, HEIGHT);
+        bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
         frontIdleAnim = load("Movements/Enemy/Front/Idle/Front - Idle_", 0.09f);
         frontWalkAnim = load("Movements/Enemy/Front/Walking/Front - Walking_", 0.08f);
@@ -129,6 +136,10 @@ public class Enemy {
         this.boundaries = boundaries;
     }
 
+    public void setCollisionPolygons(ArrayList<Polygon> polygons) {
+        this.collisionPolygons = polygons;
+    }
+
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
         this.worldMinX = minX;
         this.worldMinY = minY;
@@ -138,7 +149,7 @@ public class Enemy {
 
     public void setPosition(float x, float y) {
         position.set(x, y);
-        bounds.setPosition(x, y);
+        bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y);
     }
 
     private Animation<TextureRegion> load(String pathPrefix, float frameDuration) {
@@ -278,7 +289,7 @@ public class Enemy {
             || !MathUtils.isEqual(prevY, position.y, 0.0001f);
         updateFacing();
 
-        bounds.setPosition(position.x, position.y);
+        bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
         if (hurtTimer > 0f) {
             currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
         } else if (attackTimer > 0f) {
@@ -442,7 +453,7 @@ public class Enemy {
     }
 
     private boolean canMoveTo(float x, float y) {
-        Rectangle next = new Rectangle(x, y, WIDTH, HEIGHT);
+        Rectangle next = new Rectangle(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
@@ -452,10 +463,24 @@ public class Enemy {
             }
         }
 
+        if (collisionPolygons != null) {
+            Polygon rectPoly = new Polygon(new float[] {
+                next.x, next.y,
+                next.x + next.width, next.y,
+                next.x + next.width, next.y + next.height,
+                next.x, next.y + next.height
+            });
+            for (Polygon poly : collisionPolygons) {
+                if (Intersector.overlapConvexPolygons(rectPoly, poly)) {
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 
-    // 🔥 RANDOM ACTION PICKER
+    // Ÿ” RANDOM ACTION PICKER
     private void pickNewRandomAction() {
 
         isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle

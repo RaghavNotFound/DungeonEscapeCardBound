@@ -4,6 +4,8 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Polygon;
+import com.badlogic.gdx.math.Intersector;
 import java.util.ArrayList;
 
 public class Arrow {
@@ -63,7 +65,7 @@ public class Arrow {
         );
     }
 
-    public boolean isCollided(float worldWidth, float worldHeight, ArrayList<Rectangle> obstacles) {
+    public boolean isCollided(float worldWidth, float worldHeight, ArrayList<Rectangle> obstacles, ArrayList<Polygon> polygons) {
         if (bounds.x < 0 || bounds.x + bounds.width > worldWidth ||
             bounds.y < 0 || bounds.y + bounds.height > worldHeight) {
             return true;
@@ -71,6 +73,18 @@ public class Arrow {
 
         for (Rectangle rect : obstacles) {
             if (bounds.overlaps(rect)) return true;
+        }
+
+        if (polygons != null) {
+            Polygon rectPoly = new Polygon(new float[] {
+                bounds.x, bounds.y,
+                bounds.x + bounds.width, bounds.y,
+                bounds.x + bounds.width, bounds.y + bounds.height,
+                bounds.x, bounds.y + bounds.height
+            });
+            for (Polygon poly : polygons) {
+                if (Intersector.overlapConvexPolygons(rectPoly, poly)) return true;
+            }
         }
 
         return false;
