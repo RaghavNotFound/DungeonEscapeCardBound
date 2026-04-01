@@ -27,6 +27,8 @@ public class HomeScreen implements Screen {
     private int selected = 0;
     private float menuAnimTime = 0f;
     private final Vector3 pointer = new Vector3();
+    private int lastMouseX = -1;
+    private int lastMouseY = -1;
     private final Color accent = new Color(0.25f, 0.85f, 1f, 1f);
 
     // BLUR SYSTEM
@@ -105,40 +107,53 @@ public class HomeScreen implements Screen {
         float settingsY = playY - btnHeight - gap;
         float exitY = settingsY - btnHeight - gap;
 
-        // ===== INPUT & LOGIC =====
+        // --- Mouse Movement Tracking ---
+        boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
+        lastMouseX = Gdx.input.getX();
+        lastMouseY = Gdx.input.getY();
+
+        // ===== INPUT & LOGIC (Prioritized) =====
         if (settings.isOverlayVisible()) {
             // If overlay active, update its transitions and capture input
             settings.update(delta);
             settings.handleInput(viewport);
         } else {
             // Normal Menu Input Handling
-            if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+            boolean keyPressed = false;
+            if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) { // W or UP
                 selected = (selected + 2) % 3;
-            }
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+                keyPressed = true;
+            } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) { // S or DOWN
                 selected = (selected + 1) % 3;
+                keyPressed = true;
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) { // ENTER
                 applySelection();
+                return; // Action taken, skip further input checks
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) { // ESCAPE
                 Gdx.app.exit();
+                return; // Action taken, skip further input checks
             }
 
-            if (Gdx.input.justTouched()) {
+            // --- Mouse Click ---
+            if (Gdx.input.justTouched()) { // Mouse Click
                 int clicked = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
                 if (clicked >= 0) {
                     selected = clicked;
                     applySelection();
+                    return; // Action taken, skip further input checks
                 }
             }
 
-            int hovered = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
-            if (hovered >= 0) {
-                selected = hovered;
+            // --- Mouse Hover (only if mouse moved and no keyboard input) ---
+            if (mouseMovedThisFrame && !keyPressed) {
+                int hovered = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
+                if (hovered >= 0) {
+                    selected = hovered;
+                }
             }
         }
 

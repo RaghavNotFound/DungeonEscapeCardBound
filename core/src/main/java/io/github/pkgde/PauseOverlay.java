@@ -33,6 +33,8 @@ public class PauseOverlay {
     private float boxW;
     private float boxH;
     private float centerX;
+    private int lastMouseX = -1;
+    private int lastMouseY = -1;
 
     public enum Action {
         NONE,
@@ -44,21 +46,26 @@ public class PauseOverlay {
     public Action handleInput(Viewport viewport) {
         updateLayout(viewport);
         updatePointer(viewport);
+        
+        boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
+        lastMouseX = Gdx.input.getX();
+        lastMouseY = Gdx.input.getY();
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
-            Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
+        // --- Keyboard Navigation ---
+        boolean keyPressed = false;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
-            Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
+            keyPressed = true;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selected = (selected + 1) % OPTION_COUNT;
+            keyPressed = true;
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             return toAction(selected);
         }
 
+        // --- Mouse Click ---
         if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
@@ -67,9 +74,12 @@ public class PauseOverlay {
             }
         }
 
-        int hovered = pointerIndex();
-        if (hovered >= 0) {
-            selected = hovered;
+        // --- Mouse Hover (only if mouse moved and no keyboard input) ---
+        if (mouseMovedThisFrame && !keyPressed) {
+            int hovered = pointerIndex();
+            if (hovered >= 0) {
+                selected = hovered;
+            }
         }
 
         return Action.NONE;
