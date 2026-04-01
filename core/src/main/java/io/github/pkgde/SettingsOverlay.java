@@ -17,13 +17,15 @@ public class SettingsOverlay {
 
     private static final int OPTION_WINDOW_800_600 = 0;
     private static final int OPTION_WINDOW_1280_720 = 1;
-    private static final int OPTION_FULLSCREEN = 2;
-    private static final int OPTION_BACK = 3;
+    private static final int OPTION_BORDERLESS = 2;
+    private static final int OPTION_WINDOWED_FULLSCREEN = 3;
+    private static final int OPTION_BACK = 4;
 
     private static final String[] LABELS = {
         "800 x 600",
         "1280 x 720",
-        "FULLSCREEN",
+        "Borderless Fullscreen",
+        "Windowed Fullscreen",
         "BACK (ESC)"
     };
 
@@ -34,7 +36,7 @@ public class SettingsOverlay {
     private enum State { INACTIVE, TRANSITION_IN, ACTIVE, TRANSITION_OUT }
     private State state = State.INACTIVE;
     private float transitionTimer = 0f;
-    private static final float TRANSITION_DURATION = 0.3f;
+    private static final float TRANSITION_DURATION = 0.3f; // Reverted to original duration
 
     private final Vector3 touch = new Vector3();
     private final float[] ys = new float[OPTION_COUNT];
@@ -69,12 +71,8 @@ public class SettingsOverlay {
         return state != State.INACTIVE;
     }
 
-    public boolean isActive() {
-        return state == State.ACTIVE || state == State.TRANSITION_IN;
-    }
-
     public void handleInput(Viewport viewport) {
-        if (state != State.ACTIVE && state != State.TRANSITION_IN) return;
+        if (state != State.ACTIVE) return; // Only handle input when fully active
 
         updateLayout(viewport);
         updatePointer(viewport);
@@ -119,16 +117,24 @@ public class SettingsOverlay {
     private void applySelection() {
         switch (selected) {
             case OPTION_WINDOW_800_600:
+                Gdx.graphics.setUndecorated(false);
                 Gdx.graphics.setWindowedMode(800, 600);
                 break;
 
             case OPTION_WINDOW_1280_720:
+                Gdx.graphics.setUndecorated(false);
                 Gdx.graphics.setWindowedMode(1280, 720);
                 break;
 
-            case OPTION_FULLSCREEN:
+            case OPTION_BORDERLESS:
+                Gdx.graphics.setUndecorated(true);
                 Graphics.DisplayMode mode = Gdx.graphics.getDisplayMode();
                 Gdx.graphics.setFullscreenMode(mode);
+                break;
+
+            case OPTION_WINDOWED_FULLSCREEN:
+                Gdx.graphics.setUndecorated(false);
+                Gdx.graphics.setWindowedMode(1920, 1025);
                 break;
 
             case OPTION_BACK:
@@ -264,9 +270,5 @@ public class SettingsOverlay {
     private void updatePointer(Viewport viewport) {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
-    }
-
-    public boolean wasClosed() {
-        return state == State.INACTIVE;
     }
 }

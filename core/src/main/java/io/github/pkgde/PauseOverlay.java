@@ -125,14 +125,6 @@ public class PauseOverlay {
         // ===== SHAPES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Draw background panel
-        shape.setColor(0f, 0f, 0f, 0.4f * alpha);
-        float panelW = boxW * 1.3f;
-        float panelH = boxH * 3.7f;
-        float panelX = centerX - (panelW - boxW) * 0.5f;
-        float panelY = ys[OPTION_COUNT - 1] - boxH * 0.55f;
-        shape.rect(panelX, panelY, panelW, panelH);
-
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {
                 float pulseAlpha = 0.22f + 0.08f * (0.5f + 0.5f * MathUtils.sin(animTime * 7f));
