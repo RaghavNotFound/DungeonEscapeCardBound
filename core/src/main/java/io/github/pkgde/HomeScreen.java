@@ -10,8 +10,8 @@ import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 
-public class HomeScreen implements Screen {
-
+public class HomeScreen implements Screen
+{
     private ShapeRenderer shapeRenderer;
     private SpriteBatch batch;
     private BitmapFont font;
@@ -29,7 +29,7 @@ public class HomeScreen implements Screen {
     private final Vector3 pointer = new Vector3();
     private final Color accent = new Color(0.25f, 0.85f, 1f, 1f);
 
-    // 🌫️ BLUR SYSTEM
+    //BLUR SYSTEM
     private FrameBuffer fbo;
     private ShaderProgram blurShader;
     private SpriteBatch blurBatch;
@@ -42,30 +42,30 @@ public class HomeScreen implements Screen {
         font = new BitmapFont();
         glyphLayout = new GlyphLayout();
 
-        // 🔥 improve font quality
+        //improve font quality
         font.getRegion().getTexture().setFilter(
             Texture.TextureFilter.Linear,
             Texture.TextureFilter.Linear
         );
 
-        background = new Texture("HomeScreen/HomeScreen.jpg");
-        background.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        background=new Texture("HomeScreen/HomeScreen.jpg");
+        background.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
 
-        camera = new OrthographicCamera();
-        viewport = new FitViewport(1280, 720, camera); // 🔥 FIXED
+        camera=new OrthographicCamera();
+        viewport=new FitViewport(1280,720,camera);
         viewport.apply(true);
 
         camera.position.set(
-            viewport.getWorldWidth() / 2f,
-            viewport.getWorldHeight() / 2f,
+            viewport.getWorldWidth()/2f,
+            viewport.getWorldHeight()/2f,
             0
         );
         camera.update();
 
-        settings = new SettingsOverlay();
+        settings=new SettingsOverlay();
 
-        // 🌫️ HIGH QUALITY FBO (DYNAMIC SIZE)
-        fbo = new FrameBuffer(
+        //DYNAMIC SIZE
+        fbo=new FrameBuffer(
             Pixmap.Format.RGBA8888,
             Gdx.graphics.getWidth(),
             Gdx.graphics.getHeight(),
@@ -77,8 +77,8 @@ public class HomeScreen implements Screen {
             Texture.TextureFilter.Linear
         );
 
-        blurShader = BlurShader.createShader(true);
-        blurBatch = new SpriteBatch();
+        blurShader=BlurShader.createShader(true);
+        blurBatch=new SpriteBatch();
         blurBatch.setShader(blurShader);
     }
 
@@ -95,38 +95,44 @@ public class HomeScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        float worldW = viewport.getWorldWidth();
-        float worldH = viewport.getWorldHeight();
+        float worldW=viewport.getWorldWidth();
+        float worldH=viewport.getWorldHeight();
 
-        float btnWidth = worldW * 0.25f;
-        float btnHeight = worldH * 0.08f;
-        float gap = worldH * 0.03f;
+        float btnWidth=worldW*0.25f;
+        float btnHeight=worldH*0.08f;
+        float gap=worldH*0.03f;
 
-        float btnX = worldW * 0.65f;
-        float playY = worldH * 0.55f;
-        float settingsY = playY - btnHeight - gap;
-        float exitY = settingsY - btnHeight - gap;
+        float btnX=worldW*0.65f;
+        float playY=worldH*0.55f;
+        float settingsY=playY-btnHeight-gap;
+        float exitY=settingsY-btnHeight-gap;
 
-        // ===== INPUT =====
-        if (settings.isActive()) {
+        //INPUT
+        if (settings.isOverlayVisible())
+        {
+            settings.update(delta);
             settings.handleInput(viewport);
-        } else {
+        }
+        else
+        {
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
-                Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-                selected = (selected + 2) % 3;
+            if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP))
+            {
+                selected=(selected+2)%3;
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
-                Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
-                selected = (selected + 1) % 3;
+            if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
+            {
+                selected=(selected+1)%3;
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
+            {
                 applySelection();
             }
 
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
+            {
                 Gdx.app.exit();
             }
 
@@ -144,51 +150,50 @@ public class HomeScreen implements Screen {
             }
         }
 
-        // ===== SETTINGS MODE =====
-        if (settings.isActive()) {
-
+        //SETTINGS MODE
+        if (settings.isOverlayVisible())
+        {
             fbo.begin();
 
             batch.begin();
-            batch.draw(background, 0, 0, worldW, worldH);
+            batch.draw(background,0,0,worldW,worldH);
             batch.end();
 
             fbo.end();
 
-            Texture tex = fbo.getColorBufferTexture();
+            Texture tex=fbo.getColorBufferTexture();
 
             blurBatch.setProjectionMatrix(camera.combined);
 
             blurBatch.begin();
-            blurShader.setUniformf("blur", 0.002f);
-
+            float progress = settings.getTransitionProgress();
+            blurShader.setUniformf("blur", progress * 0.002f);
+            
             blurBatch.draw(
                 tex,
-                0, 0,
-                worldW, worldH,
-                0, 0,
+                0,0,
+                worldW,worldH,
+                0,0,
                 tex.getWidth(),
                 tex.getHeight(),
-                false, true   // 🔥 FIXED FLIP
+                false,true
             );
 
             blurBatch.end();
-
-            // 🌑 overlay (improved)
             Gdx.gl.glEnable(GL20.GL_BLEND);
 
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            shapeRenderer.setColor(0, 0, 0, 0.5f);
-            shapeRenderer.rect(0, 0, worldW, worldH);
+            shapeRenderer.setColor(0, 0, 0, progress * 0.5f);
+            shapeRenderer.rect(0,0,worldW,worldH);
             shapeRenderer.end();
 
             Gdx.gl.glDisable(GL20.GL_BLEND);
 
-            settings.render(shapeRenderer, batch, font, viewport);
+            settings.render(shapeRenderer,batch,font,viewport);
             return;
         }
 
-        // ===== NORMAL MENU =====
+        //NORMAL MENU
         batch.begin();
         batch.draw(background, 0, 0, worldW, worldH);
         batch.end();
@@ -291,23 +296,26 @@ public class HomeScreen implements Screen {
         return x >= bx && x <= bx + bw && y >= by && y <= by + bh;
     }
 
-    private void applySelection() {
-
-        if (selected == 0) {
-            ((Main) Gdx.app.getApplicationListener())
-                .setScreen(new ExplorationScreen());
+    private void applySelection()
+    {
+        if (selected==0)
+        {
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
         }
-        else if (selected == 1) {
+        else if (selected==1)
+        {
             settings.show();
         }
-        else if (selected == 2) {
+        else if (selected==2)
+        {
             Gdx.app.exit();
         }
     }
 
     @Override
-    public void resize(int width, int height) {
-        viewport.update(width, height, true);
+    public void resize(int width,int height)
+    {
+        viewport.update(width,height,true);
     }
 
     @Override public void pause() {}
@@ -315,7 +323,8 @@ public class HomeScreen implements Screen {
     @Override public void hide() {}
 
     @Override
-    public void dispose() {
+    public void dispose()
+    {
         shapeRenderer.dispose();
         batch.dispose();
         font.dispose();

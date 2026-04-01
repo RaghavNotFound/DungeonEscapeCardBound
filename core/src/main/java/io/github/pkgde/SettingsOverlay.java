@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.badlogic.gdx.math.Vector3;
 
@@ -28,8 +29,12 @@ public class SettingsOverlay {
 
     private static final int OPTION_COUNT = LABELS.length;
 
-    private boolean active = false;
     private int selected = 0;
+
+    private enum State { INACTIVE, TRANSITION_IN, ACTIVE, TRANSITION_OUT }
+    private State state = State.INACTIVE;
+    private float transitionTimer = 0f;
+    private static final float TRANSITION_DURATION = 0.3f;
 
     private final Vector3 touch = new Vector3();
     private final float[] ys = new float[OPTION_COUNT];
@@ -46,32 +51,35 @@ public class SettingsOverlay {
     private float centerX;
 
     public void show() {
-        active = true;
-        selected = 0;
+        if (state == State.INACTIVE || state == State.TRANSITION_OUT) {
+            state = State.TRANSITION_IN;
+            transitionTimer = 0f;
+            selected = 0;
+        }
     }
 
     public void hide() {
-        active = false;
+        if (state == State.ACTIVE || state == State.TRANSITION_IN) {
+            state = State.TRANSITION_OUT;
+            transitionTimer = 0f;
+        }
     }
 
-    public boolean isActive() {
-        return active;
+    public boolean isOverlayVisible() {
+        return state != State.INACTIVE;
     }
 
     public void handleInput(Viewport viewport) {
-
-        if (!active) return;
-
+        if (state != State.ACTIVE && state != State.TRANSITION_IN) return;
+        
         updateLayout(viewport);
         updatePointer(viewport);
 
-        // 🔥 ESC BACK (instant + clean)
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             hide();
             return;
         }
 
-        // ===== KEYBOARD NAV =====
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
             Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
 
@@ -89,7 +97,6 @@ public class SettingsOverlay {
             return;
         }
 
-        // ===== MOUSE =====
         if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
@@ -131,9 +138,7 @@ public class SettingsOverlay {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        if (w == lastLayoutWidth && h == lastLayoutHeight) {
-            return;
-        }
+        if (w == lastLayoutWidth && h == lastLayoutHeight) return;
 
         lastLayoutWidth = w;
         lastLayoutHeight = h;
@@ -150,64 +155,89 @@ public class SettingsOverlay {
         }
     }
 
+    public void update(float delta) {
+        animTime += delta;
+
+        if (state == State.TRANSITION_IN) {
+            transitionTimer += delta;
+            if (transitionTimer >= TRANSITION_DURATION) {
+                transitionTimer = TRANSITION_DURATION;
+                state = State.ACTIVE;
+            }
+        } else if (state == State.TRANSITION_OUT) {
+            transitionTimer += delta;
+            if (transitionTimer >= TRANSITION_DURATION) {
+                transitionTimer = TRANSITION_DURATION;
+                state = State.INACTIVE;
+            }
+        }
+    }
+
+    public float getTransitionProgress() {
+        if (state == State.TRANSITION_IN) {
+            return Interpolation.pow2Out.apply(transitionTimer / TRANSITION_DURATION);
+        }
+        if (state == State.TRANSITION_OUT) {
+            return Interpolation.pow2Out.apply(1f - (transitionTimer / TRANSITION_DURATION));
+        }
+        return (state == State.ACTIVE) ? 1f : 0f;
+    }
+
     public void render(ShapeRenderer shape, SpriteBatch batch,
                        BitmapFont font, Viewport viewport) {
 
-        if (!active) return;
+        if (!isOverlayVisible()) return;
 
         updateLayout(viewport);
         float w = viewport.getWorldWidth();
-        animTime += Gdx.graphics.getDeltaTime();
 
-        // ===== SHAPES =====
+        float progress = getTransitionProgress();
+        float yOffset = (1 - progress) * viewport.getWorldHeight() * 0.3f;
+
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0f, 0f, 0f, 0.45f);
-        float panelW = boxW * 1.35f;
-        float panelH = boxH * 4.9f;
-        float panelX = centerX - (panelW - boxW) * 0.5f;
-        float panelY = ys[OPTION_COUNT - 1] - boxH * 0.6f;
-        shape.rect(panelX, panelY, panelW, panelH);
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {
                 float alpha = 0.22f + 0.08f * (0.5f + 0.5f * MathUtils.sin(animTime * 7f));
-                shape.setColor(accent.r, accent.g, accent.b, alpha);
+                shape.setColor(accent.r, accent.g, accent.b, alpha * progress);
             } else {
-                shape.setColor(0f, 0f, 0f, 0.3f);
+                shape.setColor(0f, 0f, 0f, 0.3f * progress);
             }
-            shape.rect(centerX, ys[i], boxW, boxH);
+            shape.rect(centerX, ys[i] + yOffset, boxW, boxH);
         }
+
         shape.end();
 
         shape.begin(ShapeRenderer.ShapeType.Line);
-
         for (int i = 0; i < OPTION_COUNT; i++) {
-            shape.setColor(selected == i ? accent : inactiveOutline);
-            shape.rect(centerX, ys[i], boxW, boxH);
+            Color c = (selected == i ? accent : inactiveOutline);
+            shape.setColor(c.r, c.g, c.b, c.a * progress);
+            shape.rect(centerX, ys[i] + yOffset, boxW, boxH);
         }
-
         shape.end();
 
-        // ===== TEXT =====
         batch.begin();
+
+        float scale = w / 800f; // ✅ fixed (only once)
 
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
-        float scale = w / 800f;
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float textScale = scale * 1.18f * (selected == i ? 1.05f + pulse : 1f);
+
             font.getData().setScale(textScale);
             glyphLayout.setText(font, LABELS[i]);
 
             float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
-            float textY = ys[i] + (boxH + glyphLayout.height) * 0.5f;
+            float textY = ys[i] + (boxH + glyphLayout.height) * 0.5f + yOffset;
             float shadow = Math.max(1.3f, w * 0.0012f);
 
-            font.setColor(0f, 0f, 0f, 0.72f);
+            font.setColor(0f, 0f, 0f, 0.72f * progress);
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
-            font.setColor(1f, 1f, 1f, selected == i ? 1f : 0.9f);
+
+            font.setColor(1f, 1f, 1f, (selected == i ? 1f : 0.9f) * progress);
             font.draw(batch, glyphLayout, textX, textY);
         }
 
@@ -230,9 +260,5 @@ public class SettingsOverlay {
     private void updatePointer(Viewport viewport) {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
-    }
-
-    public boolean wasClosed() {
-        return !active;
     }
 }
