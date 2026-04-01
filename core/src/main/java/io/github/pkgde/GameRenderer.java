@@ -5,12 +5,12 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
 
-public class GameRenderer {
-
+public class GameRenderer
+{
     private final GameWorld world;
-
     private final SpriteBatch batch;
     private final ShapeRenderer shape;
     private final BitmapFont font;
@@ -18,37 +18,33 @@ public class GameRenderer {
     private float torchAnimTime;
 
     private final OrthographicCamera camera;
-    private final MapManager mapManager;
+    private final MapManager mapManager = null;
 
-    public GameRenderer(GameWorld world, OrthographicCamera camera) {
+    public GameRenderer(GameWorld world, OrthographicCamera camera)
+    {
         this.world = world;
         this.camera = camera;
-        this.mapManager = world.getMapManager();
 
         batch = new SpriteBatch();
         shape = new ShapeRenderer();
         font = new BitmapFont();
-
-        font.getRegion().getTexture().setFilter(
-            Texture.TextureFilter.Linear,
-            Texture.TextureFilter.Linear
-        );
+        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         torchFrames = new Texture[7];
-        for (int i = 0; i < torchFrames.length; i++) {
+        for (int i = 0; i < torchFrames.length; i++)
+        {
             torchFrames[i] = new Texture("Objects/torch/torch_" + (i + 1) + ".png");
-            torchFrames[i].setFilter(
-                Texture.TextureFilter.Linear,
-                Texture.TextureFilter.Linear
-            );
+            torchFrames[i].setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         }
     }
 
-    public void render() {
+    public void render()
+    {
         render(0f, 0f);
     }
 
-    public void render(float offsetX, float offsetY) {
+    public void render(float offsetX, float offsetY)
+    {
         torchAnimTime += Gdx.graphics.getDeltaTime();
 
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
@@ -60,21 +56,21 @@ public class GameRenderer {
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
-        if (mapManager != null) {
-            mapManager.render(camera);
-        }
+        if (mapManager != null) mapManager.render(camera);
 
         batch.begin();
 
         drawTorches(batch);
 
-        if (world.getPlayer().getPos().y > world.getEnemy().getBounds().y) {
+        if (world.getPlayer().getPos().y > world.getEnemy().getBounds().y)
+        {
             world.getEnemy().render(batch);
         }
 
         world.getPlayer().render(batch);
 
-        if (world.getPlayer().getPos().y <= world.getEnemy().getBounds().y) {
+        if (world.getPlayer().getPos().y <= world.getEnemy().getBounds().y)
+        {
             world.getEnemy().render(batch);
         }
 
@@ -89,44 +85,104 @@ public class GameRenderer {
         camera.update();
     }
 
-    private void drawTorches(SpriteBatch batch) {
+    private void drawTorches(SpriteBatch batch)
+    {
         if (mapManager == null || torchFrames.length == 0) return;
 
         int frameIndex = ((int) (torchAnimTime / 0.1f)) % torchFrames.length;
         Texture frame = torchFrames[frameIndex];
 
-        for (Rectangle torch : mapManager.getTorchRects()) {
+        for (Rectangle torch : mapManager.getTorchRects())
+        {
             batch.draw(frame, torch.x, torch.y, torch.width, torch.height);
         }
     }
 
-    private void drawCollisionDebug() {
-        if (mapManager == null) return;
-
+    private void drawCollisionDebug()
+    {
         shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(Color.RED);
 
-        for (Rectangle r : mapManager.getCollisionRects()) {
-            shape.rect(r.x, r.y, r.width, r.height);
+        shape.setColor(Color.RED);
+        if (mapManager != null)
+        {
+            for (Rectangle r : mapManager.getCollisionRects())
+            {
+                shape.rect(r.x, r.y, r.width, r.height);
+            }
+            if (mapManager.getCollisionPolygons() != null)
+            {
+                for (Polygon p : mapManager.getCollisionPolygons())
+                {
+                    shape.polygon(p.getTransformedVertices());
+                }
+            }
+        }
+
+        shape.setColor(Color.GREEN);
+        Rectangle pBounds = world.getPlayer().getBounds();
+        shape.rect(pBounds.x, pBounds.y, pBounds.width, pBounds.height);
+
+        if (world.getPlayer().canDealSwordDamage())
+        {
+            shape.setColor(Color.YELLOW);
+            Rectangle sBounds = world.getPlayer().getSwordHitbox();
+            shape.rect(sBounds.x, sBounds.y, sBounds.width, sBounds.height);
+        }
+
+        shape.setColor(Color.MAGENTA);
+        Rectangle eBounds = world.getEnemy().getBounds();
+        shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
+
+        shape.setColor(Color.CYAN);
+        for (Arrow arrow : world.getPlayer().getArrows())
+        {
+            Rectangle aBounds = arrow.getBounds();
+            shape.rect(aBounds.x, aBounds.y, aBounds.width, aBounds.height);
         }
 
         shape.end();
     }
 
-    private void drawChestBorders() {
+    private void drawChestBorders()
+    {
         if (mapManager == null) return;
 
         shape.begin(ShapeRenderer.ShapeType.Line);
         shape.setColor(Color.GOLD);
 
-        for (Rectangle r : mapManager.getChestRects()) {
+        for (Rectangle r : mapManager.getChestRects())
+        {
             shape.rect(r.x, r.y, r.width, r.height);
         }
 
         shape.end();
     }
 
-    private void drawUI() {
+    private void drawEnemyHealthBar()
+    {
+        Enemy enemy = world.getEnemy();
+        if (!enemy.isAlive()) return;
+
+        Rectangle b = enemy.getBounds();
+        float barW = b.width * 0.8f;
+        float barH = 11f;
+        float x = b.x + (b.width - barW) * 0.5f;
+        float y = b.y + b.height + 14f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        drawRoundedBar(
+            shape, x, y, barW, barH,
+            enemy.getHealthRatio(),
+            new Color(0.15f, 0.15f, 0.15f, 0.95f),
+            new Color(0.9f, 0.2f, 0.2f, 1f)
+        );
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawUI()
+    {
         Gdx.gl.glEnable(GL20.GL_BLEND);
 
         float health = world.getPlayer().getHealth();
@@ -160,31 +216,6 @@ public class GameRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void drawEnemyHealthBar() {
-        Enemy enemy = world.getEnemy();
-        if (!enemy.isAlive()) return;
-
-        Rectangle b = enemy.getBounds();
-
-        float barW = b.width * 0.8f;
-        float barH = 11f;
-        float x = b.x + (b.width - barW) * 0.5f;
-        float y = b.y + b.height + 14f;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-
-        shape.begin(ShapeRenderer.ShapeType.Filled);
-
-        drawRoundedBar(shape, x, y, barW, barH,
-            enemy.getHealthRatio(),
-            new Color(0.15f, 0.15f, 0.15f, 0.95f),
-            new Color(0.9f, 0.2f, 0.2f, 1f));
-
-        shape.end();
-
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-    }
-
     private void drawRoundedBar(
         ShapeRenderer shape,
         float x,
@@ -193,8 +224,8 @@ public class GameRenderer {
         float height,
         float percent,
         Color bgColor,
-        Color fillColor) {
-
+        Color fillColor)
+    {
         float clampedPercent = MathUtils.clamp(percent, 0f, 1f);
         float radius = height / 2f;
 
@@ -207,25 +238,53 @@ public class GameRenderer {
         shape.setColor(fillColor);
         float fillWidth = width * clampedPercent;
 
-        if (fillWidth <= width - radius) {
+        if (fillWidth <= width - radius)
+        {
             shape.rect(x, y, fillWidth, height);
-        } else {
+        }
+        else
+        {
             shape.rect(x, y, width - radius, height);
             shape.circle(x + width - radius, y + radius, radius);
         }
+    }
+
+    public void renderInventoryOverlay()
+    {
+        float panelW = Math.min(420f, camera.viewportWidth * 0.6f);
+        float panelH = Math.min(280f, camera.viewportHeight * 0.55f);
+        float x = camera.position.x - panelW * 0.5f;
+        float y = camera.position.y - panelH * 0.5f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0.08f, 0.08f, 0.1f, 0.9f);
+        shape.rect(x, y, panelW, panelH);
+        shape.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(0.95f, 0.85f, 0.35f, 1f);
+        shape.rect(x, y, panelW, panelH);
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch, "Inventory", x + 18f, y + panelH - 18f);
+        font.draw(batch, "Torches: " + world.getPlayer().getTorchCount(), x + 18f, y + panelH - 58f);
+        font.draw(batch, "Press E or ESC to close", x + 18f, y + 30f);
+        batch.end();
     }
 
     public SpriteBatch getBatch() { return batch; }
     public ShapeRenderer getShape() { return shape; }
     public BitmapFont getFont() { return font; }
 
-    public void dispose() {
+    public void dispose()
+    {
         batch.dispose();
         shape.dispose();
         font.dispose();
         for (Texture t : torchFrames) t.dispose();
-    }
-
-    public void renderInventoryOverlay() {
     }
 }
