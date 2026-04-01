@@ -69,26 +69,30 @@ public class SettingsOverlay {
         return state != State.INACTIVE;
     }
 
+    public boolean isActive() {
+        return state == State.ACTIVE || state == State.TRANSITION_IN;
+    }
+
     public void handleInput(Viewport viewport) {
         if (state != State.ACTIVE && state != State.TRANSITION_IN) return;
-        
+
         updateLayout(viewport);
         updatePointer(viewport);
 
+        // ESC BACK (instant + clean)
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             hide();
             return;
         }
 
+        // ===== KEYBOARD NAV =====
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
             Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
             Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
-
             selected = (selected + 1) % OPTION_COUNT;
         }
 
@@ -97,6 +101,7 @@ public class SettingsOverlay {
             return;
         }
 
+        // ===== MOUSE =====
         if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
@@ -112,9 +117,7 @@ public class SettingsOverlay {
     }
 
     private void applySelection() {
-
         switch (selected) {
-
             case OPTION_WINDOW_800_600:
                 Gdx.graphics.setWindowedMode(800, 600);
                 break;
@@ -194,12 +197,13 @@ public class SettingsOverlay {
         float progress = getTransitionProgress();
         float yOffset = (1 - progress) * viewport.getWorldHeight() * 0.3f;
 
+        // ===== SHAPES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {
-                float alpha = 0.22f + 0.08f * (0.5f + 0.5f * MathUtils.sin(animTime * 7f));
-                shape.setColor(accent.r, accent.g, accent.b, alpha * progress);
+                float pulseAlpha = 0.22f + 0.08f * (0.5f + 0.5f * MathUtils.sin(animTime * 7f));
+                shape.setColor(accent.r, accent.g, accent.b, pulseAlpha * progress);
             } else {
                 shape.setColor(0f, 0f, 0f, 0.3f * progress);
             }
@@ -216,10 +220,10 @@ public class SettingsOverlay {
         }
         shape.end();
 
+        // ===== TEXT =====
         batch.begin();
 
-        float scale = w / 800f; // ✅ fixed (only once)
-
+        float scale = w / 800f;
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
 
@@ -260,5 +264,9 @@ public class SettingsOverlay {
     private void updatePointer(Viewport viewport) {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
+    }
+
+    public boolean wasClosed() {
+        return state == State.INACTIVE;
     }
 }

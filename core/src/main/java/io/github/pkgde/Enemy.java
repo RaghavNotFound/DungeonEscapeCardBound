@@ -4,10 +4,12 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.GL20;
 import java.util.ArrayList;
 
-public class Enemy
-{
+public class Enemy {
+
     private final Vector2 position;
     private final Rectangle bounds;
 
@@ -58,6 +60,8 @@ public class Enemy
 
     private float fovAngle = 90f;
 
+    private float forcedAggroTimer = 0f;
+
     private Vector2 forward = new Vector2(1, 0);
 
     private final float WIDTH = 128;
@@ -94,8 +98,14 @@ public class Enemy
     private float moveDuration = 0f;
     private boolean isMoving = false;
 
-    public Enemy()
-    {
+    // 🔥 Knockback
+    private Vector2 knockbackVelocity = new Vector2(0, 0);
+    private static final float KNOCKBACK_FRICTION = 600f; // decel
+
+    // 🔥 UI Renderer
+    private ShapeRenderer shape = new ShapeRenderer();
+
+    public Enemy() {
         position = new Vector2(400, 300);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
@@ -129,36 +139,34 @@ public class Enemy
         pickNewRandomAction();
     }
 
-    public void setBoundaries(ArrayList<Rectangle> boundaries)
-    {
+    public Rectangle getBounds() {
+        return bounds;
+    }
+
+    public void setBoundaries(ArrayList<Rectangle> boundaries) {
         this.boundaries = boundaries;
     }
 
-    public void setCollisionPolygons(ArrayList<Polygon> polygons)
-    {
+    public void setCollisionPolygons(ArrayList<Polygon> polygons) {
         this.collisionPolygons = polygons;
     }
 
-    public void setWorldBounds(float minX, float minY, float maxX, float maxY)
-    {
+    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
         this.worldMinX = minX;
         this.worldMinY = minY;
         this.worldMaxX = maxX;
         this.worldMaxY = maxY;
     }
 
-    public void setPosition(float x, float y)
-    {
+    public void setPosition(float x, float y) {
         position.set(x, y);
         bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y);
     }
 
-    private Animation<TextureRegion> load(String pathPrefix, float frameDuration)
-    {
+    private Animation<TextureRegion> load(String pathPrefix, float frameDuration) {
         ArrayList<TextureRegion> frames = new ArrayList<>();
 
-        for (int i = 0; ; i++)
-        {
+        for (int i = 0; ; i++) {
             String path = pathPrefix + String.format("%03d", i) + ".png";
             if (!Gdx.files.internal(path).exists()) break;
 
@@ -167,20 +175,29 @@ public class Enemy
             frames.add(new TextureRegion(tex));
         }
 
-        if (frames.isEmpty())
-        {
+        if (frames.isEmpty()) {
             throw new IllegalStateException("Missing enemy animation frames for prefix: " + pathPrefix);
         }
 
         return new Animation<>(frameDuration, frames.toArray(new TextureRegion[0]));
     }
 
-    public void update(float delta, Player player)
-    {
+    public void update(float delta, Player player) {
         if (disposed) return;
 
-        if (!isAlive())
-        {
+        // 🔥 Process Knockback
+        if (knockbackVelocity.len2() > 0) {
+            float currentSpeed = knockbackVelocity.len();
+            currentSpeed -= KNOCKBACK_FRICTION * delta;
+            if (currentSpeed <= 0) {
+                knockbackVelocity.setZero();
+            } else {
+                knockbackVelocity.setLength(currentSpeed);
+                moveBy(knockbackVelocity.x * delta, knockbackVelocity.y * delta);
+            }
+        }
+
+        if (!isAlive()) {
             deathStateTime += delta;
             currentFrame = deathAnim.getKeyFrame(deathStateTime, false);
             return;
@@ -190,16 +207,14 @@ public class Enemy
         float prevX = position.x;
         float prevY = position.y;
 
-        if (hurtTimer > 0f)
-        {
+        if (hurtTimer > 0f) {
             hurtTimer -= delta;
             hurtStateTime += delta;
         }
 
         if (attackCooldownTimer > 0f) attackCooldownTimer -= delta;
 
-        if (attackTimer > 0f)
-        {
+        if (attackTimer > 0f) {
             attackTimer -= delta;
             attackStateTime += delta;
             if (attackTimer <= 0f) attackDamageConsumed = false;
@@ -209,66 +224,73 @@ public class Enemy
         Vector2 toPlayer = new Vector2(playerPos).sub(position);
         float distance = toPlayer.len();
 
-        boolean inRange = state == State.CHASE ? distance <= alertRange : distance <= baseRange;
+        boolean inRange;
         boolean inCone = false;
 
-        if (inRange)
-        {
+        // ===== RANGE =====
+        if (state == State.CHASE) {
+            inRange = distance <= alertRange;
+        } else {
+            inRange = distance <= baseRange;
+        }
+
+        // ===== VISION =====
+        if (inRange) {
             toPlayer.nor();
             float dot = forward.dot(toPlayer);
             float threshold = MathUtils.cosDeg(fovAngle / 2f);
             inCone = dot >= threshold;
         }
 
-        if (inRange && inCone)
-        {
+        // ===== STATE =====
+        if (forcedAggroTimer > 0f) {
+            forcedAggroTimer -= delta;
             state = State.CHASE;
-        }
-        else if (state == State.CHASE && distance <= alertRange)
-        {
-            state = State.CHASE;
-        }
-        else
-        {
-            state = State.IDLE;
+        } else {
+            if (inRange && inCone) {
+                state = State.CHASE;
+            } else if (state == State.CHASE && distance <= alertRange) {
+                state = State.CHASE;
+            } else {
+                state = State.IDLE;
+            }
         }
 
+        // ===== BEHAVIOR =====
         boolean isAttacking = attackTimer > 0f;
 
-        switch (state)
-        {
+        switch (state) {
             case IDLE:
                 moveTimer -= delta;
-                if (moveTimer <= 0) pickNewRandomAction();
 
-                if (isMoving && !isAttacking)
-                {
+                if (moveTimer <= 0) {
+                    pickNewRandomAction();
+                }
+
+                if (isMoving && !isAttacking && hurtTimer <= 0f) {
                     moveBy(randomDir.x * SPEED * 0.5f * delta, randomDir.y * SPEED * 0.5f * delta);
                     forward.set(randomDir);
                 }
                 break;
 
             case CHASE:
-                if (!isAttacking)
-                {
+                if (!isAttacking && hurtTimer <= 0f) {
                     Vector2 direction = new Vector2(playerPos).sub(position).nor();
                     forward.set(direction);
 
-                    if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f)
-                    {
+                    if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
                         attackTimer = getAttackAnimation().getAnimationDuration();
                         attackStateTime = 0f;
                         attackDamageConsumed = false;
                         attackCooldownTimer = ATTACK_COOLDOWN;
-                    }
-                    else
-                    {
+                    } else {
                         moveBy(direction.x * SPEED * delta, direction.y * SPEED * delta);
                     }
                 }
                 break;
         }
 
+        // Keep enemy inside map bounds.
         position.x = MathUtils.clamp(position.x, worldMinX, worldMaxX - WIDTH);
         position.y = MathUtils.clamp(position.y, worldMinY, worldMaxY - HEIGHT);
 
@@ -278,28 +300,21 @@ public class Enemy
         updateFacing();
         bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
 
-        if (hurtTimer > 0f)
-        {
+        if (hurtTimer > 0f) {
             currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
-        }
-        else if (attackTimer > 0f)
-        {
+        } else if (attackTimer > 0f) {
             currentFrame = getAttackAnimation().getKeyFrame(attackStateTime, false);
-        }
-        else
-        {
+        } else {
             currentFrame = pickAnimation(state, movedThisFrame).getKeyFrame(stateTime, true);
         }
     }
 
-    public void takeDamage(float damage)
-    {
+    public void takeDamage(float damage) {
         if (damage <= 0f || !isAlive() || disposed) return;
 
         health = Math.max(0f, health - damage);
 
-        if (!isAlive())
-        {
+        if (!isAlive()) {
             deathStateTime = 0f;
             attackTimer = 0f;
             attackCooldownTimer = 0f;
@@ -313,8 +328,27 @@ public class Enemy
         hurtStateTime = 0f;
     }
 
-    public boolean canDealDamage()
-    {
+    public void applyKnockback(Vector2 forceDir, float forceAmt) {
+        if (!isAlive() || disposed) return;
+        Vector2 normalized = new Vector2(forceDir).nor();
+        knockbackVelocity.add(normalized.scl(forceAmt));
+    }
+
+    public boolean isPlayerInAttackRadius(Player p) {
+        float centerX = bounds.x + bounds.width / 2f;
+        float centerY = bounds.y + bounds.height / 2f;
+        Rectangle pBounds = p.getBounds();
+
+        float closestX = MathUtils.clamp(centerX, pBounds.x, pBounds.x + pBounds.width);
+        float closestY = MathUtils.clamp(centerY, pBounds.y, pBounds.y + pBounds.height);
+
+        float dx = centerX - closestX;
+        float dy = centerY - closestY;
+
+        return (dx * dx + dy * dy) <= (ATTACK_RANGE * ATTACK_RANGE);
+    }
+
+    public boolean canDealDamage() {
         if (attackTimer <= 0f || attackDamageConsumed || !isAlive()) return false;
 
         float duration = getAttackAnimation().getAnimationDuration();
@@ -322,67 +356,62 @@ public class Enemy
         return progress >= 0.35f && progress <= 0.6f;
     }
 
-    public void consumeAttackDamage()
-    {
+    public boolean isChasing() {
+        return state == State.CHASE;
+    }
+
+    public void forceChase(float duration) {
+        if (!isAlive() || disposed) return;
+        forcedAggroTimer = Math.max(forcedAggroTimer, duration);
+        state = State.CHASE;
+    }
+
+    public void consumeAttackDamage() {
         attackDamageConsumed = true;
     }
 
-    public float getDamage()
-    {
+    public float getDamage() {
         return ATTACK_DAMAGE;
     }
 
-    public float getHealth()
-    {
+    public float getHealth() {
         return health;
     }
 
-    public float getMaxHealth()
-    {
+    public float getMaxHealth() {
         return MAX_HEALTH;
     }
 
-    public float getHealthRatio()
-    {
+    public float getHealthRatio() {
         return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f);
     }
 
-    public boolean isAlive()
-    {
+    public boolean isAlive() {
         return health > 0f;
     }
 
-    public boolean isDead()
-    {
+    public boolean isDead() {
         return !isAlive();
     }
 
-    public boolean isDeathAnimationFinished()
-    {
+    public boolean isDeathAnimationFinished() {
         return !isAlive() && deathStateTime >= deathAnim.getAnimationDuration();
     }
 
-    private void updateFacing()
-    {
+    private void updateFacing() {
         float ax = Math.abs(forward.x);
         float ay = Math.abs(forward.y);
 
-        if (ax > ay)
-        {
+        if (ax > ay) {
             facing = forward.x >= 0f ? Facing.RIGHT : Facing.LEFT;
-        }
-        else
-        {
+        } else {
             facing = forward.y >= 0f ? Facing.BACK : Facing.FRONT;
         }
     }
 
-    private Animation<TextureRegion> pickAnimation(State state, boolean moved)
-    {
-        if (!moved)
-        {
-            switch (facing)
-            {
+    private Animation<TextureRegion> pickAnimation(State state, boolean moved) {
+        if (!moved) {
+            switch (facing) {
                 case BACK:  return backIdleAnim;
                 case LEFT:  return leftIdleAnim;
                 case RIGHT: return rightIdleAnim;
@@ -390,10 +419,8 @@ public class Enemy
             }
         }
 
-        if (state == State.CHASE)
-        {
-            switch (facing)
-            {
+        if (state == State.CHASE) {
+            switch (facing) {
                 case BACK:  return backRunAnim;
                 case LEFT:  return leftRunAnim;
                 case RIGHT: return rightRunAnim;
@@ -401,8 +428,7 @@ public class Enemy
             }
         }
 
-        switch (facing)
-        {
+        switch (facing) {
             case BACK:  return backWalkAnim;
             case LEFT:  return leftWalkAnim;
             case RIGHT: return rightWalkAnim;
@@ -410,10 +436,8 @@ public class Enemy
         }
     }
 
-    private Animation<TextureRegion> getHurtAnimation()
-    {
-        switch (facing)
-        {
+    private Animation<TextureRegion> getHurtAnimation() {
+        switch (facing) {
             case BACK:  return backHurtAnim;
             case LEFT:  return leftHurtAnim;
             case RIGHT: return rightHurtAnim;
@@ -421,10 +445,8 @@ public class Enemy
         }
     }
 
-    private Animation<TextureRegion> getAttackAnimation()
-    {
-        switch (facing)
-        {
+    private Animation<TextureRegion> getAttackAnimation() {
+        switch (facing) {
             case BACK:  return backAttackAnim;
             case LEFT:  return leftAttackAnim;
             case RIGHT: return rightAttackAnim;
@@ -432,34 +454,28 @@ public class Enemy
         }
     }
 
-    private void moveBy(float dx, float dy)
-    {
+    private void moveBy(float dx, float dy) {
         if (canMoveTo(position.x + dx, position.y)) position.x += dx;
         if (canMoveTo(position.x, position.y + dy)) position.y += dy;
     }
 
-    private boolean canMoveTo(float x, float y)
-    {
+    private boolean canMoveTo(float x, float y) {
         Rectangle next = new Rectangle(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
-        if (boundaries != null)
-        {
-            for (Rectangle wall : boundaries)
-            {
+        if (boundaries != null) {
+            for (Rectangle wall : boundaries) {
                 if (next.overlaps(wall)) return false;
             }
         }
 
-        if (collisionPolygons != null)
-        {
+        if (collisionPolygons != null) {
             Polygon rectPoly = new Polygon(new float[] {
                 next.x, next.y,
                 next.x + next.width, next.y,
                 next.x + next.width, next.y + next.height,
                 next.x, next.y + next.height
             });
-            for (Polygon poly : collisionPolygons)
-            {
+            for (Polygon poly : collisionPolygons) {
                 if (Intersector.overlapConvexPolygons(rectPoly, poly)) return false;
             }
         }
@@ -467,14 +483,13 @@ public class Enemy
         return true;
     }
 
-    private void pickNewRandomAction()
-    {
-        isMoving = MathUtils.randomBoolean(0.7f);
+    // Ÿ” RANDOM ACTION PICKER
+    private void pickNewRandomAction() {
+        isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
         moveDuration = MathUtils.random(1f, 3f);
         moveTimer = moveDuration;
 
-        if (isMoving)
-        {
+        if (isMoving) {
             randomDir.set(
                 MathUtils.random(-1f, 1f),
                 MathUtils.random(-1f, 1f)
@@ -482,22 +497,92 @@ public class Enemy
         }
     }
 
-    public void render(SpriteBatch batch)
-    {
+    public void render(SpriteBatch batch) {
         if (disposed) return;
+
+        // 🔴 HURT FLASH
+        if (hurtTimer > 0f) {
+            batch.setColor(1f, 0.5f, 0.5f, 1f);
+        }
+
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+        batch.setColor(1f, 1f, 1f, 1f);
+        batch.end();
+
+        // 🔥 UI DRAW
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shape.setProjectionMatrix(batch.getProjectionMatrix());
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        float barWidth = bounds.width * 1.5f;
+        float barHeight = 8f;
+        float x = bounds.x + (bounds.width - barWidth) / 2f;
+        float y = bounds.y + bounds.height + 14f;
+
+        float ratio = getHealthRatio();
+
+        // Health bar background & border
+        shape.setColor(0.15f, 0.15f, 0.15f, 0.95f);
+        shape.rect(x - 2, y - 2, barWidth + 4, barHeight + 4);
+
+        shape.setColor(0.3f, 0f, 0f, 1f);
+        shape.rect(x, y, barWidth, barHeight);
+
+        // Health remaining
+        if (ratio > 0.6f) shape.setColor(0.2f, 0.9f, 0.2f, 1f);
+        else if (ratio > 0.3f) shape.setColor(0.9f, 0.9f, 0.2f, 1f);
+        else shape.setColor(0.9f, 0.2f, 0.2f, 1f);
+
+        shape.rect(x, y, barWidth * ratio, barHeight);
+
+        // State indicator
+        float exX = x + barWidth / 2f;
+        float exY = y + barHeight + 12f;
+
+        if (state == State.CHASE) {
+            shape.setColor(1f, 0.2f, 0.2f, 1f);
+            shape.rect(exX - 2.5f, exY, 5f, 14f);
+            shape.circle(exX, exY - 4f, 2.5f);
+        } else {
+            shape.setColor(0.6f, 0.6f, 0.6f, 0.6f);
+            shape.circle(exX, exY, 4f);
+        }
+
+        // Attack telegraphing
+        if (attackTimer > 0f) {
+            float duration = getAttackAnimation().getAnimationDuration();
+            float progress = 1f - (attackTimer / duration);
+
+            float centerX = bounds.x + bounds.width / 2f;
+            float centerY = bounds.y + bounds.height / 2f;
+
+            // Faint outer range
+            shape.setColor(1f, 0.1f, 0.1f, 0.15f);
+            shape.circle(centerX, centerY, ATTACK_RANGE);
+
+            // Expanding inner danger zone
+            float expandRadius = ATTACK_RANGE * progress;
+            shape.setColor(1f, 0f, 0f, 0.4f * progress);
+            shape.circle(centerX, centerY, expandRadius);
+        }
+
+        shape.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
     }
 
-    public Rectangle getBounds()
-    {
-        return bounds;
-    }
-
-    public void dispose()
-    {
+    public void dispose() {
         if (disposed) return;
 
-        for (Texture t : textures) t.dispose();
+        for (Texture t : textures) {
+            t.dispose();
+        }
+
+        shape.dispose(); // 🔥 ADDED
+
         disposed = true;
     }
 }

@@ -9,8 +9,7 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class PauseOverlay
-{
+public class PauseOverlay {
 
     private static final String[] OPTIONS = {
         "RESUME",
@@ -46,25 +45,21 @@ public class PauseOverlay
         updateLayout(viewport);
         updatePointer(viewport);
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP))
-        {
-
+        if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
+            Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
-        {
-
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
+            Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selected = (selected + 1) % OPTION_COUNT;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
-        {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             return toAction(selected);
         }
 
-        if (Gdx.input.justTouched())
-        {
+        if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
                 selected = clicked;
@@ -73,8 +68,7 @@ public class PauseOverlay
         }
 
         int hovered = pointerIndex();
-        if (hovered >=0)
-        {
+        if (hovered >= 0) {
             selected = hovered;
         }
 
@@ -82,13 +76,16 @@ public class PauseOverlay
     }
 
     private Action toAction(int optionIndex) {
-        return switch (optionIndex)
-        {
-            case 0 -> Action.RESUME;
-            case 1 -> Action.SETTINGS;
-            case 2 -> Action.EXIT;
-            default -> Action.NONE;
-        };
+        switch (optionIndex) {
+            case 0:
+                return Action.RESUME;
+            case 1:
+                return Action.SETTINGS;
+            case 2:
+                return Action.EXIT;
+            default:
+                return Action.NONE;
+        }
     }
 
     private void updateLayout(Viewport viewport) {
@@ -128,6 +125,14 @@ public class PauseOverlay
         // ===== SHAPES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
+        // Draw background panel
+        shape.setColor(0f, 0f, 0f, 0.4f * alpha);
+        float panelW = boxW * 1.3f;
+        float panelH = boxH * 3.7f;
+        float panelX = centerX - (panelW - boxW) * 0.5f;
+        float panelY = ys[OPTION_COUNT - 1] - boxH * 0.55f;
+        shape.rect(panelX, panelY, panelW, panelH);
+
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {
                 float pulseAlpha = 0.22f + 0.08f * (0.5f + 0.5f * MathUtils.sin(animTime * 7f));
@@ -149,7 +154,7 @@ public class PauseOverlay
 
         shape.end();
 
-        //TEXT
+        // ===== TEXT =====
         batch.begin();
 
         float scale = w / 800f;
@@ -190,8 +195,7 @@ public class PauseOverlay
         return -1;
     }
 
-    private void updatePointer(Viewport viewport)
-    {
+    private void updatePointer(Viewport viewport) {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
     }
