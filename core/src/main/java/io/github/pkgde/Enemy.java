@@ -4,7 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer; // 🔥 ADDED
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.GL20;
 import java.util.ArrayList;
 
@@ -109,30 +109,30 @@ public class Enemy {
         position = new Vector2(400, 300);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
-        frontIdleAnim = load("Movements/Enemy/Front/Idle/Front - Idle_", 0.09f);
-        frontWalkAnim = load("Movements/Enemy/Front/Walking/Front - Walking_", 0.08f);
-        frontRunAnim = load("Movements/Enemy/Front/Running/Front - Running_", 0.07f);
-        frontHurtAnim = load("Movements/Enemy/Front/Hurt/Front - Hurt_", 0.05f);
+        frontIdleAnim   = load("Movements/Enemy/Front/Idle/Front - Idle_", 0.09f);
+        frontWalkAnim   = load("Movements/Enemy/Front/Walking/Front - Walking_", 0.08f);
+        frontRunAnim    = load("Movements/Enemy/Front/Running/Front - Running_", 0.07f);
+        frontHurtAnim   = load("Movements/Enemy/Front/Hurt/Front - Hurt_", 0.05f);
         frontAttackAnim = load("Movements/Enemy/Front/Attacking/Front - Attacking_", 0.05f);
 
-        backIdleAnim = load("Movements/Enemy/Back/Idle/Back - Idle_", 0.09f);
-        backWalkAnim = load("Movements/Enemy/Back/Walking/Back - Walking_", 0.08f);
-        backRunAnim = load("Movements/Enemy/Back/Running/Back - Running_", 0.07f);
-        backHurtAnim = load("Movements/Enemy/Back/Hurt/Back - Hurt_", 0.05f);
+        backIdleAnim   = load("Movements/Enemy/Back/Idle/Back - Idle_", 0.09f);
+        backWalkAnim   = load("Movements/Enemy/Back/Walking/Back - Walking_", 0.08f);
+        backRunAnim    = load("Movements/Enemy/Back/Running/Back - Running_", 0.07f);
+        backHurtAnim   = load("Movements/Enemy/Back/Hurt/Back - Hurt_", 0.05f);
         backAttackAnim = load("Movements/Enemy/Back/Attacking/Back - Attacking_", 0.05f);
 
-        leftIdleAnim = load("Movements/Enemy/Left/Idle/Left - Idle_", 0.09f);
-        leftWalkAnim = load("Movements/Enemy/Left/Walking/Left - Walking_", 0.08f);
-        leftRunAnim = load("Movements/Enemy/Left/Running/Left - Running_", 0.07f);
-        leftHurtAnim = load("Movements/Enemy/Left/Hurt/Left - Hurt_", 0.05f);
+        leftIdleAnim   = load("Movements/Enemy/Left/Idle/Left - Idle_", 0.09f);
+        leftWalkAnim   = load("Movements/Enemy/Left/Walking/Left - Walking_", 0.08f);
+        leftRunAnim    = load("Movements/Enemy/Left/Running/Left - Running_", 0.07f);
+        leftHurtAnim   = load("Movements/Enemy/Left/Hurt/Left - Hurt_", 0.05f);
         leftAttackAnim = load("Movements/Enemy/Left/Attacking/Left - Attacking_", 0.05f);
 
-        rightIdleAnim = load("Movements/Enemy/Right/Idle/Right - Idle_", 0.09f);
-        rightWalkAnim = load("Movements/Enemy/Right/Walking/Right - Walking_", 0.08f);
-        rightRunAnim = load("Movements/Enemy/Right/Running/Right - Running_", 0.07f);
-        rightHurtAnim = load("Movements/Enemy/Right/Hurt/Right - Hurt_", 0.05f);
+        rightIdleAnim   = load("Movements/Enemy/Right/Idle/Right - Idle_", 0.09f);
+        rightWalkAnim   = load("Movements/Enemy/Right/Walking/Right - Walking_", 0.08f);
+        rightRunAnim    = load("Movements/Enemy/Right/Running/Right - Running_", 0.07f);
+        rightHurtAnim   = load("Movements/Enemy/Right/Hurt/Right - Hurt_", 0.05f);
         rightAttackAnim = load("Movements/Enemy/Right/Attacking/Right - Attacking_", 0.05f);
-        deathAnim = load("Movements/Enemy/Dying/Dying_", 0.08f);
+        deathAnim       = load("Movements/Enemy/Dying/Dying_", 0.08f);
 
         currentFrame = frontIdleAnim.getKeyFrame(0f, true);
 
@@ -168,9 +168,7 @@ public class Enemy {
 
         for (int i = 0; ; i++) {
             String path = pathPrefix + String.format("%03d", i) + ".png";
-            if (!Gdx.files.internal(path).exists()) {
-                break;
-            }
+            if (!Gdx.files.internal(path).exists()) break;
 
             Texture tex = new Texture(path);
             textures.add(tex);
@@ -185,8 +183,18 @@ public class Enemy {
     }
 
     public void update(float delta, Player player) {
-        if (disposed) {
-            return;
+        if (disposed) return;
+
+        // 🔥 Process Knockback
+        if (knockbackVelocity.len2() > 0) {
+            float currentSpeed = knockbackVelocity.len();
+            currentSpeed -= KNOCKBACK_FRICTION * delta;
+            if (currentSpeed <= 0) {
+                knockbackVelocity.setZero();
+            } else {
+                knockbackVelocity.setLength(currentSpeed);
+                moveBy(knockbackVelocity.x * delta, knockbackVelocity.y * delta);
+            }
         }
 
         if (knockbackVelocity.len2() > 0) {
@@ -215,16 +223,12 @@ public class Enemy {
             hurtStateTime += delta;
         }
 
-        if (attackCooldownTimer > 0f) {
-            attackCooldownTimer -= delta;
-        }
+        if (attackCooldownTimer > 0f) attackCooldownTimer -= delta;
 
         if (attackTimer > 0f) {
             attackTimer -= delta;
             attackStateTime += delta;
-            if (attackTimer <= 0f) {
-                attackDamageConsumed = false;
-            }
+            if (attackTimer <= 0f) attackDamageConsumed = false;
         }
 
         Vector2 playerPos = player.getPosition();
@@ -257,11 +261,9 @@ public class Enemy {
         } else {
             if (inRange && inCone) {
                 state = State.CHASE;
-            }
-            else if (state == State.CHASE && distance <= alertRange) {
+            } else if (state == State.CHASE && distance <= alertRange) {
                 state = State.CHASE;
-            }
-            else {
+            } else {
                 state = State.IDLE;
             }
         }
@@ -270,9 +272,7 @@ public class Enemy {
         boolean isAttacking = attackTimer > 0f;
 
         switch (state) {
-
             case IDLE:
-
                 moveTimer -= delta;
 
                 if (moveTimer <= 0) {
@@ -283,16 +283,11 @@ public class Enemy {
                     moveBy(randomDir.x * SPEED * 0.5f * delta, randomDir.y * SPEED * 0.5f * delta);
                     forward.set(randomDir);
                 }
-
                 break;
 
             case CHASE:
-
                 if (!isAttacking && hurtTimer <= 0f) {
-                    Vector2 direction = new Vector2(playerPos)
-                        .sub(position)
-                        .nor();
-
+                    Vector2 direction = new Vector2(playerPos).sub(position).nor();
                     forward.set(direction);
 
                     if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
@@ -304,7 +299,6 @@ public class Enemy {
                         moveBy(direction.x * SPEED * delta, direction.y * SPEED * delta);
                     }
                 }
-
                 break;
         }
 
@@ -314,8 +308,8 @@ public class Enemy {
 
         boolean movedThisFrame = !MathUtils.isEqual(prevX, position.x, 0.0001f)
             || !MathUtils.isEqual(prevY, position.y, 0.0001f);
-        updateFacing();
 
+        updateFacing();
         bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
         if (hurtTimer > 0f) {
             currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
@@ -327,9 +321,7 @@ public class Enemy {
     }
 
     public void takeDamage(float damage) {
-        if (damage <= 0f || !isAlive() || disposed) {
-            return;
-        }
+        if (damage <= 0f || !isAlive() || disposed) return;
 
         health = Math.max(0f, health - damage);
 
@@ -368,9 +360,7 @@ public class Enemy {
     }
 
     public boolean canDealDamage() {
-        if (attackTimer <= 0f || attackDamageConsumed || !isAlive()) {
-            return false;
-        }
+        if (attackTimer <= 0f || attackDamageConsumed || !isAlive()) return false;
 
         float duration = getAttackAnimation().getAnimationDuration();
         float progress = 1f - (attackTimer / duration);
@@ -411,6 +401,10 @@ public class Enemy {
         return health > 0f;
     }
 
+    public boolean isDead() {
+        return !isAlive();
+    }
+
     public boolean isDeathAnimationFinished() {
         return !isAlive() && deathStateTime >= deathAnim.getAnimationDuration();
     }
@@ -429,84 +423,51 @@ public class Enemy {
     private Animation<TextureRegion> pickAnimation(State state, boolean moved) {
         if (!moved) {
             switch (facing) {
-                case BACK:
-                    return backIdleAnim;
-                case LEFT:
-                    return leftIdleAnim;
-                case RIGHT:
-                    return rightIdleAnim;
-                case FRONT:
-                default:
-                    return frontIdleAnim;
+                case BACK:  return backIdleAnim;
+                case LEFT:  return leftIdleAnim;
+                case RIGHT: return rightIdleAnim;
+                default:    return frontIdleAnim;
             }
         }
 
         if (state == State.CHASE) {
             switch (facing) {
-                case BACK:
-                    return backRunAnim;
-                case LEFT:
-                    return leftRunAnim;
-                case RIGHT:
-                    return rightRunAnim;
-                case FRONT:
-                default:
-                    return frontRunAnim;
+                case BACK:  return backRunAnim;
+                case LEFT:  return leftRunAnim;
+                case RIGHT: return rightRunAnim;
+                default:    return frontRunAnim;
             }
         }
 
         switch (facing) {
-            case BACK:
-                return backWalkAnim;
-            case LEFT:
-                return leftWalkAnim;
-            case RIGHT:
-                return rightWalkAnim;
-            case FRONT:
-            default:
-                return frontWalkAnim;
+            case BACK:  return backWalkAnim;
+            case LEFT:  return leftWalkAnim;
+            case RIGHT: return rightWalkAnim;
+            default:    return frontWalkAnim;
         }
     }
 
     private Animation<TextureRegion> getHurtAnimation() {
         switch (facing) {
-            case BACK:
-                return backHurtAnim;
-            case LEFT:
-                return leftHurtAnim;
-            case RIGHT:
-                return rightHurtAnim;
-            case FRONT:
-            default:
-                return frontHurtAnim;
+            case BACK:  return backHurtAnim;
+            case LEFT:  return leftHurtAnim;
+            case RIGHT: return rightHurtAnim;
+            default:    return frontHurtAnim;
         }
     }
 
     private Animation<TextureRegion> getAttackAnimation() {
         switch (facing) {
-            case BACK:
-                return backAttackAnim;
-            case LEFT:
-                return leftAttackAnim;
-            case RIGHT:
-                return rightAttackAnim;
-            case FRONT:
-            default:
-                return frontAttackAnim;
+            case BACK:  return backAttackAnim;
+            case LEFT:  return leftAttackAnim;
+            case RIGHT: return rightAttackAnim;
+            default:    return frontAttackAnim;
         }
     }
 
     private void moveBy(float dx, float dy) {
-        float newX = position.x + dx;
-        float newY = position.y + dy;
-
-        if (canMoveTo(newX, position.y)) {
-            position.x = newX;
-        }
-
-        if (canMoveTo(position.x, newY)) {
-            position.y = newY;
-        }
+        if (canMoveTo(position.x + dx, position.y)) position.x += dx;
+        if (canMoveTo(position.x, position.y + dy)) position.y += dy;
     }
 
     private boolean canMoveTo(float x, float y) {
@@ -514,9 +475,19 @@ public class Enemy {
 
         if (boundaries != null) {
             for (Rectangle wall : boundaries) {
-                if (next.overlaps(wall)) {
-                    return false;
-                }
+                if (next.overlaps(wall)) return false;
+            }
+        }
+
+        if (collisionPolygons != null) {
+            Polygon rectPoly = new Polygon(new float[] {
+                next.x, next.y,
+                next.x + next.width, next.y,
+                next.x + next.width, next.y + next.height,
+                next.x, next.y + next.height
+            });
+            for (Polygon poly : collisionPolygons) {
+                if (Intersector.overlapConvexPolygons(rectPoly, poly)) return false;
             }
         }
 
@@ -539,9 +510,7 @@ public class Enemy {
 
     // Ÿ” RANDOM ACTION PICKER
     private void pickNewRandomAction() {
-
         isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
-
         moveDuration = MathUtils.random(1f, 3f);
         moveTimer = moveDuration;
 
@@ -554,8 +523,11 @@ public class Enemy {
     }
 
     public void render(SpriteBatch batch) {
-        if (disposed) {
-            return;
+        if (disposed) return;
+
+        // 🔴 HURT FLASH
+        if (hurtTimer > 0f) {
+            batch.setColor(1f, 0.5f, 0.5f, 1f);
         }
 
         // 🔴 HURT FLASH
@@ -564,15 +536,12 @@ public class Enemy {
         }
 
         batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
-
         batch.setColor(1f, 1f, 1f, 1f);
-
         batch.end();
 
         // 🔥 UI DRAW
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        
         shape.setProjectionMatrix(batch.getProjectionMatrix());
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
@@ -586,7 +555,7 @@ public class Enemy {
         // Health bar background & border
         shape.setColor(0.15f, 0.15f, 0.15f, 0.95f);
         shape.rect(x - 2, y - 2, barWidth + 4, barHeight + 4);
-        
+
         shape.setColor(0.3f, 0f, 0f, 1f);
         shape.rect(x, y, barWidth, barHeight);
 
@@ -614,7 +583,7 @@ public class Enemy {
         if (attackTimer > 0f) {
             float duration = getAttackAnimation().getAnimationDuration();
             float progress = 1f - (attackTimer / duration);
-            
+
             float centerX = bounds.x + bounds.width / 2f;
             float centerY = bounds.y + bounds.height / 2f;
 
@@ -635,9 +604,7 @@ public class Enemy {
     }
 
     public void dispose() {
-        if (disposed) {
-            return;
-        }
+        if (disposed) return;
 
         for (Texture t : textures) {
             t.dispose();

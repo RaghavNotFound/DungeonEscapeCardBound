@@ -11,7 +11,6 @@ import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.maps.objects.*;
 import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector2;
-
 import java.util.ArrayList;
 
 public class MapManager {
@@ -74,15 +73,18 @@ public class MapManager {
         MapLayer objectLayer = getObjectLayer();
         if (objectLayer != null) {
             for (MapObject obj : objectLayer.getObjects()) {
-
                 if (isObjectTag(obj, "wall") || isObjectTag(obj, "water") || isObjectTag(obj, "centerFire")) {
                     if (obj instanceof PolygonMapObject) {
                         collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
                     } else {
                         Rectangle r = extractObjectBounds(obj);
+<<<<<<< HEAD
                         if (r != null) {
                             collisionRects.add(r);
                         }
+=======
+                        if (r != null) collisionRects.add(r);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                     }
                 }
             }
@@ -100,9 +102,13 @@ public class MapManager {
                     collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
                 } else {
                     Rectangle r = extractObjectBounds(obj);
+<<<<<<< HEAD
                     if (r != null) {
                         collisionRects.add(r);
                     }
+=======
+                    if (r != null) collisionRects.add(r);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 }
             }
         }
@@ -110,9 +116,7 @@ public class MapManager {
 
     private MapLayer getObjectLayer() {
         MapLayer layer = map.getLayers().get("object");
-        if (layer != null) {
-            return layer;
-        }
+        if (layer != null) return layer;
         return map.getLayers().get("objects");
     }
 
@@ -121,14 +125,10 @@ public class MapManager {
         if (layer == null) return;
 
         for (MapObject obj : layer.getObjects()) {
-            if (!isObjectTag(obj, "torch")) {
-                continue;
-            }
+            if (!isObjectTag(obj, "torch")) continue;
 
             Rectangle bounds = extractObjectBounds(obj);
-            if (bounds != null) {
-                torchRects.add(bounds);
-            }
+            if (bounds != null) torchRects.add(bounds);
         }
     }
 
@@ -137,22 +137,16 @@ public class MapManager {
         if (layer == null) return;
 
         for (MapObject obj : layer.getObjects()) {
-            if (!isObjectTag(obj, "chest")) {
-                continue;
-            }
+            if (!isObjectTag(obj, "chest")) continue;
 
             Rectangle bounds = extractObjectBounds(obj);
-            if (bounds != null) {
-                chestRects.add(bounds);
-            }
+            if (bounds != null) chestRects.add(bounds);
         }
     }
 
     private boolean isObjectTag(MapObject obj, String expectedTag) {
         String name = obj.getName();
-        if (expectedTag.equals(name)) {
-            return true;
-        }
+        if (expectedTag.equals(name)) return true;
 
         Object type = obj.getProperties().get("type");
         return expectedTag.equals(type);
@@ -177,25 +171,16 @@ public class MapManager {
             Rectangle rect = ((RectangleMapObject) obj).getRectangle();
             float rotation = obj.getProperties().get("rotation", 0f, Float.class);
 
-            if (MathUtils.isZero(rotation, 0.001f)) {
-                return new Rectangle(rect);
-            }
+            if (MathUtils.isZero(rotation, 0.001f)) return new Rectangle(rect);
 
             float radians = rotation * MathUtils.degreesToRadians;
             float cos = MathUtils.cos(radians);
             float sin = MathUtils.sin(radians);
 
-            float x0 = rect.x;
-            float y0 = rect.y;
-
-            float x1 = x0 + rect.width * cos;
-            float y1 = y0 + rect.width * sin;
-
-            float x2 = x0 + rect.width * cos - rect.height * sin;
-            float y2 = y0 + rect.width * sin + rect.height * cos;
-
-            float x3 = x0 - rect.height * sin;
-            float y3 = y0 + rect.height * cos;
+            float x0 = rect.x, y0 = rect.y;
+            float x1 = x0 + rect.width * cos, y1 = y0 + rect.width * sin;
+            float x2 = x0 + rect.width * cos - rect.height * sin, y2 = y0 + rect.width * sin + rect.height * cos;
+            float x3 = x0 - rect.height * sin, y3 = y0 + rect.height * cos;
 
             float minX = Math.min(Math.min(x0, x1), Math.min(x2, x3));
             float maxX = Math.max(Math.max(x0, x1), Math.max(x2, x3));
@@ -214,10 +199,8 @@ public class MapManager {
     }
 
     private Circle ellipseAsCircle(EllipseMapObject obj) {
-        float x = obj.getEllipse().x;
-        float y = obj.getEllipse().y;
-        float w = obj.getEllipse().width;
-        float h = obj.getEllipse().height;
+        float x = obj.getEllipse().x, y = obj.getEllipse().y;
+        float w = obj.getEllipse().width, h = obj.getEllipse().height;
         float radius = Math.max(w, h) * 0.5f;
         return new Circle(x + w * 0.5f, y + h * 0.5f, radius);
     }

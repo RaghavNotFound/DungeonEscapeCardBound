@@ -86,6 +86,16 @@ public class Player {
     private Vector2 dashDirection = new Vector2();
     private boolean isDashing;
 
+    // ===== DASH =====
+    private static final float DASH_DURATION = 0.22f;
+    private static final float DASH_SPEED_MULT = 3.8f;
+    private static final float DASH_STAMINA_COST = 30f;
+    private static final float DASH_COOLDOWN = 0.6f;
+    private float dashTimer;
+    private float dashCooldownTimer;
+    private Vector2 dashDirection = new Vector2();
+    private boolean isDashing;
+
     private float stamina = 100f;
     private float maxStamina = 100f;
     private boolean runLocked;
@@ -108,7 +118,6 @@ public class Player {
     private float deathStateTime;
 
     public Player() {
-
         position = new Vector2(200, 200);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
@@ -157,18 +166,21 @@ public class Player {
             idleBlinkingFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
+        // HURT
         TextureRegion[] hurtFrames = new TextureRegion[hurtFrameCount];
         for (int i = 0; i < hurtFrameCount; i++) {
             hurtTextures[i] = new Texture("Movements/Player/hurt/hurt_" + (i + 1) + ".png");
             hurtFrames[i] = new TextureRegion(hurtTextures[i]);
         }
 
+        // SWORD
         TextureRegion[] swordFrames = new TextureRegion[swordFrameCount];
         for (int i = 0; i < swordFrameCount; i++) {
             swordTextures[i] = new Texture("Movements/Player/kicking/kicking_" + (i + 1) + ".png");
             swordFrames[i] = new TextureRegion(swordTextures[i]);
         }
 
+        // DEATH
         TextureRegion[] deathFrames = new TextureRegion[deathFrameCount];
         for (int i = 0; i < deathFrameCount; i++) {
             deathTextures[i] = new Texture("Movements/Player/dying/dying_" + (i + 1) + ".png");
@@ -177,7 +189,6 @@ public class Player {
 
         walkAnimation = new Animation<>(0.025f, walkFrames);
         runAnimation = new Animation<>(0.08f, runFrames);
-
         idleAnimation = new Animation<>(0.08f, idleFrames);
         idleBlinkingAnimation = new Animation<>(0.08f, idleBlinkingFrames);
         hurtAnimation = new Animation<>(0.05f, hurtFrames);
@@ -251,7 +262,11 @@ public class Player {
         if (dashCooldownTimer > 0f) {
             dashCooldownTimer -= delta;
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         if (dashTimer > 0f) {
             dashTimer -= delta;
             if (dashTimer <= 0f) {
@@ -261,6 +276,7 @@ public class Player {
             }
         }
 
+<<<<<<< HEAD
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) 
             && stamina >= DASH_STAMINA_COST 
             && dashTimer <= 0f 
@@ -268,17 +284,34 @@ public class Player {
             && hurtTimer <= 0f 
             && !isDashing) {
             
+=======
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)
+            && stamina >= DASH_STAMINA_COST
+            && dashTimer <= 0f
+            && dashCooldownTimer <= 0f
+            && hurtTimer <= 0f
+            && !isDashing) {
+
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             stamina -= DASH_STAMINA_COST;
             dashTimer = DASH_DURATION;
             dashCooldownTimer = DASH_COOLDOWN;
             isDashing = true;
 
             float dx = 0, dy = 0;
+<<<<<<< HEAD
             if (Gdx.input.isKeyPressed(Input.Keys.W)) dy = 1;
             if (Gdx.input.isKeyPressed(Input.Keys.S)) dy = -1;
             if (Gdx.input.isKeyPressed(Input.Keys.A)) dx = -1;
             if (Gdx.input.isKeyPressed(Input.Keys.D)) dx = 1;
             
+=======
+            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) dy = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) dy = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) dx = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx = 1;
+
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             if (dx == 0 && dy == 0) {
                 dx = facingRight ? 1 : -1;
             }
@@ -288,11 +321,15 @@ public class Player {
         if (swordAttackTimer > 0f) {
             swordAttackTimer -= delta;
             swordAttackStateTime += delta;
+<<<<<<< HEAD
 
             swordAttackTimer = swordAnimation.getAnimationDuration();
             swordAttackStateTime = 0f;
             swordCooldownTimer = SWORD_COOLDOWN;
             swordDamageConsumed = false; // ✅ KEEP ONLY HERE
+=======
+            if (swordAttackTimer <= 0f) swordDamageConsumed = false;
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         }
 
         if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)
@@ -356,8 +393,13 @@ public class Player {
             arrow.update(delta);
 
             if (arrow.isCollided(worldMaxX, worldMaxY,
+<<<<<<< HEAD
                                  boundaries == null ? new ArrayList<>() : boundaries,
                                  collisionPolygons == null ? new ArrayList<>() : collisionPolygons)) {
+=======
+                boundaries == null ? new ArrayList<>() : boundaries,
+                collisionPolygons == null ? new ArrayList<>() : collisionPolygons)) {
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 arrows.remove(i);
             }
         }
@@ -392,7 +434,11 @@ public class Player {
     }
 
     public boolean isDeathAnimationFinished() {
+<<<<<<< HEAD
         return !isAlive() && deathStateTime >= deathAnimation.getAnimationDuration();
+=======
+        return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     }
 
     public boolean canDealSwordDamage() {
@@ -478,10 +524,17 @@ public class Player {
             else if (dashDirection.x > 0) facingRight = true;
             isRunning = true;
         } else if (hurtTimer <= 0f) {
+<<<<<<< HEAD
             boolean up = Gdx.input.isKeyPressed(Input.Keys.W);
             boolean down = Gdx.input.isKeyPressed(Input.Keys.S);
             boolean left = Gdx.input.isKeyPressed(Input.Keys.A);
             boolean right = Gdx.input.isKeyPressed(Input.Keys.D);
+=======
+            boolean up = Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
+            boolean down = Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
+            boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
+            boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
             boolean runKeyPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 

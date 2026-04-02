@@ -27,22 +27,31 @@ public class HomeScreen implements Screen {
     private int selected = 0;
     private float menuAnimTime = 0f;
     private final Vector3 pointer = new Vector3();
+    private int lastMouseX = -1;
+    private int lastMouseY = -1;
     private final Color accent = new Color(0.25f, 0.85f, 1f, 1f);
 
+<<<<<<< HEAD
     // 🌫️ BLUR SYSTEM
+=======
+    // BLUR SYSTEM
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     private FrameBuffer fbo;
     private ShaderProgram blurShader;
     private SpriteBatch blurBatch;
 
     @Override
     public void show() {
-
         shapeRenderer = new ShapeRenderer();
         batch = new SpriteBatch();
         font = new BitmapFont();
         glyphLayout = new GlyphLayout();
 
+<<<<<<< HEAD
         // 🔥 improve font quality
+=======
+        // Improve font quality
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         font.getRegion().getTexture().setFilter(
             Texture.TextureFilter.Linear,
             Texture.TextureFilter.Linear
@@ -52,7 +61,11 @@ public class HomeScreen implements Screen {
         background.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         camera = new OrthographicCamera();
+<<<<<<< HEAD
         viewport = new FitViewport(1280, 720, camera); // 🔥 FIXED
+=======
+        viewport = new FitViewport(1280, 720, camera);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         viewport.apply(true);
 
         camera.position.set(
@@ -64,7 +77,11 @@ public class HomeScreen implements Screen {
 
         settings = new SettingsOverlay();
 
+<<<<<<< HEAD
         // 🌫️ HIGH QUALITY FBO (DYNAMIC SIZE)
+=======
+        // DYNAMIC SIZE FBO
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         fbo = new FrameBuffer(
             Pixmap.Format.RGBA8888,
             Gdx.graphics.getWidth(),
@@ -84,7 +101,6 @@ public class HomeScreen implements Screen {
 
     @Override
     public void render(float delta) {
-
         menuAnimTime += delta;
 
         Gdx.gl.glClearColor(0, 0, 0, 1);
@@ -107,6 +123,7 @@ public class HomeScreen implements Screen {
         float settingsY = playY - btnHeight - gap;
         float exitY = settingsY - btnHeight - gap;
 
+<<<<<<< HEAD
         // ===== INPUT =====
         if (settings.isActive()) {
             settings.handleInput(viewport);
@@ -123,44 +140,88 @@ public class HomeScreen implements Screen {
             }
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+=======
+        // --- Mouse Movement Tracking ---
+        boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
+        lastMouseX = Gdx.input.getX();
+        lastMouseY = Gdx.input.getY();
+
+        // ===== INPUT & LOGIC (Prioritized) =====
+        if (settings.isOverlayVisible()) {
+            // If overlay active, update its transitions and capture input
+            settings.update(delta);
+            settings.handleInput(viewport);
+        } else {
+            // Normal Menu Input Handling
+            boolean keyPressed = false;
+            if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) { // W or UP
+                selected = (selected + 2) % 3;
+                keyPressed = true;
+            } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) { // S or DOWN
+                selected = (selected + 1) % 3;
+                keyPressed = true;
+            }
+
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) { // ENTER
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 applySelection();
+                return; // Action taken, skip further input checks
             }
 
+<<<<<<< HEAD
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+=======
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) { // ESCAPE
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 Gdx.app.exit();
+                return; // Action taken, skip further input checks
             }
 
-            if (Gdx.input.justTouched()) {
+            // --- Mouse Click ---
+            if (Gdx.input.justTouched()) { // Mouse Click
                 int clicked = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
                 if (clicked >= 0) {
                     selected = clicked;
                     applySelection();
+                    return; // Action taken, skip further input checks
                 }
             }
 
-            int hovered = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
-            if (hovered >= 0) {
-                selected = hovered;
+            // --- Mouse Hover (only if mouse moved and no keyboard input) ---
+            if (mouseMovedThisFrame && !keyPressed) {
+                int hovered = getPointerSelection(btnX, playY, settingsY, exitY, btnWidth, btnHeight);
+                if (hovered >= 0) {
+                    selected = hovered;
+                }
             }
         }
 
+<<<<<<< HEAD
         // ===== SETTINGS MODE =====
         if (settings.isActive()) {
 
+=======
+        // ===== RENDERING =====
+        if (settings.isOverlayVisible()) {
+            // Render background to FBO for blurring
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             fbo.begin();
-
             batch.begin();
             batch.draw(background, 0, 0, worldW, worldH);
             batch.end();
-
             fbo.end();
 
             Texture tex = fbo.getColorBufferTexture();
 
             blurBatch.setProjectionMatrix(camera.combined);
-
             blurBatch.begin();
+<<<<<<< HEAD
             blurShader.setUniformf("blur", 0.002f);
+=======
+
+            float progress = settings.getTransitionProgress();
+            blurShader.setUniformf("blur", progress * 0.002f);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
             blurBatch.draw(
                 tex,
@@ -169,26 +230,39 @@ public class HomeScreen implements Screen {
                 0, 0,
                 tex.getWidth(),
                 tex.getHeight(),
+<<<<<<< HEAD
                 false, true   // 🔥 FIXED FLIP
+=======
+                false, true
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             );
-
             blurBatch.end();
 
+<<<<<<< HEAD
             // 🌑 overlay (improved)
+=======
+            // Darken overlay behind settings menu
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             Gdx.gl.glEnable(GL20.GL_BLEND);
-
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+<<<<<<< HEAD
             shapeRenderer.setColor(0, 0, 0, 0.5f);
+=======
+            shapeRenderer.setColor(0, 0, 0, progress * 0.5f);
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             shapeRenderer.rect(0, 0, worldW, worldH);
             shapeRenderer.end();
-
             Gdx.gl.glDisable(GL20.GL_BLEND);
 
             settings.render(shapeRenderer, batch, font, viewport);
             return;
         }
 
+<<<<<<< HEAD
         // ===== NORMAL MENU =====
+=======
+        // --- Normal Menu Rendering ---
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         batch.begin();
         batch.draw(background, 0, 0, worldW, worldH);
         batch.end();
@@ -219,8 +293,10 @@ public class HomeScreen implements Screen {
         glyphLayout.setText(font, "DUNGEON ESCAPE");
         float titleX = worldW * 0.06f;
         float titleY = worldH * 0.9f;
+
         font.setColor(0f, 0f, 0f, 0.7f);
         font.draw(batch, glyphLayout, titleX + 3f, titleY - 3f);
+
         font.setColor(1f, 1f, 1f, 1f);
         font.draw(batch, glyphLayout, titleX, titleY);
 
@@ -249,8 +325,10 @@ public class HomeScreen implements Screen {
         float shadowOffset = Math.max(1.5f, worldW * 0.0013f);
         font.setColor(0f, 0f, 0f, 0.75f);
         font.draw(batch, glyphLayout, textX + shadowOffset, textY - shadowOffset);
+
         font.setColor(active ? accent : Color.WHITE);
         font.draw(batch, glyphLayout, textX, textY);
+
         font.setColor(Color.WHITE);
     }
 
@@ -292,6 +370,7 @@ public class HomeScreen implements Screen {
     }
 
     private void applySelection() {
+<<<<<<< HEAD
 
         if (selected == 0) {
             ((Main) Gdx.app.getApplicationListener())
@@ -301,6 +380,13 @@ public class HomeScreen implements Screen {
             settings.show();
         }
         else if (selected == 2) {
+=======
+        if (selected == 0) {
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
+        } else if (selected == 1) {
+            settings.show();
+        } else if (selected == 2) {
+>>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             Gdx.app.exit();
         }
     }
