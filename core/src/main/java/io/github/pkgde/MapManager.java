@@ -231,8 +231,8 @@ public class MapManager {
         if (exitGateRects.isEmpty()) {
             float mapW = getMapWidth();
             float mapH = getMapHeight();
-            // Place gate near the top-right corner of the map
-            exitGateRects.add(new Rectangle(mapW - 120f, mapH - 120f, 80f, 80f));
+            // Place gate in an accessible area (center-top of map, away from walls)
+            exitGateRects.add(new Rectangle(mapW * 0.5f - 40f, mapH * 0.75f - 40f, 80f, 80f));
         }
     }
 

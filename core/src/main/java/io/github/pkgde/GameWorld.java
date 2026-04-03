@@ -241,8 +241,16 @@ public class GameWorld {
         exitGateUnlocked = enemies.isEmpty() || allEnemiesDead;
 
         if (exitGateUnlocked) {
+            Rectangle pBounds = player.getBounds();
+            float pcx = pBounds.x + pBounds.width / 2f;
+            float pcy = pBounds.y + pBounds.height / 2f;
             for (Rectangle gateRect : mapManager.getExitGateRects()) {
-                if (player.getBounds().overlaps(gateRect)) {
+                float gcx = gateRect.x + gateRect.width / 2f;
+                float gcy = gateRect.y + gateRect.height / 2f;
+                float dx = pcx - gcx;
+                float dy = pcy - gcy;
+                // Trigger when player center is within 60px of gate center
+                if (dx * dx + dy * dy < 60f * 60f) {
                     exitGateReached = true;
                     break;
                 }
