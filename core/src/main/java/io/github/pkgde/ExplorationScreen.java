@@ -38,7 +38,6 @@ public class ExplorationScreen implements Screen {
     private final SpriteBatch blurBatch;
 
     public ExplorationScreen() {
-
         camera = new OrthographicCamera();
 
         viewport = new FitViewport(1280, 720, camera);
@@ -51,7 +50,7 @@ public class ExplorationScreen implements Screen {
         mapManager.load(SAFE_ROOM_MAP);
 
         world = new GameWorld(mapManager);
-        renderer = new GameRenderer(world, camera);
+        renderer = new GameRenderer(world, camera, mapManager);
         input = new InputHandler(viewport);
 
         pauseOverlay = new PauseOverlay();
@@ -78,46 +77,35 @@ public class ExplorationScreen implements Screen {
 
     @Override
     public void render(float delta) {
-
         settingsOverlay.update(delta);
 
         // ===== INPUT HANDLING =====
         if (state == State.GAME) {
-
             InputHandler.Action action = input.handle();
 
             switch (action) {
                 case TOGGLE_PAUSE:
                     state = State.PAUSE;
                     break;
-
                 case TOGGLE_INVENTORY:
                     state = State.INVENTORY;
                     break;
-
                 case OPEN_SETTINGS:
                     state = State.SETTINGS;
                     settingsOverlay.show();
                     break;
-
                 case EXIT_TO_MENU:
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                     return;
-
                 case NONE:
                     break;
             }
-
         } else if (state == State.INVENTORY) {
-
             inventoryOverlay.handleInput();
-            if (Gdx.input.isKeyJustPressed(Input.Keys.E) ||
-                Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 state = State.GAME;
             }
-
         } else if (state == State.PAUSE) {
-
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
                 state = State.GAME;
             } else {
@@ -127,24 +115,21 @@ public class ExplorationScreen implements Screen {
                     case RESUME:
                         state = State.GAME;
                         break;
-
                     case SETTINGS:
                         state = State.SETTINGS;
                         settingsOverlay.show();
                         break;
-
                     case EXIT:
                         ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                         return;
-
                     case NONE:
                         break;
                 }
             }
-
         } else if (state == State.SETTINGS) {
-
-            if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(viewport);
+            if (settingsOverlay.getTransitionProgress() >= 1f) {
+                settingsOverlay.handleInput(viewport);
+            }
 
             if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) {
                 state = State.PAUSE;
@@ -165,14 +150,31 @@ public class ExplorationScreen implements Screen {
 
         // ===== UPDATE =====
         if (state == State.GAME) {
-            world.update(delta, camera);
+            boolean playerIsDead = !world.getPlayer().isAlive();
+            boolean isVictorySequence = false;
+            boolean allVictoryAnimsFinished = true;
 
-            // Check for player death after world update
-            if (world.getPlayer().isDeathAnimationFinished()) {
+            if (!world.getEnemies().isEmpty()) {
+                boolean allEnemiesDefeated = true;
+                for (Enemy e : world.getEnemies()) {
+                    if (e.isAlive()) {
+                        allEnemiesDefeated = false;
+                        break;
+                    }
+                    if (!e.isDeathAnimationFinished()) {
+                        allVictoryAnimsFinished = false;
+                    }
+                }
+                isVictorySequence = allEnemiesDefeated;
+            }
+
+            world.update(delta, camera); // Use raw delta as timeManager is removed
+
+            if (playerIsDead && world.getPlayer().isDeathAnimationFinished()) {
                 state = State.GAME_OVER;
             }
 
-            if (world.isPlayerNearEnemy()) {
+            if (world.isPlayerNearEnemy() && !playerIsDead && !isVictorySequence) {
                 if (!shakeTriggered) {
                     shakeTime = shakeDuration;
                     shakeTriggered = true;
@@ -191,16 +193,14 @@ public class ExplorationScreen implements Screen {
         }
 
         // ===== RENDER =====
-        boolean isOverlayActive = (state != State.GAME);
+        boolean isOverlayActive = (state != State.GAME); // This is correct, it covers all non-GAME states
 
-        if (isOverlayActive) {
-
+        if (isOverlayActive) { // Only blur if any overlay is active
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
 
             viewport.apply();
-            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
             Texture tex = fbo.getColorBufferTexture();
 
@@ -227,7 +227,6 @@ public class ExplorationScreen implements Screen {
                 false, true
             );
             blurBatch.end();
-
         } else {
             renderer.render(offsetX, offsetY);
         }

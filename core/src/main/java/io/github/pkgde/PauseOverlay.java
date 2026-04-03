@@ -9,8 +9,7 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class PauseOverlay
-{
+public class PauseOverlay {
 
     private static final String[] OPTIONS = {
         "RESUME",
@@ -34,6 +33,8 @@ public class PauseOverlay
     private float boxW;
     private float boxH;
     private float centerX;
+    private int lastMouseX = -1;
+    private int lastMouseY = -1;
 
     public enum Action {
         NONE,
@@ -45,26 +46,27 @@ public class PauseOverlay
     public Action handleInput(Viewport viewport) {
         updateLayout(viewport);
         updatePointer(viewport);
+        
+        boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
+        lastMouseX = Gdx.input.getX();
+        lastMouseY = Gdx.input.getY();
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP))
-        {
-
+        // --- Keyboard Navigation ---
+        boolean keyPressed = false;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
-        {
-
+            keyPressed = true;
+        } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selected = (selected + 1) % OPTION_COUNT;
+            keyPressed = true;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER))
-        {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             return toAction(selected);
         }
 
-        if (Gdx.input.justTouched())
-        {
+        // --- Mouse Click ---
+        if (Gdx.input.justTouched()) {
             int clicked = pointerIndex();
             if (clicked >= 0) {
                 selected = clicked;
@@ -72,23 +74,28 @@ public class PauseOverlay
             }
         }
 
-        int hovered = pointerIndex();
-        if (hovered >=0)
-        {
-            selected = hovered;
+        // --- Mouse Hover (only if mouse moved and no keyboard input) ---
+        if (mouseMovedThisFrame && !keyPressed) {
+            int hovered = pointerIndex();
+            if (hovered >= 0) {
+                selected = hovered;
+            }
         }
 
         return Action.NONE;
     }
 
     private Action toAction(int optionIndex) {
-        return switch (optionIndex)
-        {
-            case 0 -> Action.RESUME;
-            case 1 -> Action.SETTINGS;
-            case 2 -> Action.EXIT;
-            default -> Action.NONE;
-        };
+        switch (optionIndex) {
+            case 0:
+                return Action.RESUME;
+            case 1:
+                return Action.SETTINGS;
+            case 2:
+                return Action.EXIT;
+            default:
+                return Action.NONE;
+        }
     }
 
     private void updateLayout(Viewport viewport) {
@@ -149,7 +156,7 @@ public class PauseOverlay
 
         shape.end();
 
-        //TEXT
+        // ===== TEXT =====
         batch.begin();
 
         float scale = w / 800f;
@@ -190,8 +197,7 @@ public class PauseOverlay
         return -1;
     }
 
-    private void updatePointer(Viewport viewport)
-    {
+    private void updatePointer(Viewport viewport) {
         touch.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(touch);
     }
