@@ -269,7 +269,7 @@ public class MapManager {
     }
 
     public void dispose() {
-        map.dispose();
-        renderer.dispose();
+        if (renderer != null) renderer.dispose();
+        if (map != null) map.dispose();
     }
 }
