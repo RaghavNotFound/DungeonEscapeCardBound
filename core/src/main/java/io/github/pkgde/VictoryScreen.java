@@ -16,7 +16,7 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 public class VictoryScreen implements Screen {
 
     // ===== OPTIONS =====
-    private static final String[] OPTIONS = { "CONTINUE", "RETRY" };
+    private static final String[] OPTIONS = {"CONTINUE", "RETRY"};
     private static final int OPTION_COUNT = OPTIONS.length;
 
     // ===== STATS =====
@@ -154,7 +154,6 @@ public class VictoryScreen implements Screen {
             }
         }
 
-        // ===== LAYOUT =====
         updateLayout();
 
         // ===== DRAW BACKGROUND GRADIENT =====
@@ -162,15 +161,12 @@ public class VictoryScreen implements Screen {
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Dark vignette gradient
         shape.setColor(0.08f, 0.06f, 0.02f, 1f);
         shape.rect(0, 0, worldW, worldH);
 
-        // Golden radial glow in center
         float glowAlpha = 0.12f + 0.04f * MathUtils.sin(animTime * 2f);
         shape.setColor(0.9f, 0.7f, 0.1f, glowAlpha * appear);
         shape.circle(worldW / 2f, worldH * 0.6f, 300f);
-
         shape.end();
 
         // ===== DRAW PARTICLES =====
@@ -219,11 +215,9 @@ public class VictoryScreen implements Screen {
         float titleX = (worldW - glyphLayout.width) / 2f;
         float titleY = worldH * 0.82f;
 
-        // Golden shadow
         font.setColor(0.4f, 0.3f, 0f, 0.8f * appear);
         font.draw(batch, glyphLayout, titleX + shadow * 2, titleY - shadow * 2);
 
-        // Main text
         float titleGlow = 0.85f + 0.15f * MathUtils.sin(animTime * 4f);
         font.setColor(goldAccent.r * titleGlow, goldAccent.g * titleGlow, goldAccent.b, appear);
         font.draw(batch, glyphLayout, titleX, titleY);
@@ -238,7 +232,6 @@ public class VictoryScreen implements Screen {
         // --- Stats ---
         float statsY = worldH * 0.62f;
         font.getData().setScale(scale * 1.1f);
-
         String[] statLabels = {
             "Enemies Defeated: " + enemiesDefeated,
             "Torches Collected: " + torchesCollected,
@@ -280,12 +273,8 @@ public class VictoryScreen implements Screen {
     private void executeOption(int index) {
         Main main = (Main) Gdx.app.getApplicationListener();
         switch (index) {
-            case 0: // CONTINUE -> Main menu
-                main.setScreen(new HomeScreen());
-                break;
-            case 1: // RETRY
-                main.setScreen(new ExplorationScreen());
-                break;
+            case 0 -> main.setScreen(new HomeScreen());
+            case 1 -> main.setScreen(new ExplorationScreen());
         }
     }
 

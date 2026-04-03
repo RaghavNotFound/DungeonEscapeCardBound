@@ -9,6 +9,10 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 
+/**
+ * The main gameplay screen. Manages the game state, camera effects,
+ * and coordinate synchronization between the world and UI overlays.
+ */
 public class ExplorationScreen implements Screen {
 
     private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
@@ -29,46 +33,46 @@ public class ExplorationScreen implements Screen {
     public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, VICTORY }
     private State state = State.GAME;
 
+    // Juice Effects
     private float shakeTime = 0f;
     private final float shakeDuration = 0.25f;
     private boolean shakeTriggered = false;
 
+    // Post-Processing
     private FrameBuffer fbo;
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
 
     public ExplorationScreen() {
-        camera = new OrthographicCamera();
-
-        viewport = new FitViewport(1280, 720, camera);
-        viewport.apply(true);
-
-        camera.position.set(640, 360, 0);
-        camera.update();
-
+        // 1. Initialize Map and World logic
         mapManager = new MapManager();
         mapManager.load(SAFE_ROOM_MAP);
 
+        float mapW = mapManager.getMapWidth();
+        float mapH = mapManager.getMapHeight();
+
+        // 2. Setup Camera and Viewport based on Map Dimensions
+        camera = new OrthographicCamera();
+        camera.setToOrtho(false, mapW, mapH);
+        camera.position.set(mapW / 2f, mapH / 2f, 0);
+
+        viewport = new FitViewport(mapW, mapH, camera);
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
+
+        // 3. Initialize Systems
         world = new GameWorld(mapManager);
         renderer = new GameRenderer(world, camera, mapManager);
         input = new InputHandler(viewport);
 
+        // 4. Initialize UI Overlays
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
         inventoryOverlay = new InventoryOverlay();
         gameOverOverlay = new GameOverOverlay();
 
-        fbo = new FrameBuffer(
-            Pixmap.Format.RGBA8888,
-            Gdx.graphics.getWidth(),
-            Gdx.graphics.getHeight(),
-            false
-        );
-
-        fbo.getColorBufferTexture().setFilter(
-            Texture.TextureFilter.Linear,
-            Texture.TextureFilter.Linear
-        );
+        // 5. Setup Blur Buffer
+        fbo = new FrameBuffer(Pixmap.Format.RGBA8888, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
+        fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         blurShader = BlurShader.createShader(true);
         blurBatch = new SpriteBatch();
@@ -80,26 +84,19 @@ public class ExplorationScreen implements Screen {
         viewport.apply();
         settingsOverlay.update(delta);
 
-        // ===== INPUT HANDLING =====
+        handleStateInput();
+        updateGameLogic(delta);
+        draw(delta);
+    }
+
+    private void handleStateInput() {
         if (state == State.GAME) {
             InputHandler.Action action = input.handle();
-
             switch (action) {
-                case TOGGLE_PAUSE:
-                    state = State.PAUSE;
-                    break;
-                case TOGGLE_INVENTORY:
-                    state = State.INVENTORY;
-                    break;
-                case OPEN_SETTINGS:
-                    state = State.SETTINGS;
-                    settingsOverlay.show();
-                    break;
-                case EXIT_TO_MENU:
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                    return;
-                case NONE:
-                    break;
+                case TOGGLE_PAUSE -> state = State.PAUSE;
+                case TOGGLE_INVENTORY -> state = State.INVENTORY;
+                case OPEN_SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
+                case EXIT_TO_MENU -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
             }
         } else if (state == State.INVENTORY) {
             inventoryOverlay.handleInput();
@@ -111,210 +108,123 @@ public class ExplorationScreen implements Screen {
                 state = State.GAME;
             } else {
                 PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
-
                 switch (action) {
-                    case RESUME:
-                        state = State.GAME;
-                        break;
-                    case SETTINGS:
-                        state = State.SETTINGS;
-                        settingsOverlay.show();
-                        break;
-                    case EXIT:
-                        ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                        return;
-                    case NONE:
-                        break;
+                    case RESUME -> state = State.GAME;
+                    case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
+                    case EXIT -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                 }
             }
         } else if (state == State.SETTINGS) {
-            if (settingsOverlay.getTransitionProgress() >= 1f) {
-                settingsOverlay.handleInput(viewport);
-            }
-
-            if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) {
-                state = State.PAUSE;
-            }
+            if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(viewport);
+            if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) state = State.PAUSE;
         } else if (state == State.GAME_OVER) {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             switch (action) {
-                case RETRY:
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
-                    return;
-                case MAIN_MENU:
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                    return;
-                case NONE:
-                    break;
-            }
-        } else if (state == State.VICTORY) {
-            // Handled by VictoryScreen transition (see update block below)
-        }
-
-        // ===== UPDATE =====
-        if (state == State.GAME) {
-            float gameDelta = delta;
-            boolean playerIsDead = !world.getPlayer().isAlive();
-            boolean isVictorySequence = false;
-            boolean allVictoryAnimsFinished = true;
-
-            if (!world.getEnemies().isEmpty()) {
-                boolean allEnemiesDefeated = true;
-                for (Enemy e : world.getEnemies()) {
-                    if (e.isAlive()) {
-                        allEnemiesDefeated = false;
-                        break;
-                    }
-                    if (!e.isDeathAnimationFinished()) {
-                        allVictoryAnimsFinished = false;
-                    }
-                }
-                isVictorySequence = allEnemiesDefeated;
-            }
-
-            if (playerIsDead) {
-                gameDelta *= 0.3f; // slow down death
-                if (world.getPlayer().isDeathAnimationFinished()) {
-                    state = State.GAME_OVER;
-                }
-            } else if (world.isExitGateReached()) {
-                // Player reached the unlocked exit gate!
-                Main main = (Main) Gdx.app.getApplicationListener();
-                main.setScreen(new VictoryScreen(
-                    world.getPlayer().getEnemiesKilled(),
-                    world.getPlayer().getTorchCount(),
-                    world.getPlayer().getTimeSurvived()
-                ));
-                return;
-            }
-
-            world.update(gameDelta, camera);
-
-            if (world.isPlayerNearEnemy() && !playerIsDead && !isVictorySequence) {
-                if (!shakeTriggered) {
-                    shakeTime = shakeDuration;
-                    shakeTriggered = true;
-                }
-            } else {
-                shakeTriggered = false;
+                case RETRY -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
+                case MAIN_MENU -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
             }
         }
+    }
 
-        float offsetX = 0f, offsetY = 0f;
+    private void updateGameLogic(float delta) {
+        if (state != State.GAME) return;
 
+        float gameDelta = delta;
+        boolean playerIsDead = !world.getPlayer().isAlive();
+
+        if (playerIsDead) {
+            gameDelta *= 0.3f; // Slow motion on death
+            if (world.getPlayer().isDeathAnimationFinished()) state = State.GAME_OVER;
+        } else if (world.isExitGateReached()) {
+            Main main = (Main) Gdx.app.getApplicationListener();
+            main.setScreen(new VictoryScreen(world.getPlayer().getEnemiesKilled(), world.getPlayer().getTorchCount(), world.getPlayer().getTimeSurvived()));
+            return;
+        }
+
+        world.update(gameDelta, camera);
+
+        // Camera Shake logic
+        if (world.isPlayerNearEnemy() && !playerIsDead) {
+            if (!shakeTriggered) {
+                shakeTime = shakeDuration;
+                shakeTriggered = true;
+            }
+        } else {
+            shakeTriggered = false;
+        }
+    }
+
+    private void draw(float delta) {
+        float offsetX = 0, offsetY = 0;
         if (shakeTime > 0) {
             shakeTime -= delta;
             offsetX = MathUtils.random(-10f, 10f);
             offsetY = MathUtils.random(-10f, 10f);
         }
 
-        // ===== RENDER =====
         boolean isOverlayActive = (state != State.GAME);
 
         if (isOverlayActive) {
-            // Render the game world to the FrameBuffer
+            // Render world to FBO for blurring
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
 
             viewport.apply();
-
             Texture tex = fbo.getColorBufferTexture();
-            float blurAmount = 0f;
+            float blurAmount = (state == State.SETTINGS) ? 0.002f * settingsOverlay.getTransitionProgress() : 0.002f;
 
-            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAME_OVER) {
-                blurAmount = 0.002f;
-            }
-            if (state == State.SETTINGS) {
-                blurAmount = 0.002f * settingsOverlay.getTransitionProgress();
-            }
-
-            // Draw blurred game frame
             blurBatch.setProjectionMatrix(camera.combined);
             blurBatch.begin();
             blurShader.setUniformf("blur", blurAmount);
-            blurBatch.draw(
-                tex,
-                camera.position.x - camera.viewportWidth / 2f,
-                camera.position.y - camera.viewportHeight / 2f,
-                camera.viewportWidth,
-                camera.viewportHeight,
-                0, 0,
-                tex.getWidth(),
-                tex.getHeight(),
-                false, true
-            );
+            blurBatch.draw(tex, camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f,
+                camera.viewportWidth, camera.viewportHeight, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
             blurBatch.end();
 
-            // Draw darkening/tinting overlay on top of blurred background
+            // Darken background
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-
-            if (state == State.GAME_OVER) {
-                shape.setColor(0.5f, 0, 0, 0.65f);
-            } else {
-                shape.setColor(0, 0, 0, 0.5f);
-            }
-
-            shape.rect(
-                camera.position.x - camera.viewportWidth / 2f,
-                camera.position.y - camera.viewportHeight / 2f,
-                camera.viewportWidth,
-                camera.viewportHeight
-            );
+            shape.setColor(0, 0, 0, (state == State.GAME_OVER) ? 0.65f : 0.5f);
+            if (state == State.GAME_OVER) shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
+            shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
             shape.end();
-            Gdx.gl.glDisable(GL20.GL_BLEND);
 
+            // Render Overlays
+            renderUIOverlays();
         } else {
-            // Normal unblurred rendering
             renderer.render(offsetX, offsetY);
         }
+    }
 
-        // Render UI Overlays
-        if (isOverlayActive) {
-            Gdx.gl.glEnable(GL20.GL_BLEND);
-            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+    private void renderUIOverlays() {
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-            SpriteBatch batch = renderer.getBatch();
-            ShapeRenderer shape = renderer.getShape();
-            BitmapFont font = renderer.getFont();
+        SpriteBatch batch = renderer.getBatch();
+        ShapeRenderer shape = renderer.getShape();
+        BitmapFont font = renderer.getFont();
 
-            batch.setProjectionMatrix(camera.combined);
-            shape.setProjectionMatrix(camera.combined);
+        batch.setProjectionMatrix(camera.combined);
+        shape.setProjectionMatrix(camera.combined);
 
-            if (state == State.PAUSE || state == State.SETTINGS) {
-                float settingsProgress = settingsOverlay.getTransitionProgress();
-                float pauseAlpha = 1f - settingsProgress;
-                pauseOverlay.render(shape, batch, font, viewport, pauseAlpha);
-            }
-
-            settingsOverlay.render(shape, batch, font, viewport);
-
-            if (state == State.INVENTORY) {
-                inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
-            }
-
-            if (state == State.GAME_OVER) {
-                gameOverOverlay.render(shape, batch, font, viewport);
-            }
-
-            Gdx.gl.glDisable(GL20.GL_BLEND);
+        if (state == State.PAUSE || state == State.SETTINGS) {
+            pauseOverlay.render(shape, batch, font, viewport, 1f - settingsOverlay.getTransitionProgress());
         }
+        settingsOverlay.render(shape, batch, font, viewport);
+        if (state == State.INVENTORY) inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
+        if (state == State.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     @Override
     public void resize(int w, int h) {
         viewport.update(w, h, true);
-
         if (fbo != null) fbo.dispose();
-
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
-        fbo.getColorBufferTexture().setFilter(
-            Texture.TextureFilter.Linear,
-            Texture.TextureFilter.Linear
-        );
+        fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
     }
 
     @Override

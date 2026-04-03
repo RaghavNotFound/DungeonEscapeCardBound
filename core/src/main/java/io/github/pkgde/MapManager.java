@@ -13,19 +13,23 @@ import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector2;
 import java.util.ArrayList;
 
+/**
+ * Handles TiledMap loading, object extraction (spawns, collisions, interactables),
+ * and rendering. Provides fallback generation for missing map objects.
+ */
 public class MapManager {
 
     private TiledMap map;
     private OrthogonalTiledMapRenderer renderer;
 
-    private Vector2 playerSpawn = new Vector2();
-    private ArrayList<Vector2> enemySpawns = new ArrayList<>();
-    private ArrayList<Rectangle> collisionRects = new ArrayList<>();
-    private ArrayList<Polygon> collisionPolygons = new ArrayList<>();
-    private ArrayList<Rectangle> torchRects = new ArrayList<>();
-    private ArrayList<Rectangle> chestRects = new ArrayList<>();
-    private ArrayList<Rectangle> exitGateRects = new ArrayList<>();
-    private ArrayList<Interactable> interactables = new ArrayList<>();
+    private final Vector2 playerSpawn = new Vector2();
+    private final ArrayList<Vector2> enemySpawns = new ArrayList<>();
+    private final ArrayList<Rectangle> collisionRects = new ArrayList<>();
+    private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
+    private final ArrayList<Rectangle> torchRects = new ArrayList<>();
+    private final ArrayList<Rectangle> chestRects = new ArrayList<>();
+    private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
+    private final ArrayList<Interactable> interactables = new ArrayList<>();
 
     private static final float UNIT_SCALE = 1f;
 
@@ -33,13 +37,7 @@ public class MapManager {
         map = new TmxMapLoader().load(path);
         renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
 
-        enemySpawns.clear();
-        collisionRects.clear();
-        collisionPolygons.clear();
-        torchRects.clear();
-        chestRects.clear();
-        exitGateRects.clear();
-        interactables.clear();
+        clearData();
 
         loadCollisions();
         loadSpawns();
@@ -47,6 +45,16 @@ public class MapManager {
         loadChests();
         loadExitGates();
         loadInteractables();
+    }
+
+    private void clearData() {
+        enemySpawns.clear();
+        collisionRects.clear();
+        collisionPolygons.clear();
+        torchRects.clear();
+        chestRects.clear();
+        exitGateRects.clear();
+        interactables.clear();
     }
 
     public float getMapWidth() {
@@ -57,6 +65,12 @@ public class MapManager {
     public float getMapHeight() {
         return map.getProperties().get("height", Integer.class) *
             map.getProperties().get("tileheight", Integer.class);
+    }
+
+    private MapLayer getObjectLayer() {
+        MapLayer layer = map.getLayers().get("object");
+        if (layer != null) return layer;
+        return map.getLayers().get("objects");
     }
 
     private void loadSpawns() {
@@ -80,68 +94,59 @@ public class MapManager {
         if (objectLayer != null) {
             for (MapObject obj : objectLayer.getObjects()) {
                 if (isObjectTag(obj, "wall") || isObjectTag(obj, "water") || isObjectTag(obj, "centerFire")) {
-                    if (obj instanceof PolygonMapObject) {
-                        collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
-                    } else {
-                        Rectangle r = extractObjectBounds(obj);
-                        if (r != null) {
-                            collisionRects.add(r);
-                        }
-                    }
+                    processCollisionObject(obj);
                 }
             }
             return;
         }
 
-        // Fallback for older maps that store collisions in separate layers.
-        String[] legacyLayers = { "wall", "water", "centerFire" };
+        // Legacy/Fallback Layer Processing
+        String[] legacyLayers = {"wall", "water", "centerFire"};
         for (String layerName : legacyLayers) {
             MapLayer layer = map.getLayers().get(layerName);
             if (layer == null) continue;
-
             for (MapObject obj : layer.getObjects()) {
-                if (obj instanceof PolygonMapObject) {
-                    collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
-                } else {
-                    Rectangle r = extractObjectBounds(obj);
-                    if (r != null) {
-                        collisionRects.add(r);
-                    }
-                }
+                processCollisionObject(obj);
             }
         }
     }
 
-    private MapLayer getObjectLayer() {
-        MapLayer layer = map.getLayers().get("object");
-        if (layer != null) return layer;
-        return map.getLayers().get("objects");
+    private void processCollisionObject(MapObject obj) {
+        if (obj instanceof PolygonMapObject) {
+            collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
+        } else {
+            Rectangle r = extractObjectBounds(obj);
+            if (r != null) collisionRects.add(r);
+        }
     }
 
     private void loadTorches() {
-        torchRects.clear();
-        int numTorches = 5;
+        MapLayer layer = getObjectLayer();
+        if (layer != null) {
+            for (MapObject obj : layer.getObjects()) {
+                if (isObjectTag(obj, "torch")) {
+                    Rectangle bounds = extractObjectBounds(obj);
+                    if (bounds != null) torchRects.add(bounds);
+                }
+            }
+        }
+
+        // If no torches in map, generate random valid positions
+        if (torchRects.isEmpty()) {
+            generateRandomTorches(5);
+        }
+    }
+
+    private void generateRandomTorches(int count) {
         float mapW = getMapWidth();
         float mapH = getMapHeight();
-
-        for (int i = 0; i < numTorches; i++) {
-            // Try up to 50 times to find a valid spot
+        for (int i = 0; i < count; i++) {
             for (int attempt = 0; attempt < 50; attempt++) {
-                float x = com.badlogic.gdx.math.MathUtils.random(60f, mapW - 60f);
-                float y = com.badlogic.gdx.math.MathUtils.random(60f, mapH - 60f);
+                float x = MathUtils.random(60f, mapW - 60f);
+                float y = MathUtils.random(60f, mapH - 60f);
                 Rectangle r = new Rectangle(x, y, 32f, 32f);
 
-                boolean collides = false;
-                for (Rectangle wall : collisionRects) {
-                    if (wall.overlaps(r)) { collides = true; break; }
-                }
-                if (!collides) {
-                    for (Polygon poly : collisionPolygons) {
-                        if (poly.getBoundingRectangle().overlaps(r)) { collides = true; break; }
-                    }
-                }
-
-                if (!collides) {
+                if (!isPositionColliding(r)) {
                     torchRects.add(r);
                     break;
                 }
@@ -149,15 +154,24 @@ public class MapManager {
         }
     }
 
+    private boolean isPositionColliding(Rectangle r) {
+        for (Rectangle wall : collisionRects) {
+            if (wall.overlaps(r)) return true;
+        }
+        for (Polygon poly : collisionPolygons) {
+            if (poly.getBoundingRectangle().overlaps(r)) return true;
+        }
+        return false;
+    }
+
     private void loadChests() {
         MapLayer layer = getObjectLayer();
         if (layer == null) return;
-
         for (MapObject obj : layer.getObjects()) {
-            if (!isObjectTag(obj, "chest")) continue;
-
-            Rectangle bounds = extractObjectBounds(obj);
-            if (bounds != null) chestRects.add(bounds);
+            if (isObjectTag(obj, "chest")) {
+                Rectangle bounds = extractObjectBounds(obj);
+                if (bounds != null) chestRects.add(bounds);
+            }
         }
     }
 
@@ -165,18 +179,16 @@ public class MapManager {
         MapLayer layer = getObjectLayer();
         if (layer != null) {
             for (MapObject obj : layer.getObjects()) {
-                if (!isObjectTag(obj, "exitGate")) continue;
-                Rectangle bounds = extractObjectBounds(obj);
-                if (bounds != null) exitGateRects.add(bounds);
+                if (isObjectTag(obj, "exitGate")) {
+                    Rectangle bounds = extractObjectBounds(obj);
+                    if (bounds != null) exitGateRects.add(bounds);
+                }
             }
         }
-
-        // Hardcoded fallback: if no exit gate found in the map, place one
         if (exitGateRects.isEmpty()) {
             float mapW = getMapWidth();
             float mapH = getMapHeight();
-            // Place gate near the top wall, mimicking a flat vertical doorway footprint
-            exitGateRects.add(new Rectangle(mapW * 0.5f - 40f, mapH - 120f, 80f, 20f));
+            exitGateRects.add(new Rectangle(mapW * 0.5f - 40f, mapH * 0.75f - 40f, 80f, 80f));
         }
     }
 
@@ -184,38 +196,38 @@ public class MapManager {
         MapLayer layer = getObjectLayer();
         if (layer != null) {
             for (MapObject obj : layer.getObjects()) {
-                Rectangle bounds = extractObjectBounds(obj);
-                if (bounds == null) continue;
+                Rectangle b = extractObjectBounds(obj);
+                if (b == null) continue;
 
                 if (isObjectTag(obj, "chest")) {
-                    interactables.add(new Interactable(Interactable.Type.CHEST, bounds.x, bounds.y, bounds.width, bounds.height));
+                    interactables.add(new Interactable(Interactable.Type.CHEST, b.x, b.y, b.width, b.height));
                 } else if (isObjectTag(obj, "sign")) {
-                    String text = "";
                     Object textProp = obj.getProperties().get("text");
-                    if (textProp != null) text = textProp.toString();
-                    interactables.add(new Interactable(Interactable.Type.SIGN, bounds.x, bounds.y, bounds.width, bounds.height, text));
+                    String text = (textProp != null) ? textProp.toString() : "";
+                    interactables.add(new Interactable(Interactable.Type.SIGN, b.x, b.y, b.width, b.height, text));
                 } else if (isObjectTag(obj, "barrel")) {
-                    interactables.add(new Interactable(Interactable.Type.BARREL, bounds.x, bounds.y, bounds.width, bounds.height));
+                    interactables.add(new Interactable(Interactable.Type.BARREL, b.x, b.y, b.width, b.height));
                 }
             }
         }
-
-        // Hardcoded fallback interactables if none found in map
         if (interactables.isEmpty()) {
-            float mapW = getMapWidth();
-            float mapH = getMapHeight();
-            interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.3f, mapH * 0.6f, 40f, 35f));
-            interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.7f, mapH * 0.4f, 40f, 35f));
-            interactables.add(new Interactable(Interactable.Type.SIGN, mapW * 0.5f, mapH * 0.8f, 30f, 40f, "Find the exit gate!"));
-            interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.2f, mapH * 0.3f, 32f, 38f));
-            interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.8f, mapH * 0.7f, 32f, 38f));
+            generateFallbackInteractables();
         }
+    }
+
+    private void generateFallbackInteractables() {
+        float mapW = getMapWidth();
+        float mapH = getMapHeight();
+        interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.3f, mapH * 0.6f, 40f, 35f));
+        interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.7f, mapH * 0.4f, 40f, 35f));
+        interactables.add(new Interactable(Interactable.Type.SIGN, mapW * 0.5f, mapH * 0.8f, 30f, 40f, "Find the exit gate!"));
+        interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.2f, mapH * 0.3f, 32f, 38f));
+        interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.8f, mapH * 0.7f, 32f, 38f));
     }
 
     private boolean isObjectTag(MapObject obj, String expectedTag) {
         String name = obj.getName();
         if (expectedTag.equals(name)) return true;
-
         Object type = obj.getProperties().get("type");
         return expectedTag.equals(type);
     }
@@ -225,12 +237,10 @@ public class MapManager {
             Rectangle rect = ((RectangleMapObject) obj).getRectangle();
             return new Vector2(rect.x, rect.y);
         }
-
         if (obj instanceof EllipseMapObject) {
             Circle c = ellipseAsCircle((EllipseMapObject) obj);
             return new Vector2(c.x, c.y);
         }
-
         return null;
     }
 
@@ -257,12 +267,10 @@ public class MapManager {
 
             return new Rectangle(minX, minY, maxX - minX, maxY - minY);
         }
-
         if (obj instanceof EllipseMapObject) {
             Circle c = ellipseAsCircle((EllipseMapObject) obj);
             return new Rectangle(c.x - c.radius, c.y - c.radius, c.radius * 2f, c.radius * 2f);
         }
-
         return null;
     }
 
@@ -278,6 +286,7 @@ public class MapManager {
         renderer.render();
     }
 
+    // ===== GETTERS =====
     public Vector2 getPlayerSpawn() { return playerSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
@@ -288,7 +297,7 @@ public class MapManager {
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {
-        map.dispose();
-        renderer.dispose();
+        if (renderer != null) renderer.dispose();
+        if (map != null) map.dispose();
     }
 }

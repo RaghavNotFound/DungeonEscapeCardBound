@@ -44,12 +44,6 @@ public class Interactable {
         this.signText = signText;
     }
 
-    public Type getType() { return type; }
-    public Rectangle getBounds() { return bounds; }
-    public boolean isInteracted() { return interacted; }
-    public String getSignText() { return signText; }
-    public float getPopupTimer() { return popupTimer; }
-
     public boolean isPlayerInRange(Player player) {
         Rectangle pBounds = player.getBounds();
         float px = pBounds.x + pBounds.width / 2f;
@@ -83,158 +77,136 @@ public class Interactable {
         float cx = bounds.x + bounds.width / 2f;
         float cy = bounds.y + bounds.height / 2f;
 
-        // === Draw the object ===
+        // 1. Render the Object Shape
         switch (type) {
-            case CHEST:
-                renderChest(shape, playerInRange);
-                break;
-            case SIGN:
-                renderSign(shape, playerInRange);
-                break;
-            case BARREL:
-                renderBarrel(shape, playerInRange);
-                break;
+            case CHEST -> renderChest(shape, playerInRange);
+            case SIGN -> renderSign(shape, playerInRange);
+            case BARREL -> renderBarrel(shape, playerInRange);
         }
 
-        // === Draw interaction prompt ===
+        // 2. Draw "Press [G]" Prompt
         if (playerInRange && (!interacted || type == Type.SIGN)) {
-            float promptY = bounds.y + bounds.height + 20f;
-            float bobOffset = MathUtils.sin(animTime * 5f) * 3f;
-
-            batch.begin();
-            font.getData().setScale(0.9f);
-            String promptText = "Press [G]";
-            glyphLayout.setText(font, promptText);
-            float promptX = cx - glyphLayout.width / 2f;
-
-            // Background pill
-            batch.end();
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0f, 0f, 0f, 0.7f);
-            shape.rect(promptX - 6f, promptY + bobOffset - glyphLayout.height - 4f,
-                glyphLayout.width + 12f, glyphLayout.height + 8f);
-            shape.end();
-
-            batch.begin();
-            font.setColor(0.95f, 0.85f, 0.3f, 1f);
-            font.draw(batch, glyphLayout, promptX, promptY + bobOffset);
-            font.getData().setScale(1f);
-            font.setColor(Color.WHITE);
-            batch.end();
+            renderPrompt(batch, shape, font, cx);
         }
 
-        // === Draw sign text popup ===
-        if (type == Type.SIGN && popupTimer > 0f && signText.length() > 0) {
-            float popupAlpha = MathUtils.clamp(popupTimer / 0.5f, 0f, 1f);
-            float popupY = bounds.y + bounds.height + 40f;
-
-            batch.begin();
-            font.getData().setScale(0.85f);
-            glyphLayout.setText(font, signText);
-            float popupX = cx - glyphLayout.width / 2f;
-
-            batch.end();
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0.05f, 0.05f, 0.08f, 0.85f * popupAlpha);
-            shape.rect(popupX - 10f, popupY - glyphLayout.height - 8f,
-                glyphLayout.width + 20f, glyphLayout.height + 16f);
-            shape.end();
-
-            shape.begin(ShapeRenderer.ShapeType.Line);
-            shape.setColor(0.8f, 0.7f, 0.3f, popupAlpha);
-            shape.rect(popupX - 10f, popupY - glyphLayout.height - 8f,
-                glyphLayout.width + 20f, glyphLayout.height + 16f);
-            shape.end();
-
-            batch.begin();
-            font.setColor(1f, 1f, 1f, popupAlpha);
-            font.draw(batch, glyphLayout, popupX, popupY);
-            font.getData().setScale(1f);
-            font.setColor(Color.WHITE);
-            batch.end();
+        // 3. Draw Sign Text Popup
+        if (type == Type.SIGN && popupTimer > 0f && !signText.isEmpty()) {
+            renderSignPopup(batch, shape, font, cx);
         }
+    }
+
+    private void renderPrompt(SpriteBatch batch, ShapeRenderer shape, BitmapFont font, float cx) {
+        float promptY = bounds.y + bounds.height + 20f;
+        float bobOffset = MathUtils.sin(animTime * 5f) * 3f;
+
+        batch.begin();
+        font.getData().setScale(0.9f);
+        glyphLayout.setText(font, "Press [G]");
+        float promptX = cx - glyphLayout.width / 2f;
+        batch.end();
+
+        // Background pill
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0f, 0f, 0f, 0.7f);
+        shape.rect(promptX - 6f, promptY + bobOffset - glyphLayout.height - 4f,
+            glyphLayout.width + 12f, glyphLayout.height + 8f);
+        shape.end();
+
+        batch.begin();
+        font.setColor(0.95f, 0.85f, 0.3f, 1f);
+        font.draw(batch, glyphLayout, promptX, promptY + bobOffset);
+        font.getData().setScale(1f);
+        font.setColor(Color.WHITE);
+        batch.end();
+    }
+
+    private void renderSignPopup(SpriteBatch batch, ShapeRenderer shape, BitmapFont font, float cx) {
+        float popupAlpha = MathUtils.clamp(popupTimer / 0.5f, 0f, 1f);
+        float popupY = bounds.y + bounds.height + 40f;
+
+        batch.begin();
+        font.getData().setScale(0.85f);
+        glyphLayout.setText(font, signText);
+        float popupX = cx - glyphLayout.width / 2f;
+        batch.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0.05f, 0.05f, 0.08f, 0.85f * popupAlpha);
+        shape.rect(popupX - 10f, popupY - glyphLayout.height - 8f, glyphLayout.width + 20f, glyphLayout.height + 16f);
+        shape.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(0.8f, 0.7f, 0.3f, popupAlpha);
+        shape.rect(popupX - 10f, popupY - glyphLayout.height - 8f, glyphLayout.width + 20f, glyphLayout.height + 16f);
+        shape.end();
+
+        batch.begin();
+        font.setColor(1f, 1f, 1f, popupAlpha);
+        font.draw(batch, glyphLayout, popupX, popupY);
+        font.getData().setScale(1f);
+        font.setColor(Color.WHITE);
+        batch.end();
     }
 
     private void renderChest(ShapeRenderer shape, boolean playerInRange) {
         float x = bounds.x, y = bounds.y, w = bounds.width, h = bounds.height;
-
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
         if (interacted) {
-            // Open chest - darker, empty
-            shape.setColor(0.35f, 0.22f, 0.08f, 1f);
+            shape.setColor(0.35f, 0.22f, 0.08f, 1f); // Interior
             shape.rect(x, y, w, h * 0.6f);
-            // Open lid
-            shape.setColor(0.45f, 0.3f, 0.1f, 1f);
+            shape.setColor(0.45f, 0.3f, 0.1f, 1f); // Open lid
             shape.rect(x - 2, y + h * 0.6f, w + 4, h * 0.25f);
         } else {
-            // Closed chest body
-            shape.setColor(0.55f, 0.35f, 0.1f, 1f);
+            shape.setColor(0.55f, 0.35f, 0.1f, 1f); // Body
             shape.rect(x, y, w, h * 0.7f);
-            // Lid
-            shape.setColor(0.65f, 0.4f, 0.12f, 1f);
+            shape.setColor(0.65f, 0.4f, 0.12f, 1f); // Lid
             shape.rect(x - 2, y + h * 0.7f, w + 4, h * 0.3f);
-            // Lock/clasp
+
             float glint = 0.7f + 0.3f * MathUtils.sin(animTime * 4f);
-            shape.setColor(0.9f * glint, 0.75f * glint, 0.1f, 1f);
+            shape.setColor(0.9f * glint, 0.75f * glint, 0.1f, 1f); // Lock
             shape.rect(x + w / 2f - 4f, y + h * 0.55f, 8f, 12f);
         }
 
-        // Glow when player is near
         if (playerInRange && !interacted) {
             float glow = 0.15f + 0.1f * MathUtils.sin(animTime * 6f);
             shape.setColor(1f, 0.85f, 0.3f, glow);
             shape.rect(x - 4, y - 4, w + 8, h + 8);
         }
-
         shape.end();
     }
 
     private void renderSign(ShapeRenderer shape, boolean playerInRange) {
         float x = bounds.x, y = bounds.y, w = bounds.width, h = bounds.height;
-
         shape.begin(ShapeRenderer.ShapeType.Filled);
-
-        // Post
-        shape.setColor(0.4f, 0.28f, 0.12f, 1f);
+        shape.setColor(0.4f, 0.28f, 0.12f, 1f); // Post
         shape.rect(x + w / 2f - 3f, y, 6f, h * 0.5f);
-
-        // Sign board
-        shape.setColor(0.55f, 0.4f, 0.18f, 1f);
+        shape.setColor(0.55f, 0.4f, 0.18f, 1f); // Board
         shape.rect(x, y + h * 0.45f, w, h * 0.55f);
-
-        // Border
         shape.end();
+
         shape.begin(ShapeRenderer.ShapeType.Line);
         shape.setColor(0.3f, 0.2f, 0.05f, 1f);
         shape.rect(x, y + h * 0.45f, w, h * 0.55f);
-
         if (playerInRange) {
             float glow = 0.5f + 0.3f * MathUtils.sin(animTime * 5f);
             shape.setColor(1f, 0.9f, 0.5f, glow);
             shape.rect(x - 2, y + h * 0.43f, w + 4, h * 0.59f);
         }
-
         shape.end();
     }
 
     private void renderBarrel(ShapeRenderer shape, boolean playerInRange) {
         float x = bounds.x, y = bounds.y, w = bounds.width, h = bounds.height;
-        float cx = x + w / 2f;
-
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
         if (interacted) {
-            // Broken barrel
             shape.setColor(0.35f, 0.25f, 0.1f, 0.6f);
             shape.rect(x, y, w, h * 0.3f);
         } else {
-            // Barrel body
             shape.setColor(0.5f, 0.33f, 0.12f, 1f);
             shape.rect(x + 2, y, w - 4, h);
-
-            // Top/bottom rings
-            shape.setColor(0.38f, 0.28f, 0.1f, 1f);
+            shape.setColor(0.38f, 0.28f, 0.1f, 1f); // Rings
             shape.rect(x, y + h * 0.05f, w, h * 0.08f);
             shape.rect(x, y + h * 0.87f, w, h * 0.08f);
             shape.rect(x, y + h * 0.45f, w, h * 0.08f);
@@ -245,7 +217,13 @@ public class Interactable {
                 shape.rect(x - 3, y - 3, w + 6, h + 6);
             }
         }
-
         shape.end();
     }
+
+    // ===== GETTERS =====
+    public Type getType() { return type; }
+    public Rectangle getBounds() { return bounds; }
+    public boolean isInteracted() { return interacted; }
+    public String getSignText() { return signText; }
+    public float getPopupTimer() { return popupTimer; }
 }
