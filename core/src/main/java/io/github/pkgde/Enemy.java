@@ -53,7 +53,13 @@ public class Enemy {
     private enum State { IDLE, CHASE }
     private State state = State.IDLE;
 
-    private static final float SPEED = 95f;
+    private static final float BASE_SPEED = 95f;
+    private float speedMultiplier = 1f;
+    private static final float LEASH_RANGE = 600f;
+    private static final float LEASH_RANGE_SQ = LEASH_RANGE * LEASH_RANGE;
+
+    // Obstacle avoidance angles to try (degrees)
+    private static final float[] AVOIDANCE_ANGLES = { 30f, -30f, 60f, -60f, 90f, -90f };
 
     private float baseRange = 200f;
     private float alertRange = baseRange * 2f;
@@ -108,6 +114,9 @@ public class Enemy {
     public Enemy() {
         position = new Vector2(400, 300);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+
+        // Random speed variation so enemies don't perfectly stack
+        speedMultiplier = MathUtils.random(0.9f, 1.1f);
 
         frontIdleAnim   = load("Movements/Enemy/Front/Idle/Front - Idle_", 0.09f);
         frontWalkAnim   = load("Movements/Enemy/Front/Walking/Front - Walking_", 0.08f);
@@ -251,7 +260,12 @@ public class Enemy {
             if (inRange && inCone) {
                 state = State.CHASE;
             } else if (state == State.CHASE && distance <= alertRange) {
-                state = State.CHASE;
+                // Leash: if player is very far away, give up chase
+                if (distance > LEASH_RANGE) {
+                    state = State.IDLE;
+                } else {
+                    state = State.CHASE;
+                }
             } else {
                 state = State.IDLE;
             }
@@ -259,6 +273,7 @@ public class Enemy {
 
         // ===== BEHAVIOR =====
         boolean isAttacking = attackTimer > 0f;
+        float speed = BASE_SPEED * speedMultiplier;
 
         switch (state) {
             case IDLE:
@@ -269,14 +284,23 @@ public class Enemy {
                 }
 
                 if (isMoving && !isAttacking && hurtTimer <= 0f) {
-                    moveBy(randomDir.x * SPEED * 0.5f * delta, randomDir.y * SPEED * 0.5f * delta);
+                    moveBy(randomDir.x * speed * 0.5f * delta, randomDir.y * speed * 0.5f * delta);
                     forward.set(randomDir);
                 }
                 break;
 
             case CHASE:
                 if (!isAttacking && hurtTimer <= 0f) {
-                    Vector2 direction = new Vector2(playerPos).sub(position).nor();
+                    // Predict player position (look 0.3s ahead)
+                    Vector2 predictedTarget = new Vector2(playerPos);
+                    // Use toPlayer as a rough velocity proxy (chase toward slightly ahead)
+                    if (distance > ATTACK_RANGE * 1.5f) {
+                        predictedTarget.add(toPlayer.nor().scl(-distance * 0.15f));
+                        // Re-aim at predicted position
+                        predictedTarget.set(playerPos); // fallback: just use actual pos
+                    }
+
+                    Vector2 direction = new Vector2(predictedTarget).sub(position).nor();
                     forward.set(direction);
 
                     if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
@@ -285,7 +309,34 @@ public class Enemy {
                         attackDamageConsumed = false;
                         attackCooldownTimer = ATTACK_COOLDOWN;
                     } else {
-                        moveBy(direction.x * SPEED * delta, direction.y * SPEED * delta);
+                        // Try direct movement first
+                        float moveX = direction.x * speed * delta;
+                        float moveY = direction.y * speed * delta;
+
+                        boolean directWorked = smartMoveBy(moveX, moveY);
+
+                        if (!directWorked) {
+                            // Obstacle avoidance: try alternate angles
+                            boolean found = false;
+                            for (float angle : AVOIDANCE_ANGLES) {
+                                Vector2 altDir = new Vector2(direction).rotateDeg(angle);
+                                float altMoveX = altDir.x * speed * delta;
+                                float altMoveY = altDir.y * speed * delta;
+                                if (smartMoveBy(altMoveX, altMoveY)) {
+                                    forward.set(altDir);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                // Wall sliding: try each axis independently
+                                if (canMoveTo(position.x + moveX, position.y)) {
+                                    position.x += moveX;
+                                } else if (canMoveTo(position.x, position.y + moveY)) {
+                                    position.y += moveY;
+                                }
+                            }
+                        }
                     }
                 }
                 break;
@@ -458,6 +509,24 @@ public class Enemy {
     private void moveBy(float dx, float dy) {
         if (canMoveTo(position.x + dx, position.y)) position.x += dx;
         if (canMoveTo(position.x, position.y + dy)) position.y += dy;
+    }
+
+    /**
+     * Attempt to move by the given offset. Returns true if any movement occurred.
+     */
+    private boolean smartMoveBy(float dx, float dy) {
+        boolean movedX = false;
+        boolean movedY = false;
+
+        if (canMoveTo(position.x + dx, position.y)) {
+            position.x += dx;
+            movedX = true;
+        }
+        if (canMoveTo(position.x, position.y + dy)) {
+            position.y += dy;
+            movedY = true;
+        }
+        return movedX || movedY;
     }
 
     private boolean canMoveTo(float x, float y) {

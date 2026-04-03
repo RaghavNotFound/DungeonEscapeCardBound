@@ -24,6 +24,8 @@ public class MapManager {
     private ArrayList<Polygon> collisionPolygons = new ArrayList<>();
     private ArrayList<Rectangle> torchRects = new ArrayList<>();
     private ArrayList<Rectangle> chestRects = new ArrayList<>();
+    private ArrayList<Rectangle> exitGateRects = new ArrayList<>();
+    private ArrayList<Interactable> interactables = new ArrayList<>();
 
     private static final float UNIT_SCALE = 1f;
 
@@ -36,11 +38,15 @@ public class MapManager {
         collisionPolygons.clear();
         torchRects.clear();
         chestRects.clear();
+        exitGateRects.clear();
+        interactables.clear();
 
         loadCollisions();
         loadSpawns();
         loadTorches();
         loadChests();
+        loadExitGates();
+        loadInteractables();
     }
 
     public float getMapWidth() {
@@ -208,6 +214,59 @@ public class MapManager {
     public ArrayList<Polygon> getCollisionPolygons() { return collisionPolygons; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
+    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
+    public ArrayList<Interactable> getInteractables() { return interactables; }
+
+    private void loadExitGates() {
+        MapLayer layer = getObjectLayer();
+        if (layer != null) {
+            for (MapObject obj : layer.getObjects()) {
+                if (!isObjectTag(obj, "exitGate")) continue;
+                Rectangle bounds = extractObjectBounds(obj);
+                if (bounds != null) exitGateRects.add(bounds);
+            }
+        }
+
+        // Hardcoded fallback: if no exit gate found in the map, place one
+        if (exitGateRects.isEmpty()) {
+            float mapW = getMapWidth();
+            float mapH = getMapHeight();
+            // Place gate near the top-right corner of the map
+            exitGateRects.add(new Rectangle(mapW - 120f, mapH - 120f, 80f, 80f));
+        }
+    }
+
+    private void loadInteractables() {
+        MapLayer layer = getObjectLayer();
+        if (layer != null) {
+            for (MapObject obj : layer.getObjects()) {
+                Rectangle bounds = extractObjectBounds(obj);
+                if (bounds == null) continue;
+
+                if (isObjectTag(obj, "chest")) {
+                    interactables.add(new Interactable(Interactable.Type.CHEST, bounds.x, bounds.y, bounds.width, bounds.height));
+                } else if (isObjectTag(obj, "sign")) {
+                    String text = "";
+                    Object textProp = obj.getProperties().get("text");
+                    if (textProp != null) text = textProp.toString();
+                    interactables.add(new Interactable(Interactable.Type.SIGN, bounds.x, bounds.y, bounds.width, bounds.height, text));
+                } else if (isObjectTag(obj, "barrel")) {
+                    interactables.add(new Interactable(Interactable.Type.BARREL, bounds.x, bounds.y, bounds.width, bounds.height));
+                }
+            }
+        }
+
+        // Hardcoded fallback interactables if none found in map
+        if (interactables.isEmpty()) {
+            float mapW = getMapWidth();
+            float mapH = getMapHeight();
+            interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.3f, mapH * 0.6f, 40f, 35f));
+            interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.7f, mapH * 0.4f, 40f, 35f));
+            interactables.add(new Interactable(Interactable.Type.SIGN, mapW * 0.5f, mapH * 0.8f, 30f, 40f, "Find the exit gate!"));
+            interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.2f, mapH * 0.3f, 32f, 38f));
+            interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.8f, mapH * 0.7f, 32f, 38f));
+        }
+    }
 
     public void dispose() {
         map.dispose();

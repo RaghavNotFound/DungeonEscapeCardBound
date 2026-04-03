@@ -151,10 +151,7 @@ public class ExplorationScreen implements Screen {
                     break;
             }
         } else if (state == State.VICTORY) {
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-                ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
-                return;
-            }
+            // Handled by VictoryScreen transition (see update block below)
         }
 
         // ===== UPDATE =====
@@ -183,11 +180,19 @@ public class ExplorationScreen implements Screen {
                 if (world.getPlayer().isDeathAnimationFinished()) {
                     state = State.GAMEOVER;
                 }
+            } else if (world.isExitGateReached()) {
+                // Player reached the unlocked exit gate!
+                Main main = (Main) Gdx.app.getApplicationListener();
+                main.setScreen(new VictoryScreen(
+                    world.getPlayer().getEnemiesKilled(),
+                    world.getPlayer().getTorchCount(),
+                    world.getPlayer().getTimeSurvived()
+                ));
+                return;
             } else if (isVictorySequence) {
                 gameDelta *= 0.3f;
-                if (allVictoryAnimsFinished) {
-                    state = State.VICTORY;
-                }
+                // Don't auto-transition to VICTORY state anymore;
+                // player must reach the exit gate
             }
 
             world.update(gameDelta, camera);
@@ -223,7 +228,7 @@ public class ExplorationScreen implements Screen {
             Texture tex = fbo.getColorBufferTexture();
 
             float blurAmount = 0f;
-            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAMEOVER || state == State.VICTORY) {
+            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAMEOVER) {
                 blurAmount = 0.002f;
             }
             if (state == State.SETTINGS) {
@@ -253,8 +258,6 @@ public class ExplorationScreen implements Screen {
 
             if (state == State.GAMEOVER) {
                 shape.setColor(0.5f, 0, 0, 0.65f);
-            } else if (state == State.VICTORY) {
-                shape.setColor(0.8f, 0.6f, 0.1f, 0.6f);
             } else {
                 shape.setColor(0, 0, 0, 0.5f);
             }
@@ -296,23 +299,6 @@ public class ExplorationScreen implements Screen {
 
             if (state == State.GAMEOVER) {
                 gameOverOverlay.render(shape, batch, font, viewport);
-            }
-
-            if (state == State.VICTORY) {
-                batch.begin();
-                font.setColor(Color.WHITE);
-
-                font.getData().setScale(3f);
-                String text = "VICTORY ACHIEVED";
-                float textW = 320f;
-                font.draw(batch, text, camera.position.x - textW / 2f, camera.position.y + 70f);
-
-                font.getData().setScale(1.5f);
-                float subtitleW = 280f;
-                font.draw(batch, "Press ESCAPE to return to Menu", camera.position.x - subtitleW / 2f, camera.position.y - 10f);
-
-                font.getData().setScale(1f);
-                batch.end();
             }
 
             Gdx.gl.glDisable(GL20.GL_BLEND);
