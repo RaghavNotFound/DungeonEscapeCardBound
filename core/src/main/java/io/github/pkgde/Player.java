@@ -176,6 +176,8 @@ public class Player {
     public Rectangle getBounds() { return bounds; }
     public ArrayList<Arrow> getArrows() { return arrows; }
     public int getTorchCount() { return torchCount; }
+    public boolean hasTorch() { return torchCount > 0; }
+    public void removeTorch() { if (torchCount > 0) {torchCount--;} }
     public int getCardsCount() { return cardsCount; }
     public int getEnemiesKilled() { return enemiesKilled; }
     public float getTimeSurvived() { return timeSurvived; }

@@ -207,9 +207,21 @@ public class MapManager {
                     interactables.add(new Interactable(Interactable.Type.SIGN, b.x, b.y, b.width, b.height, text));
                 } else if (isObjectTag(obj, "barrel")) {
                     interactables.add(new Interactable(Interactable.Type.BARREL, b.x, b.y, b.width, b.height));
+                } else if (isObjectTag(obj, "centerFire")) {
+                    interactables.add(new Interactable(Interactable.Type.CENTER_FIRE, b.x, b.y, b.width, b.height));
                 }
             }
         }
+
+        // Extract Center Fire interactables from the 'centerFire' layer
+        MapLayer cfLayer = map.getLayers().get("centerFire");
+        if (cfLayer != null) {
+            for (MapObject obj : cfLayer.getObjects()) {
+                Rectangle b = extractObjectBounds(obj);
+                if (b != null) interactables.add(new Interactable(Interactable.Type.CENTER_FIRE, b.x, b.y, b.width, b.height));
+            }
+        }
+
         if (interactables.isEmpty()) {
             generateFallbackInteractables();
         }

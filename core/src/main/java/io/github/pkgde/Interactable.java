@@ -15,7 +15,7 @@ import com.badlogic.gdx.math.Rectangle;
  */
 public class Interactable {
 
-    public enum Type { CHEST, SIGN, BARREL }
+    public enum Type { CHEST, SIGN, BARREL,DOOR,CENTER_FIRE }
 
     private final Type type;
     private final Rectangle bounds;
@@ -82,6 +82,7 @@ public class Interactable {
             case CHEST -> renderChest(shape, playerInRange);
             case SIGN -> renderSign(shape, playerInRange);
             case BARREL -> renderBarrel(shape, playerInRange);
+            case CENTER_FIRE -> renderCenterFire(shape, playerInRange);
         }
 
         // 2. Draw "Press [G]" Prompt
@@ -216,6 +217,29 @@ public class Interactable {
                 shape.setColor(1f, 0.85f, 0.3f, glow);
                 shape.rect(x - 3, y - 3, w + 6, h + 6);
             }
+        }
+        shape.end();
+    }
+
+    private void renderCenterFire(ShapeRenderer shape, boolean playerInRange) {
+        float cx = bounds.x + bounds.width / 2f;
+        float cy = bounds.y + bounds.height / 2f;
+        float radius = Math.min(bounds.width, bounds.height) / 2f;
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0.3f, 0.3f, 0.35f, 1f); // Stone ring
+        shape.circle(cx, cy, radius);
+        shape.setColor(0.15f, 0.15f, 0.15f, 1f); // Inside pit
+        shape.circle(cx, cy, radius * 0.7f);
+
+        shape.setColor(0.25f, 0.15f, 0.05f, 1f); // Unlit logs
+        shape.rect(cx - radius * 0.6f, cy - 3f, radius * 1.2f, 6f);
+        shape.rect(cx - 3f, cy - radius * 0.6f, 6f, radius * 1.2f);
+        
+        if (playerInRange && !interacted) {
+            float glow = 0.15f + 0.1f * MathUtils.sin(animTime * 6f);
+            shape.setColor(1f, 0.85f, 0.3f, glow);
+            shape.circle(cx, cy, radius + 4f);
         }
         shape.end();
     }

@@ -181,6 +181,8 @@ public class ExplorationScreen implements Screen {
                 camera.viewportWidth, camera.viewportHeight, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
             blurBatch.end();
 
+            renderer.renderLighting();
+
             // Darken background
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
@@ -195,6 +197,7 @@ public class ExplorationScreen implements Screen {
             renderUIOverlays();
         } else {
             renderer.render(offsetX, offsetY);
+            renderer.renderLighting();
         }
     }
 
@@ -225,6 +228,10 @@ public class ExplorationScreen implements Screen {
         if (fbo != null) fbo.dispose();
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
         fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        if (world != null && world.getLightingManager() != null) {
+            world.getLightingManager().resize(w, h);
+        }
     }
 
     @Override

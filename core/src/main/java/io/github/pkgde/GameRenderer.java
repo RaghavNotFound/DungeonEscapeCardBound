@@ -99,6 +99,10 @@ public class GameRenderer {
         camera.update();
     }
 
+    public void renderLighting() {
+        world.getLightingManager().render(camera, batch, shape);
+    }
+
     private void drawTorches(SpriteBatch batch) {
         if (mapManager == null || torchFrames.length == 0) return;
 
@@ -255,13 +259,13 @@ public class GameRenderer {
             shape.setColor(fillColor);
             float fillW = width * clamped;
             float clipX = x + fillW;
-            
-            if (clamped >= 1.0f) { 
+
+            if (clamped >= 1.0f) {
                 drawFullyRoundedRect(shape, x, y, width, height);
             } else {
                 // Left Circle
                 drawLeftClippedCircle(shape, x + radius, y + radius, radius, clipX);
-                
+
                 // Middle Rectangle
                 float rectX = x + radius;
                 if (clipX > rectX) {
@@ -270,7 +274,7 @@ public class GameRenderer {
                         shape.rect(rectX, y, rectDrawW, height);
                     }
                 }
-                
+
                 // Right Circle
                 float cx2 = x + width - radius;
                 if (clipX > cx2 - radius) {
@@ -290,10 +294,10 @@ public class GameRenderer {
         float dx = (clipX - cx) / r;
         dx = MathUtils.clamp(dx, -1f, 1f);
         float intersectAngle = (float) Math.acos(dx) * MathUtils.radiansToDegrees;
-        
+
         float startAngle = intersectAngle;
         float endAngle = 360f - intersectAngle;
-        
+
         int segments = 32;
         float step = (endAngle - startAngle) / segments;
 

@@ -24,6 +24,7 @@ public class GameWorld {
     public static final float FLOOR_OFFSET = 120f;
 
     private final MapManager mapManager;
+    private final LightingManager lightingManager;
     private final Player player;
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private final ArrayList<LootDrop> lootDrops = new ArrayList<>();
@@ -38,6 +39,7 @@ public class GameWorld {
 
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
+        this.lightingManager = new LightingManager();
         this.player = new Player();
 
         this.boundaries = mapManager.getCollisionRects();
@@ -61,6 +63,7 @@ public class GameWorld {
     }
 
     public void update(float delta, OrthographicCamera camera) {
+        lightingManager.update(delta);
         player.update(delta, camera);
 
         for (Enemy e : enemies) {
@@ -208,7 +211,18 @@ public class GameWorld {
             interactable.update(Gdx.graphics.getDeltaTime());
 
             if (interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
-                if (interactable.interact(player)) {
+                if (interactable.getType() == Interactable.Type.CENTER_FIRE) {
+                    if (!lightingManager.isLit()) {
+                        if (player.hasTorch()) {
+                            player.removeTorch();
+                            interactable.interact(player); // Hides the "Press [G]" prompt
+                            Rectangle b = interactable.getBounds();
+                            lightingManager.triggerLighting(b.x + b.width / 2f, b.y + b.height / 2f);
+                        } else {
+                            System.out.println("You need a torch to light the center fire!");
+                        }
+                    }
+                } else if (interactable.interact(player)) {
                     Rectangle b = interactable.getBounds();
                     float cx = b.x + b.width / 2f;
                     float cy = b.y + b.height / 2f;
@@ -283,6 +297,7 @@ public class GameWorld {
     public boolean isExitGateReached() { return exitGateReached; }
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
+    public LightingManager getLightingManager() { return lightingManager; }
     public ArrayList<LootDrop> getLootDrops() { return lootDrops; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
     public MapManager getMapManager() { return mapManager; }
@@ -291,5 +306,6 @@ public class GameWorld {
     public void dispose() {
         player.dispose();
         for (Enemy e : enemies) e.dispose();
+        if (lightingManager != null) lightingManager.dispose();
     }
 }
