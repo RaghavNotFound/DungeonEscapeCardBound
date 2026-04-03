@@ -1,5 +1,7 @@
 package io.github.pkgde;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Polygon;
@@ -14,17 +16,18 @@ public class GameWorld {
     private static final float NEAR_ENEMY_DISTANCE_SQ = NEAR_ENEMY_DISTANCE * NEAR_ENEMY_DISTANCE;
     private static final float ARROW_DAMAGE = 20f;
 
-    public static final float WORLD_WIDTH = 1280;
-    public static final float WORLD_HEIGHT = 720;
-    public static final float FLOOR_OFFSET = 120f;
-
     private final MapManager mapManager;
     private final Player player;
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private final ArrayList<LootDrop> lootDrops = new ArrayList<>();
+    private final ArrayList<Interactable> interactables;
 
     private final ArrayList<Rectangle> boundaries;
     private final ArrayList<Polygon> collisionPolygons;
+
+    // ===== EXIT GATE =====
+    private boolean exitGateUnlocked = false;
+    private boolean exitGateReached = false;
 
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -48,6 +51,8 @@ public class GameWorld {
             e.setPosition(spawn.x, spawn.y);
             enemies.add(e);
         }
+
+        interactables = mapManager.getInteractables();
     }
 
     public void update(float delta, OrthographicCamera camera) {
@@ -70,6 +75,9 @@ public class GameWorld {
                     boolean wasAlive = e.isAlive();
                     e.takeDamage(player.getSwordDamage());
                     if (wasAlive && !e.isAlive()) {
+                        player.incrementEnemiesKilled();
+                        // Explicitly drop a card
+                        lootDrops.add(new LootDrop(LootDrop.Type.CARD, e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f));
                         spawnLoot(e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f);
                     }
                     Vector2 dir = new Vector2(
@@ -104,6 +112,9 @@ public class GameWorld {
                         boolean wasAlive = e.isAlive();
                         e.takeDamage(ARROW_DAMAGE);
                         if (wasAlive && !e.isAlive()) {
+                            player.incrementEnemiesKilled();
+                            // Explicitly drop a card
+                            lootDrops.add(new LootDrop(LootDrop.Type.CARD, e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f));
                             spawnLoot(e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f);
                         }
                         Vector2 hitDir = new Vector2(
@@ -146,27 +157,126 @@ public class GameWorld {
         }
 
         // --- LOOT DROPS LOGIC ---
+        float playerCX = player.getBounds().x + player.getBounds().width / 2f;
+        float playerCY = player.getBounds().y + player.getBounds().height / 2f;
+
         for (int i = lootDrops.size() - 1; i >= 0; i--) {
             LootDrop drop = lootDrops.get(i);
             drop.update(delta);
+
+            // Remove expired drops
+            if (drop.isExpired()) {
+                lootDrops.remove(i);
+                continue;
+            }
+
+            // Magnet attraction
+            drop.attractToward(playerCX, playerCY, delta);
+
+            // Pickup check
             if (player.getBounds().overlaps(drop.getBounds())) {
-                if (drop.getType() == LootDrop.Type.HEALTH) {
-                    player.addHealth(25f);
-                } else if (drop.getType() == LootDrop.Type.TORCH) {
-                    player.addTorch();
+                switch (drop.getType()) {
+                    case HEALTH:
+                        player.addHealth(25f);
+                        break;
+                    case TORCH:
+                        player.addTorch();
+                        break;
+                    case ARROW:
+                        // Give a small stamina boost as arrow ammo
+                        player.addStamina(15f);
+                        break;
+                    case STAMINA:
+                        player.addStamina(30f);
+                        break;
+                    case CARD:
+                        player.addCard();
+                        break;
                 }
                 lootDrops.remove(i);
+            }
+        }
+
+        // --- INTERACTABLES ---
+        for (Interactable interactable : interactables) {
+            interactable.update(delta);
+
+            if (interactable.isPlayerInRange(player)
+                && Gdx.input.isKeyJustPressed(Input.Keys.G)
+                && (!interactable.isInteracted() || interactable.getType() == Interactable.Type.SIGN)) {
+
+                if (interactable.interact(player)) {
+                    // Spawn loot from chests and barrels
+                    if (interactable.getType() == Interactable.Type.CHEST) {
+                        Rectangle b = interactable.getBounds();
+                        float cx = b.x + b.width / 2f;
+                        float cy = b.y + b.height / 2f;
+                        // Chests give guaranteed + bonus loot
+                        lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, cx - 15f, cy + 20f));
+                        if (MathUtils.random() < 0.5f) {
+                            lootDrops.add(new LootDrop(LootDrop.Type.TORCH, cx + 15f, cy + 20f));
+                        }
+                        if (MathUtils.random() < 0.3f) {
+                            lootDrops.add(new LootDrop(LootDrop.Type.STAMINA, cx, cy + 35f));
+                        }
+                    } else if (interactable.getType() == Interactable.Type.BARREL) {
+                        Rectangle b = interactable.getBounds();
+                        float cx = b.x + b.width / 2f;
+                        float cy = b.y + b.height / 2f;
+                        // Barrels give random single drop
+                        float roll = MathUtils.random();
+                        if (roll < 0.4f) {
+                            lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, cx, cy + 15f));
+                        } else if (roll < 0.7f) {
+                            lootDrops.add(new LootDrop(LootDrop.Type.STAMINA, cx, cy + 15f));
+                        } else {
+                            lootDrops.add(new LootDrop(LootDrop.Type.ARROW, cx, cy + 15f));
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- EXIT GATE ---
+        boolean allEnemiesDead = true;
+        for (Enemy e : enemies) {
+            if (e.isAlive()) {
+                allEnemiesDead = false;
+                break;
+            }
+        }
+        exitGateUnlocked = enemies.isEmpty() || allEnemiesDead;
+
+        if (exitGateUnlocked) {
+            Rectangle pBounds = player.getBounds();
+            float pcx = pBounds.x + pBounds.width / 2f;
+            float pcy = pBounds.y + pBounds.height / 2f;
+            for (Rectangle gateRect : mapManager.getExitGateRects()) {
+                float gcx = gateRect.x + gateRect.width / 2f;
+                float gcy = gateRect.y + gateRect.height / 2f;
+                float dx = pcx - gcx;
+                float dy = pcy - gcy;
+                // Trigger when player center is within 60px of gate center
+                if (dx * dx + dy * dy < 60f * 60f) {
+                    exitGateReached = true;
+                    break;
+                }
             }
         }
     }
 
     private void spawnLoot(float x, float y) {
         float roll = MathUtils.random();
-        if (roll < 0.35f) { // 35% chance health
+        if (roll < 0.30f) { // 30% health
             lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, x, y));
-        } else if (roll < 0.60f) { // 25% chance torch
+        } else if (roll < 0.50f) { // 20% torch
             lootDrops.add(new LootDrop(LootDrop.Type.TORCH, x, y));
+        } else if (roll < 0.65f) { // 15% stamina
+            lootDrops.add(new LootDrop(LootDrop.Type.STAMINA, x, y));
+        } else if (roll < 0.78f) { // 13% arrow
+            lootDrops.add(new LootDrop(LootDrop.Type.ARROW, x, y));
         }
+        // 22% nothing
     }
 
     public boolean isPlayerNearEnemy() {
@@ -187,16 +297,19 @@ public class GameWorld {
         return false;
     }
 
+    // ===== EXIT GATE =====
+    public boolean isExitGateUnlocked() { return exitGateUnlocked; }
+    public boolean isExitGateReached() { return exitGateReached; }
+
     public Player getPlayer() { return player; }
 
     public Enemy getEnemy() {
-        // Helper method added to support legacy single-enemy calls if they exist elsewhere.
-        // Returns the first enemy, or null if empty.
         return enemies.isEmpty() ? null : enemies.get(0);
     }
 
     public ArrayList<Enemy> getEnemies() { return enemies; }
     public ArrayList<LootDrop> getLootDrops() { return lootDrops; }
+    public ArrayList<Interactable> getInteractables() { return interactables; }
     public MapManager getMapManager() { return mapManager; }
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 

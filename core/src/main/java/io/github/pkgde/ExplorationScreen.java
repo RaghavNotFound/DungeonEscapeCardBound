@@ -26,7 +26,7 @@ public class ExplorationScreen implements Screen {
     private final InventoryOverlay inventoryOverlay;
     private final GameOverOverlay gameOverOverlay;
 
-    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAMEOVER, VICTORY }
     private State state = State.GAME;
 
     private float shakeTime = 0f;
@@ -38,16 +38,19 @@ public class ExplorationScreen implements Screen {
     private final SpriteBatch blurBatch;
 
     public ExplorationScreen() {
-        camera = new OrthographicCamera();
-
-        viewport = new FitViewport(1280, 720, camera);
-        viewport.apply(true);
-
-        camera.position.set(640, 360, 0);
-        camera.update();
-
         mapManager = new MapManager();
         mapManager.load(SAFE_ROOM_MAP);
+
+        camera = new OrthographicCamera();
+
+        float w = mapManager.getMapWidth();
+        float h = mapManager.getMapHeight();
+
+        camera.setToOrtho(false, w, h);
+        camera.position.set(w / 2, h / 2, 0);
+
+        viewport = new FitViewport(w, h, camera);
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
 
         world = new GameWorld(mapManager);
         renderer = new GameRenderer(world, camera, mapManager);
@@ -77,6 +80,7 @@ public class ExplorationScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        viewport.apply();
         settingsOverlay.update(delta);
 
         // ===== INPUT HANDLING =====
@@ -134,7 +138,7 @@ public class ExplorationScreen implements Screen {
             if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) {
                 state = State.PAUSE;
             }
-        } else if (state == State.GAME_OVER) {
+        } else if (state == State.GAMEOVER) {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             switch (action) {
                 case RETRY:
@@ -146,10 +150,13 @@ public class ExplorationScreen implements Screen {
                 case NONE:
                     break;
             }
+        } else if (state == State.VICTORY) {
+            // Handled by VictoryScreen transition (see update block below)
         }
 
         // ===== UPDATE =====
         if (state == State.GAME) {
+            float gameDelta = delta;
             boolean playerIsDead = !world.getPlayer().isAlive();
             boolean isVictorySequence = false;
             boolean allVictoryAnimsFinished = true;
@@ -168,11 +175,23 @@ public class ExplorationScreen implements Screen {
                 isVictorySequence = allEnemiesDefeated;
             }
 
-            world.update(delta, camera); // Use raw delta as timeManager is removed
-
-            if (playerIsDead && world.getPlayer().isDeathAnimationFinished()) {
-                state = State.GAME_OVER;
+            if (playerIsDead) {
+                gameDelta *= 0.3f;
+                if (world.getPlayer().isDeathAnimationFinished()) {
+                    state = State.GAMEOVER;
+                }
+            } else if (world.isExitGateReached()) {
+                // Player reached the unlocked exit gate!
+                Main main = (Main) Gdx.app.getApplicationListener();
+                main.setScreen(new VictoryScreen(
+                    world.getPlayer().getEnemiesKilled(),
+                    world.getPlayer().getTorchCount(),
+                    world.getPlayer().getTimeSurvived()
+                ));
+                return;
             }
+
+            world.update(gameDelta, camera);
 
             if (world.isPlayerNearEnemy() && !playerIsDead && !isVictorySequence) {
                 if (!shakeTriggered) {
@@ -193,9 +212,9 @@ public class ExplorationScreen implements Screen {
         }
 
         // ===== RENDER =====
-        boolean isOverlayActive = (state != State.GAME); // This is correct, it covers all non-GAME states
+        boolean isOverlayActive = (state != State.GAME);
 
-        if (isOverlayActive) { // Only blur if any overlay is active
+        if (isOverlayActive) {
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
@@ -205,7 +224,7 @@ public class ExplorationScreen implements Screen {
             Texture tex = fbo.getColorBufferTexture();
 
             float blurAmount = 0f;
-            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAME_OVER) {
+            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAMEOVER) {
                 blurAmount = 0.002f;
             }
             if (state == State.SETTINGS) {
@@ -227,6 +246,26 @@ public class ExplorationScreen implements Screen {
                 false, true
             );
             blurBatch.end();
+
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            ShapeRenderer shape = renderer.getShape();
+            shape.setProjectionMatrix(camera.combined);
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+
+            if (state == State.GAMEOVER) {
+                shape.setColor(0.5f, 0, 0, 0.65f);
+            } else {
+                shape.setColor(0, 0, 0, 0.5f);
+            }
+
+            shape.rect(
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
+                camera.viewportWidth,
+                camera.viewportHeight
+            );
+            shape.end();
+            Gdx.gl.glDisable(GL20.GL_BLEND);
         } else {
             renderer.render(offsetX, offsetY);
         }
@@ -254,7 +293,7 @@ public class ExplorationScreen implements Screen {
                 inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
             }
 
-            if (state == State.GAME_OVER) {
+            if (state == State.GAMEOVER) {
                 gameOverOverlay.render(shape, batch, font, viewport);
             }
 

@@ -1,5 +1,4 @@
 package io.github.pkgde;
-
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
@@ -89,6 +88,8 @@ public class GameRenderer {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        drawExitGate();
+        drawInteractables();
         drawEnemyHealthBars();
         drawCollisionDebug();
         drawUI();
@@ -173,6 +174,105 @@ public class GameRenderer {
     private void drawEnemyHealthBars() {
         // This health bar was redundant. The primary, color-changing health bar
         // is now rendered directly within the Enemy.render() method.
+    }
+
+    private void drawExitGate() {
+        if (world.getMapManager() == null) return;
+
+        java.util.ArrayList<Rectangle> gates = world.getMapManager().getExitGateRects();
+        if (gates.isEmpty()) return;
+
+        boolean unlocked = world.isExitGateUnlocked();
+        float time = (float) (System.nanoTime() / 1_000_000_000.0);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+
+        for (Rectangle gate : gates) {
+            float cx = gate.x + gate.width / 2f;
+            float cy = gate.y + gate.height / 2f;
+
+            // Base platform
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            shape.setColor(0.15f, 0.15f, 0.2f, 0.8f);
+            shape.rect(gate.x, gate.y, gate.width, gate.height);
+
+            if (unlocked) {
+                // Green glow effect
+                float pulse = 0.3f + 0.2f * MathUtils.sin(time * 4f);
+                shape.setColor(0.1f, 0.9f, 0.3f, pulse);
+                shape.rect(gate.x - 4, gate.y - 4, gate.width + 8, gate.height + 8);
+
+                // Inner bright core
+                shape.setColor(0.2f, 1f, 0.4f, 0.15f + 0.1f * MathUtils.sin(time * 6f));
+                shape.circle(cx, cy, gate.width * 0.4f);
+
+                // Sparkle particles around the gate
+                for (int i = 0; i < 6; i++) {
+                    float angle = time * 2f + i * 60f;
+                    float radius = gate.width * 0.5f + 8f * MathUtils.sin(time * 3f + i);
+                    float px = cx + MathUtils.cosDeg(angle * 57.3f) * radius;
+                    float py = cy + MathUtils.sinDeg(angle * 57.3f) * radius;
+                    float alpha = 0.5f + 0.3f * MathUtils.sin(time * 5f + i * 1.5f);
+                    shape.setColor(0.3f, 1f, 0.5f, alpha);
+                    shape.circle(px, py, 2.5f);
+                }
+            } else {
+                // Red locked glow
+                float pulse = 0.2f + 0.1f * MathUtils.sin(time * 3f);
+                shape.setColor(0.8f, 0.1f, 0.1f, pulse);
+                shape.rect(gate.x - 3, gate.y - 3, gate.width + 6, gate.height + 6);
+
+                // Lock icon (simple cross)
+                shape.setColor(0.6f, 0.15f, 0.15f, 0.9f);
+                shape.rect(cx - 3f, cy - 10f, 6f, 20f);
+                shape.rect(cx - 10f, cy - 3f, 20f, 6f);
+            }
+            shape.end();
+
+            // Border outline
+            shape.begin(ShapeRenderer.ShapeType.Line);
+            if (unlocked) {
+                float borderPulse = 0.7f + 0.3f * MathUtils.sin(time * 4f);
+                shape.setColor(0.2f, 1f, 0.4f, borderPulse);
+            } else {
+                shape.setColor(0.7f, 0.2f, 0.2f, 0.8f);
+            }
+            shape.rect(gate.x, gate.y, gate.width, gate.height);
+            shape.end();
+
+            // "EXIT" text when unlocked and player is nearby
+            if (unlocked) {
+                Rectangle pBounds = world.getPlayer().getBounds();
+                float dx = (pBounds.x + pBounds.width / 2f) - cx;
+                float dy = (pBounds.y + pBounds.height / 2f) - cy;
+                if (dx * dx + dy * dy < 150f * 150f) {
+                    batch.begin();
+                    font.getData().setScale(1.3f);
+                    float bobY = MathUtils.sin(time * 4f) * 3f;
+                    font.setColor(0.2f, 1f, 0.4f, 0.9f);
+                    font.draw(batch, "EXIT", cx - 18f, gate.y + gate.height + 25f + bobY);
+                    font.getData().setScale(1f);
+                    font.setColor(Color.WHITE);
+                    batch.end();
+                }
+            }
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawInteractables() {
+        if (world.getInteractables() == null) return;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        for (Interactable interactable : world.getInteractables()) {
+            boolean inRange = interactable.isPlayerInRange(world.getPlayer());
+            interactable.render(batch, shape, font, inRange);
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void drawUI() {

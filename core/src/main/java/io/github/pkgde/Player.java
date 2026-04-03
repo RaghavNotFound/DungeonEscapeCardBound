@@ -69,6 +69,11 @@ public class Player {
     private static final float SHOOT_COOLDOWN = 1.0f;
     private float shootTimer = 0f;
     private int torchCount = 0;
+    private int cardsCount = 0;
+
+    // ===== STATS =====
+    private int enemiesKilled = 0;
+    private float timeSurvived = 0f;
 
     // ===== STAMINA =====
     private static final float STAMINA_DRAIN_RATE = 40f;
@@ -206,10 +211,31 @@ public class Player {
     public Rectangle getBounds() { return bounds; }
     public ArrayList<Arrow> getArrows() { return arrows; }
     public int getTorchCount() { return torchCount; }
+    public int getCardsCount() { return cardsCount; }
 
     public void addTorch() {
         torchCount++;
     }
+    
+    public void addCard() {
+        cardsCount++;
+    }
+
+    public void addStamina(float amount) {
+        stamina = Math.min(stamina + amount, maxStamina);
+    }
+
+    public void addArrows(int count) {
+        // Spawn arrows at current position (pre-loaded)
+        // This is handled externally by adding arrow pickups
+    }
+
+    public void incrementEnemiesKilled() {
+        enemiesKilled++;
+    }
+
+    public int getEnemiesKilled() { return enemiesKilled; }
+    public float getTimeSurvived() { return timeSurvived; }
 
     public void setBoundaries(ArrayList<Rectangle> boundaries) {
         this.boundaries = boundaries;
@@ -228,6 +254,8 @@ public class Player {
 
     // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
+
+        timeSurvived += delta;
 
         if (!isAlive()) {
             deathStateTime += delta;
