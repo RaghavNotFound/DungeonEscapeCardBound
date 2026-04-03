@@ -76,6 +76,8 @@ public class GameWorld {
                     e.takeDamage(player.getSwordDamage());
                     if (wasAlive && !e.isAlive()) {
                         player.incrementEnemiesKilled();
+                        // Explicitly drop a card
+                        lootDrops.add(new LootDrop(LootDrop.Type.CARD, e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f));
                         spawnLoot(e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f);
                     }
                     Vector2 dir = new Vector2(
@@ -111,6 +113,8 @@ public class GameWorld {
                         e.takeDamage(ARROW_DAMAGE);
                         if (wasAlive && !e.isAlive()) {
                             player.incrementEnemiesKilled();
+                            // Explicitly drop a card
+                            lootDrops.add(new LootDrop(LootDrop.Type.CARD, e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f));
                             spawnLoot(e.getBounds().x + e.getBounds().width / 2f, e.getBounds().y + e.getBounds().height / 2f);
                         }
                         Vector2 hitDir = new Vector2(
@@ -184,6 +188,9 @@ public class GameWorld {
                         break;
                     case STAMINA:
                         player.addStamina(30f);
+                        break;
+                    case CARD:
+                        player.addCard();
                         break;
                 }
                 lootDrops.remove(i);

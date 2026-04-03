@@ -189,10 +189,6 @@ public class ExplorationScreen implements Screen {
                     world.getPlayer().getTimeSurvived()
                 ));
                 return;
-            } else if (isVictorySequence) {
-                gameDelta *= 0.3f;
-                // Don't auto-transition to VICTORY state anymore;
-                // player must reach the exit gate
             }
 
             world.update(gameDelta, camera);

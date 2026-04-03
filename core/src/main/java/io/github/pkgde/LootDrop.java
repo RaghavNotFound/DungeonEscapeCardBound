@@ -9,7 +9,7 @@ import com.badlogic.gdx.math.Vector2;
 
 public class LootDrop {
 
-    public enum Type { HEALTH, TORCH, ARROW, STAMINA }
+    public enum Type { HEALTH, TORCH, ARROW, STAMINA, CARD }
 
     private Type type;
     private Rectangle bounds;
@@ -118,6 +118,9 @@ public class LootDrop {
             case STAMINA:
                 renderStamina(shape);
                 break;
+            case CARD:
+                renderCard(shape);
+                break;
         }
     }
 
@@ -176,12 +179,28 @@ public class LootDrop {
         shape.circle(cx, cy, 3f);
     }
 
+    private void renderCard(ShapeRenderer shape) {
+        float cx = bounds.x + bounds.width / 2f;
+        float cy = bounds.y + bounds.height / 2f;
+        // Draw a light blue rectangular card
+        shape.setColor(0.8f, 0.9f, 1f, 1f);
+        shape.rect(cx - 8f, cy - 10f, 16f, 20f);
+        // Draw a golden border/pattern inside
+        float pulse = 0.8f + 0.2f * MathUtils.sin(glowTimer * 6f);
+        shape.setColor(0.9f * pulse, 0.7f * pulse, 0.2f, 1f);
+        shape.rect(cx - 5f, cy - 7f, 10f, 14f);
+        // Center jewel/symbol
+        shape.setColor(0.2f, 0.6f, 1f, 1f);
+        shape.rect(cx - 2f, cy - 2f, 4f, 4f);
+    }
+
     private Color getGlowColor() {
         switch (type) {
             case HEALTH:  return new Color(1f, 0.2f, 0.2f, 1f);
             case TORCH:   return new Color(1f, 0.7f, 0.1f, 1f);
             case ARROW:   return new Color(0.7f, 0.7f, 0.8f, 1f);
             case STAMINA: return new Color(0.2f, 1f, 0.4f, 1f);
+            case CARD:    return new Color(0.4f, 0.8f, 1f, 1f);
             default:      return Color.WHITE;
         }
     }
