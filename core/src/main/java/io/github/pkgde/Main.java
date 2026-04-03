@@ -12,7 +12,7 @@ public class Main extends Game {
         Graphics.DisplayMode mode = Gdx.graphics.getDisplayMode();
 
         // Set to borderless windowed fullscreen (matches monitor resolution)
-        Gdx.graphics.setFullscreenMode(mode);
+        Gdx.graphics.setWindowedMode(mode.width, mode.height);
 
         // Alternatively, for true exclusive fullscreen, you would use:
         // Gdx.graphics.setFullscreenMode(mode);

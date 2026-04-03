@@ -12,8 +12,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class InventoryOverlay
-{
+public class InventoryOverlay {
 
     private static final int GRID_COLS = 5;
     private static final int GRID_ROWS = 4;
@@ -112,12 +111,35 @@ public class InventoryOverlay
             shape.setColor(slotOutlineColor);
             shape.rect(slot.x, slot.y, slot.width, slot.height);
         }
-        // Draw selected slot
+
+        // Draw selected slot outline
         int selectedIndex = selectedRow * GRID_COLS + selectedCol;
         Rectangle selectedSlot = slots[selectedIndex];
         shape.setColor(selectedColor);
         shape.rect(selectedSlot.x, selectedSlot.y, selectedSlot.width, selectedSlot.height);
         shape.end();
+
+        // Draw card icon in slot 1 if player has cards
+        if (player.getCardsCount() > 0) {
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            Rectangle slot = slots[1];
+            float iconSize = slot.height * 0.6f;
+            float cx = slot.x + slot.width / 2f;
+            float cy = slot.y + slot.height * 0.65f; // upper part of slot
+
+            // Light blue card background
+            shape.setColor(0.8f, 0.9f, 1f, 1f);
+            shape.rect(cx - iconSize * 0.35f, cy - iconSize * 0.45f, iconSize * 0.7f, iconSize * 0.9f);
+
+            // Golden inner pattern
+            shape.setColor(0.9f, 0.7f, 0.2f, 1f);
+            shape.rect(cx - iconSize * 0.2f, cy - iconSize * 0.3f, iconSize * 0.4f, iconSize * 0.6f);
+
+            // Center jewel
+            shape.setColor(0.2f, 0.6f, 1f, 1f);
+            shape.rect(cx - iconSize * 0.1f, cy - iconSize * 0.1f, iconSize * 0.2f, iconSize * 0.2f);
+            shape.end();
+        }
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
@@ -137,7 +159,7 @@ public class InventoryOverlay
         font.setColor(Color.WHITE);
         font.draw(batch, glyphLayout, titleX, titleY);
 
-        // Draw items (just torches for now)
+        // Draw items
         int torchCount = player.getTorchCount();
         if (torchCount > 0) {
             Rectangle slot = slots[0];
@@ -161,25 +183,45 @@ public class InventoryOverlay
             font.draw(batch, glyphLayout, textX, textY);
         }
 
-        // Draw tooltip for selected item
-        if (selectedRow == 0 && selectedCol == 0 && player.getTorchCount() > 0) {
-            String tooltipText = "Torch";
-            font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.0f);
-            glyphLayout.setText(font, tooltipText);
+        int cardsCount = player.getCardsCount();
+        if (cardsCount > 0) {
+            Rectangle slot = slots[1];
+            // Draw quantity
+            font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.1f);
+            String quantityStr = String.valueOf(cardsCount);
+            glyphLayout.setText(font, quantityStr);
+            float textX = slot.x + slot.width - glyphLayout.width - slot.width * 0.1f;
+            float textY = slot.y + glyphLayout.height + slot.height * 0.1f;
 
-            // Position the tooltip text inside the bottom of the selected slot.
-            float tooltipX = selectedSlot.x + (selectedSlot.width - glyphLayout.width) / 2f;
-            float tooltipY = selectedSlot.y + glyphLayout.height + selectedSlot.height * 0.1f;
-
-            font.setColor(0f, 0f, 0f, 0.72f);
-            font.draw(batch, glyphLayout, tooltipX + shadow, tooltipY - shadow);
+            font.setColor(0f, 0f, 0f, 0.7f);
+            font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
             font.setColor(Color.WHITE);
-            font.draw(batch, glyphLayout, tooltipX, tooltipY);
+            font.draw(batch, glyphLayout, textX, textY);
+        }
+
+        // Draw tooltips for selected items
+        if (selectedRow == 0 && selectedCol == 0 && player.getTorchCount() > 0) {
+            drawTooltip(batch, font, "Torch", slots[0], viewport, shadow);
+        } else if (selectedRow == 0 && selectedCol == 1 && player.getCardsCount() > 0) {
+            drawTooltip(batch, font, "Card", slots[1], viewport, shadow);
         }
 
         font.getData().setScale(oldScaleX, oldScaleY);
         font.setColor(Color.WHITE);
         batch.end();
+    }
+
+    private void drawTooltip(SpriteBatch batch, BitmapFont font, String text, Rectangle slot, Viewport viewport, float shadow) {
+        font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.0f);
+        glyphLayout.setText(font, text);
+
+        float tooltipX = slot.x + (slot.width - glyphLayout.width) / 2f;
+        float tooltipY = slot.y + glyphLayout.height + slot.height * 0.1f;
+
+        font.setColor(0f, 0f, 0f, 0.72f);
+        font.draw(batch, glyphLayout, tooltipX + shadow, tooltipY - shadow);
+        font.setColor(Color.WHITE);
+        font.draw(batch, glyphLayout, tooltipX, tooltipY);
     }
 
     public void dispose() {

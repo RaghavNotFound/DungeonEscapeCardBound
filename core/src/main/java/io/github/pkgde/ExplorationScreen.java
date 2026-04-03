@@ -26,7 +26,7 @@ public class ExplorationScreen implements Screen {
     private final InventoryOverlay inventoryOverlay;
     private final GameOverOverlay gameOverOverlay;
 
-    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, VICTORY }
     private State state = State.GAME;
 
     private float shakeTime = 0f;
@@ -77,6 +77,7 @@ public class ExplorationScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        viewport.apply();
         settingsOverlay.update(delta);
 
         // ===== INPUT HANDLING =====
@@ -146,10 +147,13 @@ public class ExplorationScreen implements Screen {
                 case NONE:
                     break;
             }
+        } else if (state == State.VICTORY) {
+            // Handled by VictoryScreen transition (see update block below)
         }
 
         // ===== UPDATE =====
         if (state == State.GAME) {
+            float gameDelta = delta;
             boolean playerIsDead = !world.getPlayer().isAlive();
             boolean isVictorySequence = false;
             boolean allVictoryAnimsFinished = true;
@@ -168,11 +172,23 @@ public class ExplorationScreen implements Screen {
                 isVictorySequence = allEnemiesDefeated;
             }
 
-            world.update(delta, camera); // Use raw delta as timeManager is removed
-
-            if (playerIsDead && world.getPlayer().isDeathAnimationFinished()) {
-                state = State.GAME_OVER;
+            if (playerIsDead) {
+                gameDelta *= 0.3f; // slow down death
+                if (world.getPlayer().isDeathAnimationFinished()) {
+                    state = State.GAME_OVER;
+                }
+            } else if (world.isExitGateReached()) {
+                // Player reached the unlocked exit gate!
+                Main main = (Main) Gdx.app.getApplicationListener();
+                main.setScreen(new VictoryScreen(
+                    world.getPlayer().getEnemiesKilled(),
+                    world.getPlayer().getTorchCount(),
+                    world.getPlayer().getTimeSurvived()
+                ));
+                return;
             }
+
+            world.update(gameDelta, camera);
 
             if (world.isPlayerNearEnemy() && !playerIsDead && !isVictorySequence) {
                 if (!shakeTriggered) {
@@ -193,9 +209,10 @@ public class ExplorationScreen implements Screen {
         }
 
         // ===== RENDER =====
-        boolean isOverlayActive = (state != State.GAME); // This is correct, it covers all non-GAME states
+        boolean isOverlayActive = (state != State.GAME);
 
-        if (isOverlayActive) { // Only blur if any overlay is active
+        if (isOverlayActive) {
+            // Render the game world to the FrameBuffer
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
@@ -203,8 +220,8 @@ public class ExplorationScreen implements Screen {
             viewport.apply();
 
             Texture tex = fbo.getColorBufferTexture();
-
             float blurAmount = 0f;
+
             if (state == State.PAUSE || state == State.INVENTORY || state == State.GAME_OVER) {
                 blurAmount = 0.002f;
             }
@@ -212,6 +229,7 @@ public class ExplorationScreen implements Screen {
                 blurAmount = 0.002f * settingsOverlay.getTransitionProgress();
             }
 
+            // Draw blurred game frame
             blurBatch.setProjectionMatrix(camera.combined);
             blurBatch.begin();
             blurShader.setUniformf("blur", blurAmount);
@@ -227,10 +245,34 @@ public class ExplorationScreen implements Screen {
                 false, true
             );
             blurBatch.end();
+
+            // Draw darkening/tinting overlay on top of blurred background
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            ShapeRenderer shape = renderer.getShape();
+            shape.setProjectionMatrix(camera.combined);
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+
+            if (state == State.GAME_OVER) {
+                shape.setColor(0.5f, 0, 0, 0.65f);
+            } else {
+                shape.setColor(0, 0, 0, 0.5f);
+            }
+
+            shape.rect(
+                camera.position.x - camera.viewportWidth / 2f,
+                camera.position.y - camera.viewportHeight / 2f,
+                camera.viewportWidth,
+                camera.viewportHeight
+            );
+            shape.end();
+            Gdx.gl.glDisable(GL20.GL_BLEND);
+
         } else {
+            // Normal unblurred rendering
             renderer.render(offsetX, offsetY);
         }
 
+        // Render UI Overlays
         if (isOverlayActive) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);

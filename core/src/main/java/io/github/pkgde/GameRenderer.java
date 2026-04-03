@@ -89,9 +89,10 @@ public class GameRenderer {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        drawExitGate();
+        drawInteractables();
         drawEnemyHealthBars();
         drawCollisionDebug();
-        drawChestBorders();
         drawUI();
 
         camera.position.sub(offsetX, offsetY, 0);
@@ -174,6 +175,111 @@ public class GameRenderer {
     private void drawEnemyHealthBars() {
         // This health bar was redundant. The primary, color-changing health bar
         // is now rendered directly within the Enemy.render() method.
+    }
+
+    private void drawExitGate() {
+        if (world.getMapManager() == null) return;
+
+        java.util.ArrayList<Rectangle> gates = world.getMapManager().getExitGateRects();
+        if (gates.isEmpty()) return;
+
+        boolean unlocked = world.isExitGateUnlocked();
+        float time = (float) (System.nanoTime() / 1_000_000_000.0);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+
+        for (Rectangle gate : gates) {
+            float cx = gate.x + gate.width / 2f;
+            float cy = gate.y + gate.height / 2f;
+
+            float archHeight = 100f;
+            float pillarW = 15f;
+
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+
+            if (unlocked) {
+                // Inner portal glow
+                float pulse = 0.8f + 0.2f * MathUtils.sin(time * 4f);
+                shape.setColor(0.1f, 0.9f, 0.3f, 0.4f * pulse);
+                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
+
+                // Portal sparkles
+                for (int i = 0; i < 8; i++) {
+                    float spX = gate.x + pillarW + MathUtils.random(0, gate.width - pillarW * 2);
+                    float spY = gate.y + MathUtils.random(0, archHeight - 15f);
+                    float alpha = 0.3f + 0.7f * MathUtils.sin(time * 5f + spX);
+                    shape.setColor(0.4f, 1f, 0.6f, alpha);
+                    shape.circle(spX, spY, 2f);
+                }
+            } else {
+                // Red locked energy barrier
+                float pulse = 0.6f + 0.2f * MathUtils.sin(time * 3f);
+                shape.setColor(0.8f, 0.1f, 0.1f, 0.3f * pulse);
+                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
+
+                // Lock icon (simple cross in the middle of the doorway)
+                shape.setColor(0.6f, 0.15f, 0.15f, 0.9f);
+                shape.rect(cx - 3f, gate.y + archHeight / 2f - 10f, 6f, 20f);
+                shape.rect(cx - 10f, gate.y + archHeight / 2f - 3f, 20f, 6f);
+            }
+
+            // Pillars and archway (dark stone color)
+            shape.setColor(0.2f, 0.2f, 0.25f, 1f);
+            // Left pillar
+            shape.rect(gate.x, gate.y, pillarW, archHeight);
+            // Right pillar
+            shape.rect(gate.x + gate.width - pillarW, gate.y, pillarW, archHeight);
+            // Top lintel
+            shape.rect(gate.x - 5f, gate.y + archHeight - 15f, gate.width + 10f, 15f);
+
+            shape.end();
+
+            // Border outline for 3D depth
+            shape.begin(ShapeRenderer.ShapeType.Line);
+            if (unlocked) {
+                float borderPulse = 0.7f + 0.3f * MathUtils.sin(time * 4f);
+                shape.setColor(0.2f, 1f, 0.4f, borderPulse);
+            } else {
+                shape.setColor(0.1f, 0.1f, 0.15f, 1f);
+            }
+            shape.rect(gate.x, gate.y, pillarW, archHeight);
+            shape.rect(gate.x + gate.width - pillarW, gate.y, pillarW, archHeight);
+            shape.rect(gate.x - 5f, gate.y + archHeight - 15f, gate.width + 10f, 15f);
+            shape.end();
+
+            // "EXIT" text when unlocked and player is nearby
+            if (unlocked) {
+                Rectangle pBounds = world.getPlayer().getBounds();
+                float dx = (pBounds.x + pBounds.width / 2f) - cx;
+                float dy = (pBounds.y + pBounds.height / 2f) - cy;
+                if (dx * dx + dy * dy < 150f * 150f) {
+                    batch.begin();
+                    font.getData().setScale(1.3f);
+                    float bobY = MathUtils.sin(time * 4f) * 3f;
+                    font.setColor(0.2f, 1f, 0.4f, 0.9f);
+                    font.draw(batch, "EXIT", cx - 18f, gate.y + 130f + bobY);
+                    font.getData().setScale(1f);
+                    font.setColor(Color.WHITE);
+                    batch.end();
+                }
+            }
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void drawInteractables() {
+        if (world.getInteractables() == null) return;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        for (Interactable interactable : world.getInteractables()) {
+            boolean inRange = interactable.isPlayerInRange(world.getPlayer());
+            interactable.render(batch, shape, font, inRange);
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void drawUI() {
