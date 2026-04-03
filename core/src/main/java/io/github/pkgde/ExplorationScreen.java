@@ -190,7 +190,7 @@ public class ExplorationScreen implements Screen {
                 }
             }
 
-            world.update(gameDelta, camera); 
+            world.update(gameDelta, camera);
 
             if (world.isPlayerNearEnemy() && !playerIsDead && !isVictorySequence) {
                 if (!shakeTriggered) {
@@ -210,14 +210,10 @@ public class ExplorationScreen implements Screen {
             offsetY = MathUtils.random(-10f, 10f);
         }
 
-<<<<<<< HEAD
-        if (state == State.PAUSE || state == State.SETTINGS || state == State.INVENTORY || state == State.GAMEOVER || state == State.VICTORY) {
-=======
         // ===== RENDER =====
-        boolean isOverlayActive = (state != State.GAME); // This is correct, it covers all non-GAME states
+        boolean isOverlayActive = (state != State.GAME);
 
-        if (isOverlayActive) { // Only blur if any overlay is active
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
+        if (isOverlayActive) {
             fbo.begin();
             renderer.render(offsetX, offsetY);
             fbo.end();
@@ -227,7 +223,7 @@ public class ExplorationScreen implements Screen {
             Texture tex = fbo.getColorBufferTexture();
 
             float blurAmount = 0f;
-            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAME_OVER) {
+            if (state == State.PAUSE || state == State.INVENTORY || state == State.GAMEOVER || state == State.VICTORY) {
                 blurAmount = 0.002f;
             }
             if (state == State.SETTINGS) {
@@ -249,11 +245,12 @@ public class ExplorationScreen implements Screen {
                 false, true
             );
             blurBatch.end();
+
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            
+
             if (state == State.GAMEOVER) {
                 shape.setColor(0.5f, 0, 0, 0.65f);
             } else if (state == State.VICTORY) {
@@ -301,27 +298,24 @@ public class ExplorationScreen implements Screen {
                 gameOverOverlay.render(shape, batch, font, viewport);
             }
 
-            Gdx.gl.glDisable(GL20.GL_BLEND);
-        }
+            if (state == State.VICTORY) {
+                batch.begin();
+                font.setColor(Color.WHITE);
 
-        if (state == State.GAMEOVER || state == State.VICTORY) {
-            batch.setProjectionMatrix(camera.combined);
-            batch.begin();
-            
-            font.getData().setScale(3f);
-            font.setColor(Color.WHITE);
-            String text = (state == State.GAMEOVER) ? "YOU DIED" : "VICTORY ACHIEVED";
-            
-            // Extremely simple rough text centering 
-            float textW = state == State.GAMEOVER ? 160f : 320f;
-            font.draw(batch, text, camera.position.x - textW / 2f, camera.position.y + 70f);
-            
-            font.getData().setScale(1.5f);
-            float subtitleW = 280f;
-            font.draw(batch, "Press ESCAPE to return to Menu", camera.position.x - subtitleW / 2f, camera.position.y - 10f);
-            
-            font.getData().setScale(1f);
-            batch.end();
+                font.getData().setScale(3f);
+                String text = "VICTORY ACHIEVED";
+                float textW = 320f;
+                font.draw(batch, text, camera.position.x - textW / 2f, camera.position.y + 70f);
+
+                font.getData().setScale(1.5f);
+                float subtitleW = 280f;
+                font.draw(batch, "Press ESCAPE to return to Menu", camera.position.x - subtitleW / 2f, camera.position.y - 10f);
+
+                font.getData().setScale(1f);
+                batch.end();
+            }
+
+            Gdx.gl.glDisable(GL20.GL_BLEND);
         }
     }
 

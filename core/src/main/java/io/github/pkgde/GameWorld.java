@@ -14,26 +14,10 @@ public class GameWorld {
     private static final float NEAR_ENEMY_DISTANCE_SQ = NEAR_ENEMY_DISTANCE * NEAR_ENEMY_DISTANCE;
     private static final float ARROW_DAMAGE = 20f;
 
-<<<<<<< HEAD
     private final MapManager mapManager;
     private final Player player;
     private final ArrayList<Enemy> enemies = new ArrayList<>();
     private final ArrayList<LootDrop> lootDrops = new ArrayList<>();
-
-    private final ArrayList<Rectangle> boundaries;
-    private final ArrayList<Polygon> collisionPolygons;
-
-    public GameWorld(MapManager mapManager) {
-=======
-    public static final float WORLD_WIDTH = 1280;
-    public static final float WORLD_HEIGHT = 720;
-    public static final float FLOOR_OFFSET = 120f;
-
-    private final MapManager mapManager;
-    private final Player player;
-    private final ArrayList<Enemy> enemies = new ArrayList<>();
-    private final ArrayList<LootDrop> lootDrops = new ArrayList<>();
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
     private final ArrayList<Rectangle> boundaries;
     private final ArrayList<Polygon> collisionPolygons;
@@ -137,12 +121,8 @@ public class GameWorld {
         boolean anyChasing = false;
         for (Enemy e : enemies) {
             if (e.isAlive() && e.isChasing()) {
-<<<<<<< HEAD
-                anyChasing = true; break;
-=======
                 anyChasing = true;
                 break;
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             }
         }
         if (anyChasing) {
@@ -204,31 +184,20 @@ public class GameWorld {
     }
 
     public Player getPlayer() { return player; }
-<<<<<<< HEAD
-    public ArrayList<Enemy> getEnemies() { return enemies; }
-    public ArrayList<LootDrop> getLootDrops() { return lootDrops; }
-=======
 
     public Enemy getEnemy() {
-        // Helper method added to support legacy single-enemy calls if they exist elsewhere.
-        // Returns the first enemy, or null if empty.
         return enemies.isEmpty() ? null : enemies.get(0);
     }
 
     public ArrayList<Enemy> getEnemies() { return enemies; }
     public ArrayList<LootDrop> getLootDrops() { return lootDrops; }
     public MapManager getMapManager() { return mapManager; }
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
 
     public void dispose() {
         player.dispose();
-<<<<<<< HEAD
-        for (Enemy e : enemies) e.dispose();
-=======
         for (Enemy e : enemies) {
             e.dispose();
         }
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     }
 }

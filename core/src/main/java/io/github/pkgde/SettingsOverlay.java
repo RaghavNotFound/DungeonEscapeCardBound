@@ -63,18 +63,6 @@ public class SettingsOverlay {
     }
 
     public void hide() {
-<<<<<<< HEAD
-        active = false;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void handleInput(Viewport viewport) {
-
-        if (!active) return;
-=======
         if (state == State.ACTIVE || state == State.TRANSITION_IN) {
             state = State.TRANSITION_OUT;
             transitionTimer = 0f;
@@ -87,7 +75,6 @@ public class SettingsOverlay {
 
     public void handleInput(Viewport viewport) {
         if (state != State.ACTIVE) return; // Only handle input when fully active
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
         updateLayout(viewport);
         updatePointer(viewport);
@@ -101,18 +88,10 @@ public class SettingsOverlay {
             hide();
             return;
         }
-<<<<<<< HEAD
-
-        // ===== KEYBOARD NAV =====
-        if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
-            Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-
-=======
         
         // --- Keyboard Navigation ---
         boolean keyPressed = false;
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
             keyPressed = true;
         } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
@@ -254,14 +233,7 @@ public class SettingsOverlay {
             shape.setColor(c.r, c.g, c.b, c.a * progress);
             shape.rect(centerX, ys[i] + yOffset, boxW, boxH);
         }
-
         shape.end();
-<<<<<<< HEAD
-
-        // ===== TEXT =====
-        batch.begin();
-=======
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
         // ===== TEXT =====
         batch.begin();

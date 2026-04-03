@@ -7,15 +7,9 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
-import io.github.pkgde.Enemy;
 
 public class GameRenderer {
 
-<<<<<<< HEAD
-=======
-public class GameRenderer {
-
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     private final GameWorld world;
     private final SpriteBatch batch;
     private final ShapeRenderer shape;
@@ -67,10 +61,7 @@ public class GameRenderer {
 
         drawTorches(batch);
 
-<<<<<<< HEAD
-=======
         // Render enemies behind the player
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         for (Enemy enemy : world.getEnemies()) {
             if (world.getPlayer().getPos().y > enemy.getBounds().y) {
                 enemy.render(batch);
@@ -79,10 +70,7 @@ public class GameRenderer {
 
         world.getPlayer().render(batch);
 
-<<<<<<< HEAD
-=======
         // Render enemies in front of the player
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         for (Enemy enemy : world.getEnemies()) {
             if (world.getPlayer().getPos().y <= enemy.getBounds().y) {
                 enemy.render(batch);
@@ -93,23 +81,15 @@ public class GameRenderer {
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shape.begin(ShapeRenderer.ShapeType.Filled);
-<<<<<<< HEAD
-        for (LootDrop drop : world.getLootDrops()) {
-            drop.render(batch, shape);
-=======
         if (world.getLootDrops() != null) {
             for (LootDrop drop : world.getLootDrops()) {
                 drop.render(batch, shape);
             }
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         }
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-<<<<<<< HEAD
-=======
         drawEnemyHealthBars();
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         drawCollisionDebug();
         drawUI();
 
@@ -140,40 +120,6 @@ public class GameRenderer {
                 shape.rect(r.x, r.y, r.width, r.height);
             }
             if (mapManager.getCollisionPolygons() != null) {
-<<<<<<< HEAD
-                for (com.badlogic.gdx.math.Polygon p : mapManager.getCollisionPolygons()) {
-                    shape.polygon(p.getTransformedVertices());
-                }
-            }
-        }
-
-        // Draw Player boundaries
-        shape.setColor(Color.GREEN);
-        Rectangle pBounds = world.getPlayer().getBounds();
-        shape.rect(pBounds.x, pBounds.y, pBounds.width, pBounds.height);
-
-        // Draw Player Sword Hitbox if active
-        if (world.getPlayer().canDealSwordDamage()) {
-            shape.setColor(Color.YELLOW);
-            Rectangle sBounds = world.getPlayer().getSwordHitbox();
-            shape.rect(sBounds.x, sBounds.y, sBounds.width, sBounds.height);
-        }
-
-        // Draw Enemy boundaries
-        shape.setColor(Color.MAGENTA);
-        for (Enemy enemy : world.getEnemies()) {
-            Rectangle eBounds = enemy.getBounds();
-            shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
-        }
-
-        // Draw Arrows
-        shape.setColor(Color.CYAN);
-        for (Arrow arrow : world.getPlayer().getArrows()) {
-            Rectangle aBounds = arrow.getBounds();
-            shape.rect(aBounds.x, aBounds.y, aBounds.width, aBounds.height);
-        }
-
-=======
                 for (Polygon p : mapManager.getCollisionPolygons()) {
                     shape.polygon(p.getTransformedVertices());
                 }
@@ -221,7 +167,6 @@ public class GameRenderer {
             shape.rect(r.x, r.y, r.width, r.height);
         }
 
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         shape.end();
     }
 
@@ -270,11 +215,6 @@ public class GameRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     private void drawRoundedBar(
         ShapeRenderer shape,
         float x,

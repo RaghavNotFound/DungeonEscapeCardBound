@@ -31,11 +31,7 @@ public class HomeScreen implements Screen {
     private int lastMouseY = -1;
     private final Color accent = new Color(0.25f, 0.85f, 1f, 1f);
 
-<<<<<<< HEAD
-    // 🌫️ BLUR SYSTEM
-=======
     // BLUR SYSTEM
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
     private FrameBuffer fbo;
     private ShaderProgram blurShader;
     private SpriteBatch blurBatch;
@@ -47,11 +43,7 @@ public class HomeScreen implements Screen {
         font = new BitmapFont();
         glyphLayout = new GlyphLayout();
 
-<<<<<<< HEAD
-        // 🔥 improve font quality
-=======
         // Improve font quality
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         font.getRegion().getTexture().setFilter(
             Texture.TextureFilter.Linear,
             Texture.TextureFilter.Linear
@@ -61,11 +53,7 @@ public class HomeScreen implements Screen {
         background.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         camera = new OrthographicCamera();
-<<<<<<< HEAD
-        viewport = new FitViewport(1280, 720, camera); // 🔥 FIXED
-=======
         viewport = new FitViewport(1280, 720, camera);
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         viewport.apply(true);
 
         camera.position.set(
@@ -77,11 +65,7 @@ public class HomeScreen implements Screen {
 
         settings = new SettingsOverlay();
 
-<<<<<<< HEAD
-        // 🌫️ HIGH QUALITY FBO (DYNAMIC SIZE)
-=======
         // DYNAMIC SIZE FBO
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         fbo = new FrameBuffer(
             Pixmap.Format.RGBA8888,
             Gdx.graphics.getWidth(),
@@ -123,24 +107,6 @@ public class HomeScreen implements Screen {
         float settingsY = playY - btnHeight - gap;
         float exitY = settingsY - btnHeight - gap;
 
-<<<<<<< HEAD
-        // ===== INPUT =====
-        if (settings.isActive()) {
-            settings.handleInput(viewport);
-        } else {
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.W) ||
-                Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
-                selected = (selected + 2) % 3;
-            }
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.S) ||
-                Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
-                selected = (selected + 1) % 3;
-            }
-
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
-=======
         // --- Mouse Movement Tracking ---
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
         lastMouseX = Gdx.input.getX();
@@ -163,16 +129,11 @@ public class HomeScreen implements Screen {
             }
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) { // ENTER
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 applySelection();
                 return; // Action taken, skip further input checks
             }
 
-<<<<<<< HEAD
-            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-=======
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) { // ESCAPE
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 Gdx.app.exit();
                 return; // Action taken, skip further input checks
             }
@@ -196,15 +157,9 @@ public class HomeScreen implements Screen {
             }
         }
 
-<<<<<<< HEAD
-        // ===== SETTINGS MODE =====
-        if (settings.isActive()) {
-
-=======
         // ===== RENDERING =====
         if (settings.isOverlayVisible()) {
             // Render background to FBO for blurring
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             fbo.begin();
             batch.begin();
             batch.draw(background, 0, 0, worldW, worldH);
@@ -215,13 +170,9 @@ public class HomeScreen implements Screen {
 
             blurBatch.setProjectionMatrix(camera.combined);
             blurBatch.begin();
-<<<<<<< HEAD
-            blurShader.setUniformf("blur", 0.002f);
-=======
 
             float progress = settings.getTransitionProgress();
             blurShader.setUniformf("blur", progress * 0.002f);
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
 
             blurBatch.draw(
                 tex,
@@ -230,26 +181,14 @@ public class HomeScreen implements Screen {
                 0, 0,
                 tex.getWidth(),
                 tex.getHeight(),
-<<<<<<< HEAD
-                false, true   // 🔥 FIXED FLIP
-=======
                 false, true
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             );
             blurBatch.end();
 
-<<<<<<< HEAD
-            // 🌑 overlay (improved)
-=======
             // Darken overlay behind settings menu
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             Gdx.gl.glEnable(GL20.GL_BLEND);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-<<<<<<< HEAD
-            shapeRenderer.setColor(0, 0, 0, 0.5f);
-=======
             shapeRenderer.setColor(0, 0, 0, progress * 0.5f);
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             shapeRenderer.rect(0, 0, worldW, worldH);
             shapeRenderer.end();
             Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -258,11 +197,7 @@ public class HomeScreen implements Screen {
             return;
         }
 
-<<<<<<< HEAD
-        // ===== NORMAL MENU =====
-=======
         // --- Normal Menu Rendering ---
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
         batch.begin();
         batch.draw(background, 0, 0, worldW, worldH);
         batch.end();
@@ -370,23 +305,11 @@ public class HomeScreen implements Screen {
     }
 
     private void applySelection() {
-<<<<<<< HEAD
-
-        if (selected == 0) {
-            ((Main) Gdx.app.getApplicationListener())
-                .setScreen(new ExplorationScreen());
-        }
-        else if (selected == 1) {
-            settings.show();
-        }
-        else if (selected == 2) {
-=======
         if (selected == 0) {
             ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
         } else if (selected == 1) {
             settings.show();
         } else if (selected == 2) {
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
             Gdx.app.exit();
         }
     }

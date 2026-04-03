@@ -78,13 +78,9 @@ public class MapManager {
                         collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
                     } else {
                         Rectangle r = extractObjectBounds(obj);
-<<<<<<< HEAD
                         if (r != null) {
                             collisionRects.add(r);
                         }
-=======
-                        if (r != null) collisionRects.add(r);
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                     }
                 }
             }
@@ -102,13 +98,9 @@ public class MapManager {
                     collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
                 } else {
                     Rectangle r = extractObjectBounds(obj);
-<<<<<<< HEAD
                     if (r != null) {
                         collisionRects.add(r);
                     }
-=======
-                    if (r != null) collisionRects.add(r);
->>>>>>> 49f371b632c2e7533ec48991d6c1ff1c20c2baf7
                 }
             }
         }

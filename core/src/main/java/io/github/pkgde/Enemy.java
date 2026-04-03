@@ -98,11 +98,11 @@ public class Enemy {
     private float moveDuration = 0f;
     private boolean isMoving = false;
 
-    // 🔥 Knockback
+    // Knockback
     private Vector2 knockbackVelocity = new Vector2(0, 0);
-    private static final float KNOCKBACK_FRICTION = 600f; // decel
+    private static final float KNOCKBACK_FRICTION = 600f;
 
-    // 🔥 UI RENDERER ADDED
+    // UI Renderer
     private ShapeRenderer shape = new ShapeRenderer();
 
     public Enemy() {
@@ -185,18 +185,7 @@ public class Enemy {
     public void update(float delta, Player player) {
         if (disposed) return;
 
-        // 🔥 Process Knockback
-        if (knockbackVelocity.len2() > 0) {
-            float currentSpeed = knockbackVelocity.len();
-            currentSpeed -= KNOCKBACK_FRICTION * delta;
-            if (currentSpeed <= 0) {
-                knockbackVelocity.setZero();
-            } else {
-                knockbackVelocity.setLength(currentSpeed);
-                moveBy(knockbackVelocity.x * delta, knockbackVelocity.y * delta);
-            }
-        }
-
+        // Process Knockback (single pass)
         if (knockbackVelocity.len2() > 0) {
             float currentSpeed = knockbackVelocity.len();
             currentSpeed -= KNOCKBACK_FRICTION * delta;
@@ -311,6 +300,7 @@ public class Enemy {
 
         updateFacing();
         bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
+
         if (hurtTimer > 0f) {
             currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
         } else if (attackTimer > 0f) {
@@ -491,24 +481,9 @@ public class Enemy {
             }
         }
 
-        if (collisionPolygons != null) {
-            Polygon rectPoly = new Polygon(new float[] {
-                next.x, next.y,
-                next.x + next.width, next.y,
-                next.x + next.width, next.y + next.height,
-                next.x, next.y + next.height
-            });
-            for (Polygon poly : collisionPolygons) {
-                if (Intersector.overlapConvexPolygons(rectPoly, poly)) {
-                    return false;
-                }
-            }
-        }
-
         return true;
     }
 
-    // Ÿ” RANDOM ACTION PICKER
     private void pickNewRandomAction() {
         isMoving = MathUtils.randomBoolean(0.7f); // 70% move, 30% idle
         moveDuration = MathUtils.random(1f, 3f);
@@ -525,12 +500,7 @@ public class Enemy {
     public void render(SpriteBatch batch) {
         if (disposed) return;
 
-        // 🔴 HURT FLASH
-        if (hurtTimer > 0f) {
-            batch.setColor(1f, 0.5f, 0.5f, 1f);
-        }
-
-        // 🔴 HURT FLASH
+        // Hurt flash
         if (hurtTimer > 0f) {
             batch.setColor(1f, 0.5f, 0.5f, 1f);
         }
@@ -539,7 +509,7 @@ public class Enemy {
         batch.setColor(1f, 1f, 1f, 1f);
         batch.end();
 
-        // 🔥 UI DRAW
+        // UI DRAW
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shape.setProjectionMatrix(batch.getProjectionMatrix());
@@ -610,7 +580,7 @@ public class Enemy {
             t.dispose();
         }
 
-        shape.dispose(); // 🔥 ADDED
+        shape.dispose();
 
         disposed = true;
     }
