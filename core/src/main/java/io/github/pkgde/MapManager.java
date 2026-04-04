@@ -28,13 +28,12 @@ public class MapManager {
     private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
-    private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
     private final ArrayList<Interactable> interactables = new ArrayList<>();
 
     private static final float UNIT_SCALE = 1f;
 
     public void load(String path) {
-        map = new TmxMapLoader().load(path);
+        map = Main.assets.get(path, TiledMap.class);
         renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
 
         clearData();
@@ -43,7 +42,6 @@ public class MapManager {
         loadSpawns();
         loadTorches();
         loadChests();
-        loadExitGates();
         loadInteractables();
     }
 
@@ -53,7 +51,6 @@ public class MapManager {
         collisionPolygons.clear();
         torchRects.clear();
         chestRects.clear();
-        exitGateRects.clear();
         interactables.clear();
     }
 
@@ -175,23 +172,6 @@ public class MapManager {
         }
     }
 
-    private void loadExitGates() {
-        MapLayer layer = getObjectLayer();
-        if (layer != null) {
-            for (MapObject obj : layer.getObjects()) {
-                if (isObjectTag(obj, "exitGate")) {
-                    Rectangle bounds = extractObjectBounds(obj);
-                    if (bounds != null) exitGateRects.add(bounds);
-                }
-            }
-        }
-        if (exitGateRects.isEmpty()) {
-            float mapW = getMapWidth();
-            float mapH = getMapHeight();
-            exitGateRects.add(new Rectangle(mapW * 0.5f - 40f, mapH * 0.75f - 40f, 80f, 80f));
-        }
-    }
-
     private void loadInteractables() {
         MapLayer layer = getObjectLayer();
         if (layer != null) {
@@ -305,11 +285,10 @@ public class MapManager {
     public ArrayList<Polygon> getCollisionPolygons() { return collisionPolygons; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
-    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {
         if (renderer != null) renderer.dispose();
-        if (map != null) map.dispose();
+        // Assets are managed by Main.assets, so do NOT dispose map here!
     }
 }

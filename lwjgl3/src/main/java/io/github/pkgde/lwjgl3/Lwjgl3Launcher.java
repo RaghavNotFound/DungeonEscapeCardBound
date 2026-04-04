@@ -29,9 +29,8 @@ public class Lwjgl3Launcher {
         // Sets a sensible default window size (1280x720) for the native aspect ratio
         configuration.setWindowedMode(1280, 720);
 
-        // keeps window frame but maximizes to fill screen
         configuration.setDecorated(true);
-        configuration.setMaximized(true);
+        configuration.setMaximized(false);
         configuration.setResizable(false);
 
         // Icons

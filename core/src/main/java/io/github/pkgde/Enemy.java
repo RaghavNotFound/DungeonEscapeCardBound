@@ -30,7 +30,6 @@ public class Enemy {
     private Facing facing = Facing.FRONT;
     private State state = State.IDLE;
     private TextureRegion currentFrame;
-    private final ArrayList<Texture> textures = new ArrayList<>();
 
     private float stateTime, hurtStateTime, attackStateTime, deathStateTime;
 
@@ -76,6 +75,23 @@ public class Enemy {
 
     private final ShapeRenderer shape = new ShapeRenderer();
 
+    public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
+        String[] prefixes = {
+            "Movements/Enemy/Front/Idle/Front - Idle_", "Movements/Enemy/Front/Walking/Front - Walking_", "Movements/Enemy/Front/Running/Front - Running_", "Movements/Enemy/Front/Hurt/Front - Hurt_", "Movements/Enemy/Front/Attacking/Front - Attacking_",
+            "Movements/Enemy/Back/Idle/Back - Idle_", "Movements/Enemy/Back/Walking/Back - Walking_", "Movements/Enemy/Back/Running/Back - Running_", "Movements/Enemy/Back/Hurt/Back - Hurt_", "Movements/Enemy/Back/Attacking/Back - Attacking_",
+            "Movements/Enemy/Left/Idle/Left - Idle_", "Movements/Enemy/Left/Walking/Left - Walking_", "Movements/Enemy/Left/Running/Left - Running_", "Movements/Enemy/Left/Hurt/Left - Hurt_", "Movements/Enemy/Left/Attacking/Left - Attacking_",
+            "Movements/Enemy/Right/Idle/Right - Idle_", "Movements/Enemy/Right/Walking/Right - Walking_", "Movements/Enemy/Right/Running/Right - Running_", "Movements/Enemy/Right/Hurt/Right - Hurt_", "Movements/Enemy/Right/Attacking/Right - Attacking_",
+            "Movements/Enemy/Dying/Dying_"
+        };
+        for (String p : prefixes) {
+            for (int i = 0; ; i++) {
+                String path = p + String.format("%03d", i) + ".png";
+                if (!Gdx.files.internal(path).exists()) break;
+                manager.load(path, Texture.class);
+            }
+        }
+    }
+
     public Enemy() {
         position = new Vector2(400, 300);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
@@ -114,9 +130,8 @@ public class Enemy {
         ArrayList<TextureRegion> frames = new ArrayList<>();
         for (int i = 0; ; i++) {
             String path = pathPrefix + String.format("%03d", i) + ".png";
-            if (!Gdx.files.internal(path).exists()) break;
-            Texture tex = new Texture(path);
-            textures.add(tex);
+            if (!Main.assets.isLoaded(path)) break;
+            Texture tex = Main.assets.get(path, Texture.class);
             frames.add(new TextureRegion(tex));
         }
         if (frames.isEmpty()) throw new IllegalStateException("Missing enemy animation frames: " + pathPrefix);
@@ -340,6 +355,9 @@ public class Enemy {
     public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) { this.worldMinX = minX; this.worldMinY = minY; this.worldMaxX = maxX; this.worldMaxY = maxY; }
     public void setPosition(float x, float y) { position.set(x, y); bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y); }
+    public Vector2 getPosition() { return position; }
+    public float getHealth() { return health; }
+    public void setHealth(float h) { health = h; }
     public boolean isAlive() { return health > 0f; }
     public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
     public float getDamage() { return ATTACK_DAMAGE; }
@@ -349,5 +367,5 @@ public class Enemy {
     public boolean isDeathAnimationFinished() { return !isAlive() && deathStateTime >= deathAnim.getAnimationDuration(); }
     public float getAttackTimer() { return attackTimer; }
     public float getAttackAnimDuration() { return getAttackAnimation().getAnimationDuration(); }
-    public void dispose() { if (!disposed) { for (Texture t : textures) t.dispose(); shape.dispose(); disposed = true; } }
+    public void dispose() { if (!disposed) { shape.dispose(); disposed = true; } }
 }

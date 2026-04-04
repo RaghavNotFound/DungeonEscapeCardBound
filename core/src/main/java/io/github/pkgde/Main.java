@@ -3,6 +3,7 @@ package io.github.pkgde;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
+import com.badlogic.gdx.assets.AssetManager;
 
 /**
  * The main entry point for the LibGDX game.
@@ -10,14 +11,18 @@ import com.badlogic.gdx.Graphics;
  */
 public class Main extends Game {
 
+    public static AssetManager assets;
+
     @Override
     public void create() {
-        // Set to Borderless Fullscreen (Matches SettingsOverlay logic exactly)
-        Gdx.graphics.setUndecorated(true);
-        Graphics.DisplayMode mode = Gdx.graphics.getDisplayMode();
-        Gdx.graphics.setFullscreenMode(mode);
-
+        assets = new AssetManager();
         // Launch the initial animated menu
         setScreen(new HomeScreen());
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        if (assets != null) assets.dispose();
     }
 }

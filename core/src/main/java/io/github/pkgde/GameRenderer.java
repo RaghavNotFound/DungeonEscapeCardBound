@@ -20,6 +20,10 @@ public class GameRenderer {
     private final OrthographicCamera camera;
     private final MapManager mapManager;
 
+    public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
+        for (int i = 1; i <= 7; i++) manager.load("Objects/torch/torch_" + i + ".png", Texture.class);
+    }
+
     public GameRenderer(GameWorld world, OrthographicCamera camera, MapManager mapManager) {
         this.world = world;
         this.camera = camera;
@@ -32,7 +36,7 @@ public class GameRenderer {
 
         torchFrames = new Texture[7];
         for (int i = 0; i < torchFrames.length; i++) {
-            torchFrames[i] = new Texture("Objects/torch/torch_" + (i + 1) + ".png");
+            torchFrames[i] = Main.assets.get("Objects/torch/torch_" + (i + 1) + ".png", Texture.class);
             torchFrames[i].setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         }
     }
@@ -88,7 +92,6 @@ public class GameRenderer {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        drawExitGate();
         drawInteractables();
         drawEnemyUI();
         drawCollisionDebug();
@@ -178,50 +181,6 @@ public class GameRenderer {
         }
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
-    }
-
-    private void drawExitGate() {
-        if (world.getMapManager() == null) return;
-        java.util.ArrayList<Rectangle> gates = world.getMapManager().getExitGateRects();
-        if (gates.isEmpty()) return;
-
-        boolean unlocked = world.isExitGateUnlocked();
-        float time = (float) (System.nanoTime() / 1_000_000_000.0);
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        for (Rectangle gate : gates) {
-            float cx = gate.x + gate.width / 2f;
-            float cy = gate.y + gate.height / 2f;
-            float archHeight = 100f;
-            float pillarW = 15f;
-
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            if (unlocked) {
-                float pulse = 0.8f + 0.2f * MathUtils.sin(time * 4f);
-                shape.setColor(0.1f, 0.9f, 0.3f, 0.4f * pulse); // Portal energy
-                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
-                shape.setColor(0.2f, 1f, 0.4f, 0.15f + 0.1f * MathUtils.sin(time * 6f));
-                shape.circle(cx, cy, gate.width * 0.4f); // Core
-            } else {
-                shape.setColor(0.8f, 0.1f, 0.1f, 0.3f); // Red Barrier
-                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
-                shape.setColor(0.6f, 0.15f, 0.15f, 0.9f); // Lock Icon
-                shape.rect(cx - 3f, cy - 10f, 6f, 20f);
-                shape.rect(cx - 10f, cy - 3f, 20f, 6f);
-            }
-            shape.setColor(0.2f, 0.2f, 0.25f, 1f); // Stone Structure
-            shape.rect(gate.x, gate.y, pillarW, archHeight);
-            shape.rect(gate.x + gate.width - pillarW, gate.y, pillarW, archHeight);
-            shape.rect(gate.x - 5f, gate.y + archHeight - 15f, gate.width + 10f, 15f);
-            shape.end();
-
-            if (unlocked) {
-                batch.begin();
-                font.setColor(0.2f, 1f, 0.4f, 1f);
-                font.draw(batch, "EXIT", cx - 18f, gate.y + archHeight + 20f);
-                batch.end();
-            }
-        }
     }
 
     private void drawInteractables() {
@@ -333,7 +292,6 @@ public class GameRenderer {
         batch.dispose();
         shape.dispose();
         font.dispose();
-        for (Texture t : torchFrames) t.dispose();
     }
 
     public SpriteBatch getBatch() { return batch; }

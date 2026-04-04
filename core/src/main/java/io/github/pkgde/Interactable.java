@@ -248,6 +248,7 @@ public class Interactable {
     public Type getType() { return type; }
     public Rectangle getBounds() { return bounds; }
     public boolean isInteracted() { return interacted; }
+    public void setInteracted(boolean interacted) { this.interacted = interacted; }
     public String getSignText() { return signText; }
     public float getPopupTimer() { return popupTimer; }
 }

@@ -274,7 +274,7 @@ public class VictoryScreen implements Screen {
         Main main = (Main) Gdx.app.getApplicationListener();
         switch (index) {
             case 0 -> main.setScreen(new HomeScreen());
-            case 1 -> main.setScreen(new ExplorationScreen());
+            case 1 -> main.setScreen(new ExplorationScreen(null));
         }
     }
 

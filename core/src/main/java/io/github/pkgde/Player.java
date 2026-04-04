@@ -94,6 +94,21 @@ public class Player {
     private int enemiesKilled = 0;
     private float timeSurvived = 0f;
 
+    public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
+        int walkCount = 23, runCount = 12, idleCount = 18, blinkCount = 18;
+        int hurtCount = 12, swordCount = 12, deathCount = 15;
+        
+        for (int i = 0; i < walkCount; i++) manager.load("Movements/Player/walking/walking_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < runCount; i++) manager.load("Movements/Player/running/running_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < idleCount; i++) manager.load("Movements/Player/idle/idle_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < blinkCount; i++) manager.load("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < hurtCount; i++) manager.load("Movements/Player/hurt/hurt_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < swordCount; i++) manager.load("Movements/Player/kicking/kicking_" + (i + 1) + ".png", Texture.class);
+        for (int i = 0; i < deathCount; i++) manager.load("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
+        
+        manager.load("Vectors/Sword.png", Texture.class);
+    }
+
     public Player() {
         position = new Vector2(200, 200);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
@@ -116,37 +131,36 @@ public class Player {
         TextureRegion[] idleFrames = new TextureRegion[idleCount];
         TextureRegion[] blinkFrames = new TextureRegion[blinkCount];
 
-        // Resource Loading (Helper pattern could be used, but keeping explicit per project style)
         for (int i = 0; i < walkCount; i++) {
-            walkingTextures[i] = new Texture("Movements/Player/walking/walking_" + (i + 1) + ".png");
+            walkingTextures[i] = Main.assets.get("Movements/Player/walking/walking_" + (i + 1) + ".png", Texture.class);
             walkFrames[i] = new TextureRegion(walkingTextures[i]);
         }
         for (int i = 0; i < runCount; i++) {
-            runTextures[i] = new Texture("Movements/Player/running/running_" + (i + 1) + ".png");
+            runTextures[i] = Main.assets.get("Movements/Player/running/running_" + (i + 1) + ".png", Texture.class);
             runFrames[i] = new TextureRegion(runTextures[i]);
         }
         for (int i = 0; i < idleCount; i++) {
-            idleTextures[i] = new Texture("Movements/Player/idle/idle_" + (i + 1) + ".png");
+            idleTextures[i] = Main.assets.get("Movements/Player/idle/idle_" + (i + 1) + ".png", Texture.class);
             idleFrames[i] = new TextureRegion(idleTextures[i]);
         }
         for (int i = 0; i < blinkCount; i++) {
-            idleBlinkingTextures[i] = new Texture("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png");
+            idleBlinkingTextures[i] = Main.assets.get("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png", Texture.class);
             blinkFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
         TextureRegion[] hFrames = new TextureRegion[hurtCount];
         for (int i = 0; i < hurtCount; i++) {
-            hurtTextures[i] = new Texture("Movements/Player/hurt/hurt_" + (i + 1) + ".png");
+            hurtTextures[i] = Main.assets.get("Movements/Player/hurt/hurt_" + (i + 1) + ".png", Texture.class);
             hFrames[i] = new TextureRegion(hurtTextures[i]);
         }
         TextureRegion[] sFrames = new TextureRegion[swordCount];
         for (int i = 0; i < swordCount; i++) {
-            swordTextures[i] = new Texture("Movements/Player/kicking/kicking_" + (i + 1) + ".png");
+            swordTextures[i] = Main.assets.get("Movements/Player/kicking/kicking_" + (i + 1) + ".png", Texture.class);
             sFrames[i] = new TextureRegion(swordTextures[i]);
         }
         TextureRegion[] dFrames = new TextureRegion[deathCount];
         for (int i = 0; i < deathCount; i++) {
-            deathTextures[i] = new Texture("Movements/Player/dying/dying_" + (i + 1) + ".png");
+            deathTextures[i] = Main.assets.get("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
             dFrames[i] = new TextureRegion(deathTextures[i]);
         }
 
@@ -158,7 +172,7 @@ public class Player {
         swordAnimation = new Animation<>(0.045f, sFrames);
         deathAnimation = new Animation<>(0.07f, dFrames);
 
-        swordTexture = new Texture("Vectors/Sword.png");
+        swordTexture = Main.assets.get("Vectors/Sword.png", Texture.class);
         swordTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         currentFrame = idleFrames[0];
     }
@@ -193,6 +207,14 @@ public class Player {
         this.worldMinX = minX; this.worldMinY = minY;
         this.worldMaxX = maxX; this.worldMaxY = maxY;
     }
+
+    public void setPosition(float x, float y) { position.set(x, y); updateBoundsPosition(); }
+    public void setHealth(float h) { health = h; }
+    public void setStamina(float s) { stamina = s; }
+    public void setTorchCount(int t) { torchCount = t; }
+    public void setCardsCount(int c) { cardsCount = c; }
+    public void setEnemiesKilled(int k) { enemiesKilled = k; }
+    public void setTimeSurvived(float t) { timeSurvived = t; }
 
     // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
@@ -416,13 +438,6 @@ public class Player {
     }
 
     public void dispose() {
-        for (Texture t : walkingTextures) t.dispose();
-        for (Texture t : runTextures) t.dispose();
-        for (Texture t : idleTextures) t.dispose();
-        for (Texture t : idleBlinkingTextures) t.dispose();
-        for (Texture t : hurtTextures) t.dispose();
-        for (Texture t : swordTextures) t.dispose();
-        for (Texture t : deathTextures) t.dispose();
-        swordTexture.dispose();
+        // Assets are managed globally by Main.assets, so no manual disposal needed here!
     }
 }

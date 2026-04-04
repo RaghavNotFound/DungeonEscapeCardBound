@@ -29,8 +29,9 @@ public class ExplorationScreen implements Screen {
     private final SettingsOverlay settingsOverlay;
     private final InventoryOverlay inventoryOverlay;
     private final GameOverOverlay gameOverOverlay;
+    private final SaveLoadOverlay saveLoadOverlay;
 
-    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, VICTORY }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD }
     private State state = State.GAME;
 
     // Juice Effects
@@ -43,40 +44,36 @@ public class ExplorationScreen implements Screen {
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
 
-    public ExplorationScreen() {
-        // 1. Initialize Map and World logic
+    public ExplorationScreen(String saveFileToLoad) {
         mapManager = new MapManager();
         mapManager.load(SAFE_ROOM_MAP);
-
         float mapW = mapManager.getMapWidth();
         float mapH = mapManager.getMapHeight();
-
-        // 2. Setup Camera and Viewport based on Map Dimensions
         camera = new OrthographicCamera();
         camera.setToOrtho(false, mapW, mapH);
         camera.position.set(mapW / 2f, mapH / 2f, 0);
-
         viewport = new FitViewport(mapW, mapH, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
 
-        // 3. Initialize Systems
         world = new GameWorld(mapManager);
         renderer = new GameRenderer(world, camera, mapManager);
         input = new InputHandler(viewport);
 
-        // 4. Initialize UI Overlays
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
         inventoryOverlay = new InventoryOverlay();
         gameOverOverlay = new GameOverOverlay();
+        saveLoadOverlay = new SaveLoadOverlay();
 
-        // 5. Setup Blur Buffer
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
         fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-
         blurShader = BlurShader.createShader(true);
         blurBatch = new SpriteBatch();
         blurBatch.setShader(blurShader);
+
+        if (saveFileToLoad != null) {
+            SaveManager.loadGame(world, saveFileToLoad);
+        }
     }
 
     @Override
@@ -110,6 +107,10 @@ public class ExplorationScreen implements Screen {
                 PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
                 switch (action) {
                     case RESUME -> state = State.GAME;
+                    case SAVE -> {
+                        state = State.SAVE_LOAD;
+                        saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE);
+                    }
                     case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
                     case EXIT -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                 }
@@ -117,10 +118,22 @@ public class ExplorationScreen implements Screen {
         } else if (state == State.SETTINGS) {
             if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(viewport);
             if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) state = State.PAUSE;
+        } else if (state == State.SAVE_LOAD) {
+            SaveLoadOverlay.Result res = saveLoadOverlay.handleInput(viewport);
+            if (res != null) {
+                if (res.action == SaveLoadOverlay.ResultAction.LOAD) {
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(res.saveName));
+                } else if (res.action == SaveLoadOverlay.ResultAction.SAVE) {
+                    SaveManager.saveGame(world, res.saveName);
+                    state = State.GAME; // Auto resume on successful save
+                }
+            } else if (!saveLoadOverlay.isVisible()) {
+                state = State.PAUSE;
+            }
         } else if (state == State.GAME_OVER) {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             switch (action) {
-                case RETRY -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen());
+                case RETRY -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
                 case MAIN_MENU -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
             }
         }
@@ -135,10 +148,6 @@ public class ExplorationScreen implements Screen {
         if (playerIsDead) {
             gameDelta *= 0.3f; // Slow motion on death
             if (world.getPlayer().isDeathAnimationFinished()) state = State.GAME_OVER;
-        } else if (world.isExitGateReached()) {
-            Main main = (Main) Gdx.app.getApplicationListener();
-            main.setScreen(new VictoryScreen(world.getPlayer().getEnemiesKilled(), world.getPlayer().getTorchCount(), world.getPlayer().getTimeSurvived()));
-            return;
         }
 
         world.update(gameDelta, camera);
@@ -212,10 +221,14 @@ public class ExplorationScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
-        if (state == State.PAUSE || state == State.SETTINGS) {
-            pauseOverlay.render(shape, batch, font, viewport, 1f - settingsOverlay.getTransitionProgress());
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.SAVE_LOAD) {
+            float alpha = 1f;
+            if (state == State.SETTINGS) alpha = 1f - settingsOverlay.getTransitionProgress();
+            if (state == State.SAVE_LOAD) alpha = 0.3f; // Dim the pause menu out of the way
+            pauseOverlay.render(shape, batch, font, viewport, alpha);
         }
         settingsOverlay.render(shape, batch, font, viewport);
+        if (state == State.SAVE_LOAD) saveLoadOverlay.render(shape, batch, font, viewport);
         if (state == State.INVENTORY) inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
         if (state == State.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
 

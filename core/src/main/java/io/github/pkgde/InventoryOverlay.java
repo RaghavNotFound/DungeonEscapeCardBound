@@ -34,9 +34,12 @@ public class InventoryOverlay {
 
     private final Rectangle[] slots = new Rectangle[SLOT_COUNT];
 
+    public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
+        manager.load("Objects/torch/torch_1.png", Texture.class);
+    }
+
     public InventoryOverlay() {
-        // Use an existing torch animation frame as the static icon
-        torchIcon = new Texture("Objects/torch/torch_1.png");
+        torchIcon = Main.assets.get("Objects/torch/torch_1.png", Texture.class);
         torchIcon.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         for (int i = 0; i < SLOT_COUNT; i++) {
@@ -216,6 +219,5 @@ public class InventoryOverlay {
     }
 
     public void dispose() {
-        torchIcon.dispose();
     }
 }

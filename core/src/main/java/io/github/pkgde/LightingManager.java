@@ -17,10 +17,16 @@ public class LightingManager {
     private final Vector2 lightCenter = new Vector2();
     private final float maxLightRadius = 1500f; // Large enough to cover the screen
 
+    private final Vector2 playerLightCenter = new Vector2();
+
     private FrameBuffer lightFbo;
 
     public LightingManager() {
         resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+    }
+
+    public void updatePlayerLight(float cx, float cy) {
+        playerLightCenter.set(cx, cy);
     }
 
     public void triggerLighting(float cx, float cy) {
@@ -54,22 +60,27 @@ public class LightingManager {
         // 1. Draw Pitch Black Overlay
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0f, 0f, 0f, 0.96f); // 96% darkness
+        shape.setColor(0f, 0f, 0f, 0.85f); // Reduced from 96% to 85% darkness so the map is slightly visible
         float cx = camera.position.x, cy = camera.position.y;
         float vw = camera.viewportWidth, vh = camera.viewportHeight;
         shape.rect(cx - vw / 2f, cy - vh / 2f, vw, vh);
         shape.end();
 
-        // 2. Punch Expanding Light Hole (using GL subtraction)
+        // 2. Punch Light Holes (using GL subtraction)
+        Gdx.gl.glBlendFunc(GL20.GL_ZERO, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+
+        // Player's personal light ring
+        shape.setColor(0f, 0f, 0f, 1f);   shape.circle(playerLightCenter.x, playerLightCenter.y, 50f);
+
+        // Center Fire Expanding Light
         if (isLit || lightRadius > 0) {
-            Gdx.gl.glBlendFunc(GL20.GL_ZERO, GL20.GL_ONE_MINUS_SRC_ALPHA);
-            shape.begin(ShapeRenderer.ShapeType.Filled);
             shape.setColor(0f, 0f, 0f, 0.3f); shape.circle(lightCenter.x, lightCenter.y, lightRadius);
             shape.setColor(0f, 0f, 0f, 0.6f); shape.circle(lightCenter.x, lightCenter.y, lightRadius * 0.8f);
             shape.setColor(0f, 0f, 0f, 1f);   shape.circle(lightCenter.x, lightCenter.y, lightRadius * 0.6f);
-            shape.end();
-            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         }
+        shape.end();
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         lightFbo.end();
 
         // 3. Draw FBO Output to Screen

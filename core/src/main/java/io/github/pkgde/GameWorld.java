@@ -33,10 +33,6 @@ public class GameWorld {
     private final ArrayList<Rectangle> boundaries;
     private final ArrayList<Polygon> collisionPolygons;
 
-    // ===== EXIT GATE =====
-    private boolean exitGateUnlocked = false;
-    private boolean exitGateReached = false;
-
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
         this.lightingManager = new LightingManager();
@@ -65,6 +61,10 @@ public class GameWorld {
     public void update(float delta, OrthographicCamera camera) {
         lightingManager.update(delta);
         player.update(delta, camera);
+
+        // Update personal player light
+        Rectangle pBounds = player.getBounds();
+        lightingManager.updatePlayerLight(pBounds.x + pBounds.width / 2f, pBounds.y + pBounds.height / 2f);
 
         for (Enemy e : enemies) {
             e.update(delta, player);
@@ -137,9 +137,6 @@ public class GameWorld {
 
         // --- INTERACTABLES ---
         updateInteractables();
-
-        // --- EXIT GATE LOGIC ---
-        checkExitGateStatus();
     }
 
     private void handleEnemyDeath(Enemy e) {
@@ -242,36 +239,6 @@ public class GameWorld {
         }
     }
 
-    private void checkExitGateStatus() {
-        boolean allEnemiesDead = true;
-        for (Enemy e : enemies) {
-            if (e.isAlive()) {
-                allEnemiesDead = false;
-                break;
-            }
-        }
-
-        exitGateUnlocked = enemies.isEmpty() || allEnemiesDead;
-
-        if (exitGateUnlocked) {
-            Rectangle pBounds = player.getBounds();
-            float pcx = pBounds.x + pBounds.width / 2f;
-            float pcy = pBounds.y + pBounds.height / 2f;
-
-            for (Rectangle gateRect : mapManager.getExitGateRects()) {
-                float gcx = gateRect.x + gateRect.width / 2f;
-                float gcy = gateRect.y + gateRect.height / 2f;
-                float dx = pcx - gcx;
-                float dy = pcy - gcy;
-
-                if (dx * dx + dy * dy < 60f * 60f) {
-                    exitGateReached = true;
-                    break;
-                }
-            }
-        }
-    }
-
     private void spawnLoot(float x, float y) {
         float roll = MathUtils.random();
         if (roll < 0.30f) lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, x, y));
@@ -293,8 +260,6 @@ public class GameWorld {
     }
 
     // ===== GETTERS & SETTERS =====
-    public boolean isExitGateUnlocked() { return exitGateUnlocked; }
-    public boolean isExitGateReached() { return exitGateReached; }
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
     public LightingManager getLightingManager() { return lightingManager; }

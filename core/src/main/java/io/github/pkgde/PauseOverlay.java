@@ -13,6 +13,7 @@ public class PauseOverlay {
 
     private static final String[] OPTIONS = {
         "RESUME",
+        "SAVE GAME",
         "SETTINGS",
         "EXIT"
     };
@@ -39,6 +40,7 @@ public class PauseOverlay {
     public enum Action {
         NONE,
         RESUME,
+        SAVE,
         SETTINGS,
         EXIT
     }
@@ -90,8 +92,10 @@ public class PauseOverlay {
             case 0:
                 return Action.RESUME;
             case 1:
-                return Action.SETTINGS;
+                return Action.SAVE;
             case 2:
+                return Action.SETTINGS;
+            case 3:
                 return Action.EXIT;
             default:
                 return Action.NONE;
