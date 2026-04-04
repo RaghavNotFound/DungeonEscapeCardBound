@@ -21,7 +21,9 @@ public class GameRenderer {
     private final MapManager mapManager;
 
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
-        for (int i = 1; i <= 7; i++) manager.load("Objects/torch/torch_" + i + ".png", Texture.class);
+        for (int i = 1; i <= 7; i++) {
+            manager.load("Objects/torch/torch_" + i + ".png", Texture.class);
+        }
     }
 
     public GameRenderer(GameWorld world, OrthographicCamera camera, MapManager mapManager) {
@@ -92,6 +94,7 @@ public class GameRenderer {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        drawExitGate();
         drawInteractables();
         drawEnemyUI();
         drawCollisionDebug();
@@ -183,6 +186,50 @@ public class GameRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
+    private void drawExitGate() {
+        if (world.getMapManager() == null) return;
+        java.util.ArrayList<Rectangle> gates = world.getMapManager().getExitGateRects();
+        if (gates.isEmpty()) return;
+
+        boolean unlocked = world.isExitGateUnlocked();
+        float time = (float) (System.nanoTime() / 1_000_000_000.0);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        for (Rectangle gate : gates) {
+            float cx = gate.x + gate.width / 2f;
+            float cy = gate.y + gate.height / 2f;
+            float archHeight = 100f;
+            float pillarW = 15f;
+
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            if (unlocked) {
+                float pulse = 0.8f + 0.2f * MathUtils.sin(time * 4f);
+                shape.setColor(0.1f, 0.9f, 0.3f, 0.4f * pulse); // Portal energy
+                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
+                shape.setColor(0.2f, 1f, 0.4f, 0.15f + 0.1f * MathUtils.sin(time * 6f));
+                shape.circle(cx, cy, gate.width * 0.4f); // Core
+            } else {
+                shape.setColor(0.8f, 0.1f, 0.1f, 0.3f); // Red Barrier
+                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
+                shape.setColor(0.6f, 0.15f, 0.15f, 0.9f); // Lock Icon
+                shape.rect(cx - 3f, cy - 10f, 6f, 20f);
+                shape.rect(cx - 10f, cy - 3f, 20f, 6f);
+            }
+            shape.setColor(0.2f, 0.2f, 0.25f, 1f); // Stone Structure
+            shape.rect(gate.x, gate.y, pillarW, archHeight);
+            shape.rect(gate.x + gate.width - pillarW, gate.y, pillarW, archHeight);
+            shape.rect(gate.x - 5f, gate.y + archHeight - 15f, gate.width + 10f, 15f);
+            shape.end();
+
+            if (unlocked) {
+                batch.begin();
+                font.setColor(0.2f, 1f, 0.4f, 1f);
+                font.draw(batch, "EXIT", cx - 18f, gate.y + archHeight + 20f);
+                batch.end();
+            }
+        }
+    }
+
     private void drawInteractables() {
         if (world.getInteractables() == null) return;
         Gdx.gl.glEnable(GL20.GL_BLEND);
@@ -197,7 +244,6 @@ public class GameRenderer {
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Use new rounded status bars
         drawRoundedStatusBar(shape, x, y, 220f, 20f, world.getPlayer().getHealthRatio(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(1f, 0.25f, 0.25f, 1f));
         drawRoundedStatusBar(shape, x, y - 30f, 220f, 20f, world.getPlayer().getStamina() / world.getPlayer().getMaxStamina(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.15f, 0.95f, 0.35f, 1f));
         drawRoundedStatusBar(shape, x, y - 60f, 220f, 20f, world.getPlayer().getShootCooldownPercent(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.25f, 0.65f, 1f, 1f));
@@ -292,6 +338,7 @@ public class GameRenderer {
         batch.dispose();
         shape.dispose();
         font.dispose();
+        // Base logic dictates we don't dispose textures here because they are managed by Main.assets.
     }
 
     public SpriteBatch getBatch() { return batch; }

@@ -21,14 +21,14 @@ public class Lwjgl3Launcher {
 
         configuration.setTitle("DungeonEscapeCardbound");
 
-        // Performance & Sync
+        // Performance & Sync (Integrated from File 2: Matches monitor refresh rate)
         configuration.useVsync(true);
-        configuration.setForegroundFPS(60);
+        configuration.setForegroundFPS(
+            Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate + 1
+        );
 
-        // Window Configuration
-        // Sets a sensible default window size (1280x720) for the native aspect ratio
+        // Window Configuration (Preserved from File 1: Exact 1280x720 size)
         configuration.setWindowedMode(1280, 720);
-
         configuration.setDecorated(true);
         configuration.setMaximized(false);
         configuration.setResizable(false);

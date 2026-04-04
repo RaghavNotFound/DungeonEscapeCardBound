@@ -17,7 +17,10 @@ public class LightingManager {
     private final Vector2 lightCenter = new Vector2();
     private final float maxLightRadius = 1500f; // Large enough to cover the screen
 
+    // Player light
     private final Vector2 playerLightCenter = new Vector2();
+    private boolean playerHasTorch = false;
+    private static final float PLAYER_TORCH_RADIUS = 180f;
 
     private FrameBuffer lightFbo;
 
@@ -25,8 +28,15 @@ public class LightingManager {
         resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
     }
 
+    // Base logic (File 1): Preserved for backward compatibility
     public void updatePlayerLight(float cx, float cy) {
         playerLightCenter.set(cx, cy);
+    }
+
+    // Added from File 2: Integrated state management for the torch
+    public void setPlayerTorchState(boolean hasTorch, float px, float py) {
+        this.playerHasTorch = hasTorch;
+        this.playerLightCenter.set(px, py);
     }
 
     public void triggerLighting(float cx, float cy) {
@@ -60,7 +70,7 @@ public class LightingManager {
         // 1. Draw Pitch Black Overlay
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0f, 0f, 0f, 0.85f); // Reduced from 96% to 85% darkness so the map is slightly visible
+        shape.setColor(0f, 0f, 0f, 0.85f); // 85% darkness so the map is slightly visible
         float cx = camera.position.x, cy = camera.position.y;
         float vw = camera.viewportWidth, vh = camera.viewportHeight;
         shape.rect(cx - vw / 2f, cy - vh / 2f, vw, vh);
@@ -70,8 +80,16 @@ public class LightingManager {
         Gdx.gl.glBlendFunc(GL20.GL_ZERO, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Player's personal light ring
-        shape.setColor(0f, 0f, 0f, 1f);   shape.circle(playerLightCenter.x, playerLightCenter.y, 50f);
+        // Base logic (File 1): Player's personal small light ring (always visible)
+        shape.setColor(0f, 0f, 0f, 1f);
+        shape.circle(playerLightCenter.x, playerLightCenter.y, 50f);
+
+        // Added from File 2: Expanding tiered torch light if player holds a torch
+        if (playerHasTorch) {
+            shape.setColor(0f, 0f, 0f, 0.25f); shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS);
+            shape.setColor(0f, 0f, 0f, 0.55f); shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS * 0.7f);
+            shape.setColor(0f, 0f, 0f, 1f);    shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS * 0.45f);
+        }
 
         // Center Fire Expanding Light
         if (isLit || lightRadius > 0) {
@@ -79,6 +97,7 @@ public class LightingManager {
             shape.setColor(0f, 0f, 0f, 0.6f); shape.circle(lightCenter.x, lightCenter.y, lightRadius * 0.8f);
             shape.setColor(0f, 0f, 0f, 1f);   shape.circle(lightCenter.x, lightCenter.y, lightRadius * 0.6f);
         }
+
         shape.end();
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         lightFbo.end();

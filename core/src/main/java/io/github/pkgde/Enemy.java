@@ -38,7 +38,9 @@ public class Enemy {
     private float speedMultiplier = 1f;
     private static final float LEASH_RANGE = 600f;
     private static final float LEASH_RANGE_SQ = LEASH_RANGE * LEASH_RANGE;
-    private static final float[] AVOIDANCE_ANGLES = { 30f, -30f, 60f, -60f, 90f, -90f };
+
+    // Expanded from File 2 for better cornering
+    private static final float[] AVOIDANCE_ANGLES = { 30f, -30f, 60f, -60f, 90f, -90f, 120f, -120f, 150f, -150f };
 
     private float baseRange = 200f;
     private float alertRange = baseRange * 2f;
@@ -68,6 +70,11 @@ public class Enemy {
     private final Vector2 randomDir = new Vector2();
     private float moveTimer = 0f;
     private boolean isMoving = false;
+
+    // Steering override (From File 2) - persists across frames to avoid oscillation
+    private final Vector2 overrideDir = new Vector2();
+    private float overrideTimer = 0f;
+    private static final float OVERRIDE_DURATION = 0.6f; // commit to detour for this long
 
     // Physics
     private final Vector2 knockbackVelocity = new Vector2(0, 0);
@@ -126,6 +133,7 @@ public class Enemy {
         deathAnim       = load("Movements/Enemy/Dying/Dying_", 0.08f);
     }
 
+    // Base logic: Uses Main.assets to manage memory
     private Animation<TextureRegion> load(String pathPrefix, float frameDuration) {
         ArrayList<TextureRegion> frames = new ArrayList<>();
         for (int i = 0; ; i++) {
@@ -183,7 +191,13 @@ public class Enemy {
             moveTimer -= delta;
             if (moveTimer <= 0) pickNewRandomAction();
             if (isMoving && !isAttacking && hurtTimer <= 0f) {
+                // Integrated from File 2: Repick action if stuck on a wall
+                float oldX = position.x, oldY = position.y;
                 moveBy(randomDir.x * speed * 0.5f * delta, randomDir.y * speed * 0.5f * delta);
+                float movedDist = Vector2.dst(oldX, oldY, position.x, position.y);
+                if (movedDist < 0.01f) {
+                    pickNewRandomAction();
+                }
                 forward.set(randomDir);
             }
         } else if (state == State.CHASE) {
@@ -223,28 +237,85 @@ public class Enemy {
         }
     }
 
+    // Integrated from File 2: Advanced Steering Override
     private void handleChaseMovement(Vector2 playerPos, float speed, float delta, float dist, Vector2 toP) {
-        Vector2 target = new Vector2(playerPos);
-        Vector2 direction = new Vector2(target).sub(position).nor();
-        forward.set(direction);
+        Vector2 direction = new Vector2(playerPos).sub(position).nor();
 
-        float mx = direction.x * speed * delta, my = direction.y * speed * delta;
-        if (!smartMoveBy(mx, my)) {
-            boolean found = false;
-            for (float angle : AVOIDANCE_ANGLES) {
-                Vector2 altDir = new Vector2(direction).rotateDeg(angle);
-                if (smartMoveBy(altDir.x * speed * delta, altDir.y * speed * delta)) {
-                    forward.set(altDir);
-                    found = true;
-                    break;
+        // Tick down override timer
+        if (overrideTimer > 0f) overrideTimer -= delta;
+
+        // If we have an active steering override, follow it
+        if (overrideTimer > 0f) {
+            // Check if direct path to player is NOW clear (combined check)
+            if (canMoveToCombined(position.x + direction.x * speed * delta,
+                position.y + direction.y * speed * delta)) {
+                overrideTimer = 0f; // direct path open, cancel detour
+            } else {
+                // Continue committed detour
+                float omx = overrideDir.x * speed * delta, omy = overrideDir.y * speed * delta;
+                if (tryMoveCombined(omx, omy)) {
+                    forward.set(overrideDir);
+                    return;
                 }
-            }
-            if (!found) {
-                // Axis sliding
-                if (canMoveTo(position.x + mx, position.y)) position.x += mx;
-                else if (canMoveTo(position.x, position.y + my)) position.y += my;
+                // Override direction blocked too — fall through to find new one
+                overrideTimer = 0f;
             }
         }
+
+        // 1. Try direct path to player (COMBINED — both axes at once)
+        forward.set(direction);
+        float mx = direction.x * speed * delta, my = direction.y * speed * delta;
+        if (tryMoveCombined(mx, my)) {
+            return; // direct diagonal path works
+        }
+
+        // 2. Direct path blocked — find avoidance angle and COMMIT
+        for (float angle : AVOIDANCE_ANGLES) {
+            Vector2 altDir = new Vector2(direction).rotateDeg(angle);
+            float ax = altDir.x * speed * delta, ay = altDir.y * speed * delta;
+            if (tryMoveCombined(ax, ay)) {
+                forward.set(altDir);
+                overrideDir.set(altDir);
+                overrideTimer = OVERRIDE_DURATION;
+                return;
+            }
+        }
+
+        // 3. No avoidance angle worked — try axis sliding as last resort
+        if (canMoveTo(position.x + mx, position.y)) {
+            position.x += mx;
+        } else if (canMoveTo(position.x, position.y + my)) {
+            position.y += my;
+        } else {
+            // 4. Completely stuck — try perpendicular
+            Vector2 perp = new Vector2(-direction.y, direction.x);
+            float pmx = perp.x * speed * delta, pmy = perp.y * speed * delta;
+            if (tryMoveCombined(pmx, pmy)) {
+                forward.set(perp);
+                overrideDir.set(perp);
+                overrideTimer = OVERRIDE_DURATION;
+            } else if (tryMoveCombined(-pmx, -pmy)) {
+                perp.scl(-1f);
+                forward.set(perp);
+                overrideDir.set(perp);
+                overrideTimer = OVERRIDE_DURATION;
+            }
+        }
+    }
+
+    /** Move in the combined direction. Returns true only if the FULL diagonal move succeeds. */
+    private boolean tryMoveCombined(float dx, float dy) {
+        if (canMoveToCombined(position.x + dx, position.y + dy)) {
+            position.x += dx;
+            position.y += dy;
+            return true;
+        }
+        return false;
+    }
+
+    /** Check if moving to (x,y) simultaneously is collision-free. */
+    private boolean canMoveToCombined(float x, float y) {
+        return canMoveTo(x, y);
     }
 
     private void startAttack() {
@@ -349,7 +420,7 @@ public class Enemy {
         if (isMoving) randomDir.set(MathUtils.random(-1f, 1f), MathUtils.random(-1f, 1f)).nor();
     }
 
-    // ===== GETTERS & SETTERS =====
+    // ===== GETTERS & SETTERS (Preserved from File 1) =====
     public Rectangle getBounds() { return bounds; }
     public void setBoundaries(ArrayList<Rectangle> b) { this.boundaries = b; }
     public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }

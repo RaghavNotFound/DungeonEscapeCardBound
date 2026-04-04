@@ -28,11 +28,13 @@ public class MapManager {
     private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
+    private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
     private final ArrayList<Interactable> interactables = new ArrayList<>();
 
     private static final float UNIT_SCALE = 1f;
 
     public void load(String path) {
+        // Base logic: Uses Main.assets to safely manage memory
         map = Main.assets.get(path, TiledMap.class);
         renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
 
@@ -42,6 +44,7 @@ public class MapManager {
         loadSpawns();
         loadTorches();
         loadChests();
+        loadExitGates(); // Added from File 2
         loadInteractables();
     }
 
@@ -51,6 +54,7 @@ public class MapManager {
         collisionPolygons.clear();
         torchRects.clear();
         chestRects.clear();
+        exitGateRects.clear(); // Added from File 2
         interactables.clear();
     }
 
@@ -128,7 +132,7 @@ public class MapManager {
             }
         }
 
-        // If no torches in map, generate random valid positions
+        // Base logic: Generate multiple random torches instead of just one fixed torch
         if (torchRects.isEmpty()) {
             generateRandomTorches(5);
         }
@@ -168,6 +172,19 @@ public class MapManager {
             if (isObjectTag(obj, "chest")) {
                 Rectangle bounds = extractObjectBounds(obj);
                 if (bounds != null) chestRects.add(bounds);
+            }
+        }
+    }
+
+    // Extracted from File 2
+    private void loadExitGates() {
+        MapLayer layer = getObjectLayer();
+        if (layer != null) {
+            for (MapObject obj : layer.getObjects()) {
+                if (isObjectTag(obj, "exitGate")) {
+                    Rectangle bounds = extractObjectBounds(obj);
+                    if (bounds != null) exitGateRects.add(bounds);
+                }
             }
         }
     }
@@ -285,10 +302,11 @@ public class MapManager {
     public ArrayList<Polygon> getCollisionPolygons() { return collisionPolygons; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
+    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; } // Added from File 2
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {
         if (renderer != null) renderer.dispose();
-        // Assets are managed by Main.assets, so do NOT dispose map here!
+        // Base logic: Assets are managed by Main.assets, so do NOT dispose map here!
     }
 }

@@ -15,7 +15,7 @@ import com.badlogic.gdx.math.Rectangle;
  */
 public class Interactable {
 
-    public enum Type { CHEST, SIGN, BARREL,DOOR,CENTER_FIRE }
+    public enum Type { CHEST, SIGN, BARREL, DOOR, CENTER_FIRE }
 
     private final Type type;
     private final Rectangle bounds;
@@ -235,7 +235,7 @@ public class Interactable {
         shape.setColor(0.25f, 0.15f, 0.05f, 1f); // Unlit logs
         shape.rect(cx - radius * 0.6f, cy - 3f, radius * 1.2f, 6f);
         shape.rect(cx - 3f, cy - radius * 0.6f, 6f, radius * 1.2f);
-        
+
         if (playerInRange && !interacted) {
             float glow = 0.15f + 0.1f * MathUtils.sin(animTime * 6f);
             shape.setColor(1f, 0.85f, 0.3f, glow);
@@ -244,7 +244,7 @@ public class Interactable {
         shape.end();
     }
 
-    // ===== GETTERS =====
+    // ===== GETTERS & SETTERS =====
     public Type getType() { return type; }
     public Rectangle getBounds() { return bounds; }
     public boolean isInteracted() { return interacted; }
