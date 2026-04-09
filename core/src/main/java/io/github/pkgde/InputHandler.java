@@ -34,10 +34,6 @@ public class InputHandler {
             return Action.TOGGLE_INVENTORY;
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
-            return Action.EXIT_TO_MENU;
-        }
-
         return Action.NONE;
     }
 }

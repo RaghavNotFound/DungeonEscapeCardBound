@@ -66,9 +66,12 @@ public class GameWorld {
         lightingManager.update(delta);
         player.update(delta, camera);
 
-        // Update personal player light and torch state (Integrated from File 2)
+        // Reverted to the old, simpler lighting logic.
+        // The light is always on and centered on the player's hitbox.
         Rectangle pBounds = player.getBounds();
-        lightingManager.setPlayerTorchState(player.hasTorch(), pBounds.x + pBounds.width / 2f, pBounds.y + pBounds.height / 2f);
+        float pcx = pBounds.x + pBounds.width / 2f;
+        float pcy = pBounds.y + pBounds.height / 2f;
+        lightingManager.updatePlayerLight(pcx, pcy);
 
         for (Enemy e : enemies) {
             e.update(delta, player);
@@ -125,9 +128,6 @@ public class GameWorld {
                         handleEnemyDeath(e);
                     }
 
-                    // Kept knockback from File 1
-                    Vector2 hitDir = new Vector2(e.getBounds().x - player.getBounds().x, e.getBounds().y - player.getBounds().y);
-                    e.applyKnockback(hitDir, 350f);
                     arrows.remove(i);
                     break;
                 }

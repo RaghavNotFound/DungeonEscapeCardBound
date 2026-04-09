@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -15,28 +16,20 @@ public class LightingManager {
     private boolean isLit = false;
     private float lightRadius = 0f;
     private final Vector2 lightCenter = new Vector2();
-    private final float maxLightRadius = 1500f; // Large enough to cover the screen
+    private final float maxLightRadius = 1500f;
 
     // Player light
     private final Vector2 playerLightCenter = new Vector2();
-    private boolean playerHasTorch = false;
-    private static final float PLAYER_TORCH_RADIUS = 180f;
+    private float playerLightRadius = 150f;
 
     private FrameBuffer lightFbo;
 
     public LightingManager() {
-        resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        // Initialization handled dynamically in render() now!
     }
 
-    // Base logic (File 1): Preserved for backward compatibility
     public void updatePlayerLight(float cx, float cy) {
         playerLightCenter.set(cx, cy);
-    }
-
-    // Added from File 2: Integrated state management for the torch
-    public void setPlayerTorchState(boolean hasTorch, float px, float py) {
-        this.playerHasTorch = hasTorch;
-        this.playerLightCenter.set(px, py);
     }
 
     public void triggerLighting(float cx, float cy) {
@@ -51,7 +44,7 @@ public class LightingManager {
 
     public void update(float delta) {
         if (isLit && lightRadius < maxLightRadius) {
-            lightRadius += 500f * delta; // Expansion speed
+            lightRadius += 500f * delta;
             if (lightRadius > maxLightRadius) {
                 lightRadius = maxLightRadius;
             }
@@ -59,36 +52,41 @@ public class LightingManager {
     }
 
     public void render(OrthographicCamera camera, SpriteBatch batch, ShapeRenderer shape) {
-        if (isLit && lightRadius >= maxLightRadius) return; // Screen is fully lit
-        if (lightFbo == null) return;
+        if (isLit && lightRadius >= maxLightRadius) return;
+
+        // THE GOLDEN FIX: Lock the FBO strictly to the camera's true viewport size!
+        // This makes aspect ratio drifting mathematically impossible.
+        int logicWidth = (int) camera.viewportWidth;
+        int logicHeight = (int) camera.viewportHeight;
+
+        // Rebuild FBO automatically if it doesn't match the exact logical dimensions
+        if (lightFbo == null || lightFbo.getWidth() != logicWidth || lightFbo.getHeight() != logicHeight) {
+            if (lightFbo != null) lightFbo.dispose();
+            lightFbo = new FrameBuffer(Pixmap.Format.RGBA8888, logicWidth, logicHeight, false);
+            lightFbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        }
 
         lightFbo.begin();
-        Gdx.gl.glClearColor(0, 0, 0, 0);
+        Gdx.gl.glClearColor(0f, 0f, 0f, 0.85f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         Gdx.gl.glEnable(GL20.GL_BLEND);
 
-        // 1. Draw Pitch Black Overlay
+        // Punch Light Holes
+        Gdx.gl.glBlendFunc(GL20.GL_ZERO, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0f, 0f, 0f, 0.85f); // 85% darkness so the map is slightly visible
-        float cx = camera.position.x, cy = camera.position.y;
-        float vw = camera.viewportWidth, vh = camera.viewportHeight;
-        shape.rect(cx - vw / 2f, cy - vh / 2f, vw, vh);
-        shape.end();
 
-        // 2. Punch Light Holes (using GL subtraction)
-        Gdx.gl.glBlendFunc(GL20.GL_ZERO, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        shape.begin(ShapeRenderer.ShapeType.Filled);
+        // Player's personal light
+        int lightBands = 80;
+        float maxAlphaPerBand = 0.08f;
 
-        // Base logic (File 1): Player's personal small light ring (always visible)
-        shape.setColor(0f, 0f, 0f, 1f);
-        shape.circle(playerLightCenter.x, playerLightCenter.y, 50f);
+        for (int i = 0; i < lightBands; i++) {
+            float progress = (float) i / lightBands;
+            float currentRadius = playerLightRadius * (1f - progress);
+            float currentAlpha = maxAlphaPerBand * (progress * progress);
 
-        // Added from File 2: Expanding tiered torch light if player holds a torch
-        if (playerHasTorch) {
-            shape.setColor(0f, 0f, 0f, 0.25f); shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS);
-            shape.setColor(0f, 0f, 0f, 0.55f); shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS * 0.7f);
-            shape.setColor(0f, 0f, 0f, 1f);    shape.circle(playerLightCenter.x, playerLightCenter.y, PLAYER_TORCH_RADIUS * 0.45f);
+            shape.setColor(0f, 0f, 0f, currentAlpha);
+            shape.circle(playerLightCenter.x, playerLightCenter.y, currentRadius);
         }
 
         // Center Fire Expanding Light
@@ -102,23 +100,28 @@ public class LightingManager {
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         lightFbo.end();
 
-        // 3. Draw FBO Output to Screen
+        // Draw FBO Output to Screen
+        float cx = camera.position.x;
+        float cy = camera.position.y;
+        float drawW = camera.viewportWidth * camera.zoom;
+        float drawH = camera.viewportHeight * camera.zoom;
+
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        Texture tex = lightFbo.getColorBufferTexture();
-        batch.draw(tex, cx - vw / 2f, cy - vh / 2f, vw, vh, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
-        batch.end();
-    }
 
-    public void resize(int w, int h) {
-        if (lightFbo != null) lightFbo.dispose();
-        if (w > 0 && h > 0) {
-            lightFbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
-            lightFbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        }
+        // Extract perfectly sized region
+        Texture tex = lightFbo.getColorBufferTexture();
+        TextureRegion fboRegion = new TextureRegion(tex, 0, 0, lightFbo.getWidth(), lightFbo.getHeight());
+        fboRegion.flip(false, true);
+
+        batch.draw(fboRegion, cx - drawW / 2f, cy - drawH / 2f, drawW, drawH);
+        batch.end();
     }
 
     public void dispose() {
         if (lightFbo != null) lightFbo.dispose();
+    }
+
+    public void resize(int w, int h) {
     }
 }

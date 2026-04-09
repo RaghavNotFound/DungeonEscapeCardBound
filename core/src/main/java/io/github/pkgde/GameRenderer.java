@@ -94,6 +94,10 @@ public class GameRenderer {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        // --- CONSOLIDATED LIGHTING RENDER ---
+        // This ensures the lighting is drawn in the same pass as the world, with the same camera.
+        world.getLightingManager().render(camera, batch, shape);
+
         drawExitGate();
         drawInteractables();
         drawEnemyUI();
@@ -105,8 +109,10 @@ public class GameRenderer {
         camera.update();
     }
 
+    // This method is now obsolete and will be removed from ExplorationScreen.
+    @Deprecated
     public void renderLighting() {
-        world.getLightingManager().render(camera, batch, shape);
+        // This logic is now inside the main render() method.
     }
 
     private void drawTorches(SpriteBatch batch) {

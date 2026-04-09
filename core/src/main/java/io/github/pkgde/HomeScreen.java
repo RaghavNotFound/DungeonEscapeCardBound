@@ -9,6 +9,8 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
+import java.util.ArrayList;
+import java.util.List;
 
 public class HomeScreen implements Screen {
 
@@ -25,7 +27,9 @@ public class HomeScreen implements Screen {
     private SettingsOverlay settings;
     private SaveLoadOverlay saveLoadOverlay;
 
-    private static final String[] LABELS = { "CONTINUE", "NEW GAME", "LOAD GAME", "SETTINGS", "EXIT" };
+    private List<String> availableLabels;
+    private List<Integer> availableOptions;
+
     private static final int OPTION_CONTINUE = 0;
     private static final int OPTION_NEW_GAME = 1;
     private static final int OPTION_LOAD_GAME = 2;
@@ -33,7 +37,7 @@ public class HomeScreen implements Screen {
     private static final int OPTION_EXIT = 4;
     private boolean continueEnabled = false;
 
-    private int selected = 0;
+    private int selectedIndex = 0;
     private float menuAnimTime = 0f;
     private final Vector3 pointer = new Vector3();
     private int lastMouseX = -1;
@@ -92,8 +96,39 @@ public class HomeScreen implements Screen {
         blurBatch = new SpriteBatch();
         blurBatch.setShader(blurShader);
 
+        updateAvailableOptions();
+        selectedIndex = 0;
+    }
+
+    private void updateAvailableOptions() {
         continueEnabled = SaveManager.getLatestSave() != null;
-        selected = continueEnabled ? OPTION_CONTINUE : OPTION_NEW_GAME;
+
+        availableLabels = new ArrayList<>();
+        availableOptions = new ArrayList<>();
+
+        if (continueEnabled) {
+            availableLabels.add("CONTINUE");
+            availableOptions.add(OPTION_CONTINUE);
+        }
+
+        availableLabels.add("NEW GAME");
+        availableOptions.add(OPTION_NEW_GAME);
+
+        if (continueEnabled) {
+            availableLabels.add("LOAD GAME");
+            availableOptions.add(OPTION_LOAD_GAME);
+        }
+
+        availableLabels.add("SETTINGS");
+        availableOptions.add(OPTION_SETTINGS);
+
+        availableLabels.add("EXIT");
+        availableOptions.add(OPTION_EXIT);
+
+        // Ensure selected index is valid
+        if (selectedIndex >= availableOptions.size()) {
+            selectedIndex = availableOptions.size() - 1;
+        }
     }
 
     @Override
@@ -116,11 +151,19 @@ public class HomeScreen implements Screen {
         float gap = worldH * 0.03f;
 
         float btnX = worldW * 0.62f;
-        float continueY = worldH * 0.65f;
-        float newGameY = continueY - btnHeight - gap;
-        float loadGameY = newGameY - btnHeight - gap;
-        float settingsY = loadGameY - btnHeight - gap;
-        float exitY = settingsY - btnHeight - gap;
+
+        // The background panel coordinates
+        float panelY = worldH * 0.1f;
+        float panelHeight = worldH * 0.7f;
+
+        // Calculate total height of all buttons to center them within the panel
+        float totalHeight = availableOptions.size() * btnHeight + (availableOptions.size() - 1) * gap;
+        float startY = panelY + (panelHeight + totalHeight) / 2f - btnHeight;
+
+        float[] btnYs = new float[availableOptions.size()];
+        for (int i = 0; i < availableOptions.size(); i++) {
+            btnYs[i] = startY - i * (btnHeight + gap);
+        }
 
         // --- Mouse Movement Tracking ---
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
@@ -137,15 +180,18 @@ public class HomeScreen implements Screen {
             if (res != null && res.action == SaveLoadOverlay.ResultAction.LOAD) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(res.saveName));
                 return;
+            } else if (!saveLoadOverlay.isVisible()) {
+                // SaveLoadOverlay just closed, update options
+                updateAvailableOptions();
             }
         } else {
             // Normal Menu Input Handling
             boolean keyPressed = false;
             if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) { // W or UP
-                do { selected = (selected + LABELS.length - 1) % LABELS.length; } while (selected == OPTION_CONTINUE && !continueEnabled);
+                selectedIndex = (selectedIndex + availableOptions.size() - 1) % availableOptions.size();
                 keyPressed = true;
             } else if (Gdx.input.isKeyJustPressed(Input.Keys.S) || Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) { // S or DOWN
-                do { selected = (selected + 1) % LABELS.length; } while (selected == OPTION_CONTINUE && !continueEnabled);
+                selectedIndex = (selectedIndex + 1) % availableOptions.size();
                 keyPressed = true;
             }
 
@@ -161,9 +207,9 @@ public class HomeScreen implements Screen {
 
             // --- Mouse Click ---
             if (Gdx.input.justTouched()) { // Mouse Click
-                int clicked = getPointerSelection(btnX, continueY, newGameY, loadGameY, settingsY, exitY, btnWidth, btnHeight);
+                int clicked = getPointerSelection(btnX, btnWidth, btnHeight, btnYs);
                 if (clicked >= 0) {
-                    selected = clicked;
+                    selectedIndex = clicked;
                     applySelection();
                     return; // Action taken, skip further input checks
                 }
@@ -171,9 +217,9 @@ public class HomeScreen implements Screen {
 
             // --- Mouse Hover (only if mouse moved and no keyboard input) ---
             if (mouseMovedThisFrame && !keyPressed) {
-                int hovered = getPointerSelection(btnX, continueY, newGameY, loadGameY, settingsY, exitY, btnWidth, btnHeight);
+                int hovered = getPointerSelection(btnX, btnWidth, btnHeight, btnYs);
                 if (hovered >= 0) {
-                    selected = hovered;
+                    selectedIndex = hovered;
                 }
             }
         }
@@ -229,24 +275,16 @@ public class HomeScreen implements Screen {
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
 
-        // Soft dark panel improves text contrast over bright backgrounds.
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0f, 0f, 0f, 0.32f);
-        shapeRenderer.rect(worldW * 0.58f, worldH * 0.1f, worldW * 0.4f, worldH * 0.7f);
-
-        drawFill(btnX, continueY, btnWidth, btnHeight, selected == OPTION_CONTINUE, continueEnabled);
-        drawFill(btnX, newGameY, btnWidth, btnHeight, selected == OPTION_NEW_GAME, true);
-        drawFill(btnX, loadGameY, btnWidth, btnHeight, selected == OPTION_LOAD_GAME, true);
-        drawFill(btnX, settingsY, btnWidth, btnHeight, selected == OPTION_SETTINGS, true);
-        drawFill(btnX, exitY, btnWidth, btnHeight, selected == OPTION_EXIT, true);
+        for (int i = 0; i < availableOptions.size(); i++) {
+            drawFill(btnX, btnYs[i], btnWidth, btnHeight, selectedIndex == i, true);
+        }
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        drawRect(btnX, continueY, btnWidth, btnHeight, selected == OPTION_CONTINUE, continueEnabled);
-        drawRect(btnX, newGameY, btnWidth, btnHeight, selected == OPTION_NEW_GAME, true);
-        drawRect(btnX, loadGameY, btnWidth, btnHeight, selected == OPTION_LOAD_GAME, true);
-        drawRect(btnX, settingsY, btnWidth, btnHeight, selected == OPTION_SETTINGS, true);
-        drawRect(btnX, exitY, btnWidth, btnHeight, selected == OPTION_EXIT, true);
+        for (int i = 0; i < availableOptions.size(); i++) {
+            drawRect(btnX, btnYs[i], btnWidth, btnHeight, selectedIndex == i, true);
+        }
         shapeRenderer.end();
 
         batch.begin();
@@ -266,11 +304,9 @@ public class HomeScreen implements Screen {
 
         font.getData().setScale(scale * 1.2f);
 
-        drawButton(batch, font, LABELS[OPTION_CONTINUE], btnX, continueY, btnWidth, btnHeight, selected == OPTION_CONTINUE, scale, worldW, continueEnabled);
-        drawButton(batch, font, LABELS[OPTION_NEW_GAME], btnX, newGameY, btnWidth, btnHeight, selected == OPTION_NEW_GAME, scale, worldW, true);
-        drawButton(batch, font, LABELS[OPTION_LOAD_GAME], btnX, loadGameY, btnWidth, btnHeight, selected == OPTION_LOAD_GAME, scale, worldW, true);
-        drawButton(batch, font, LABELS[OPTION_SETTINGS], btnX, settingsY, btnWidth, btnHeight, selected == OPTION_SETTINGS, scale, worldW, true);
-        drawButton(batch, font, LABELS[OPTION_EXIT], btnX, exitY, btnWidth, btnHeight, selected == OPTION_EXIT, scale, worldW, true);
+        for (int i = 0; i < availableOptions.size(); i++) {
+            drawButton(batch, font, availableLabels.get(i), btnX, btnYs[i], btnWidth, btnHeight, selectedIndex == i, scale, worldW, true);
+        }
 
         batch.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -320,18 +356,15 @@ public class HomeScreen implements Screen {
         shapeRenderer.rect(x, y, w, h);
     }
 
-    private int getPointerSelection(float btnX, float... ys) {
+    private int getPointerSelection(float btnX, float btnWidth, float btnHeight, float[] ys) {
         pointer.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         viewport.unproject(pointer);
 
         float x = pointer.x;
         float y = pointer.y;
-        float btnWidth = viewport.getWorldWidth() * 0.25f;
-        float btnHeight = viewport.getWorldHeight() * 0.08f;
 
         for (int i = 0; i < ys.length; i++) {
             if (inside(x, y, btnX, ys[i], btnWidth, btnHeight)) {
-                if (i == OPTION_CONTINUE && !continueEnabled) continue;
                 return i;
             }
         }
@@ -343,7 +376,8 @@ public class HomeScreen implements Screen {
     }
 
     private void applySelection() {
-        switch (selected) {
+        int selectedOption = availableOptions.get(selectedIndex);
+        switch (selectedOption) {
             case OPTION_CONTINUE:
                 if (continueEnabled) ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(SaveManager.getLatestSave()));
                 break;

@@ -190,15 +190,16 @@ public class ExplorationScreen implements Screen {
                 camera.viewportWidth, camera.viewportHeight, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
             blurBatch.end();
 
-            renderer.renderLighting();
-
             // Darken background
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0, 0, 0, (state == State.GAME_OVER) ? 0.65f : 0.5f);
-            if (state == State.GAME_OVER) shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
+            if (state == State.GAME_OVER) {
+                shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
+            } else {
+                shape.setColor(0, 0, 0, 0.5f);
+            }
             shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
             shape.end();
 
@@ -206,7 +207,6 @@ public class ExplorationScreen implements Screen {
             renderUIOverlays();
         } else {
             renderer.render(offsetX, offsetY);
-            renderer.renderLighting();
         }
     }
 
