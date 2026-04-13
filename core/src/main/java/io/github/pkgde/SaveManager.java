@@ -5,6 +5,7 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonWriter;
+import java.util.Comparator;
 
 /**
  * Handles saving and loading game state to/from JSON files.
@@ -12,6 +13,7 @@ import com.badlogic.gdx.utils.JsonWriter;
 public class SaveManager {
 
     private static final String SAVE_DIR = "saves/";
+    private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
 
     public static void saveGame(GameWorld world, String slotName) {
         SaveState state = new SaveState();
@@ -57,6 +59,10 @@ public class SaveManager {
         Json json = new Json();
         json.setOutputType(JsonWriter.OutputType.json);
         file.writeString(json.prettyPrint(state), false);
+    }
+
+    public static void autoSaveGame(GameWorld world) {
+        saveGame(world, AUTO_SAVE_SLOT_NAME);
     }
 
     public static void loadGame(GameWorld world, String slotName) {
@@ -111,19 +117,40 @@ public class SaveManager {
 
     public static Array<String> getAllSaves() {
         Array<String> saves = new Array<>();
+        FileHandle autoSaveFile = null;
+        Array<FileHandle> otherSaves = new Array<>();
+
         FileHandle dir = Gdx.files.local(SAVE_DIR);
         if (dir.exists()) {
             for (FileHandle file : dir.list(".json")) {
-                saves.add(file.nameWithoutExtension());
+                if (file.nameWithoutExtension().equals(AUTO_SAVE_SLOT_NAME)) {
+                    autoSaveFile = file;
+                } else {
+                    otherSaves.add(file);
+                }
             }
         }
+
+        // Sort other saves by last modified date (newest first)
+        otherSaves.sort(Comparator.comparingLong(FileHandle::lastModified).reversed());
+
+        // Add auto-save first if it exists
+        if (autoSaveFile != null) {
+            saves.add(autoSaveFile.nameWithoutExtension());
+        }
+
+        // Add the rest of the sorted saves
+        for (FileHandle file : otherSaves) {
+            saves.add(file.nameWithoutExtension());
+        }
+
         return saves;
     }
 
     public static String getLatestSave() {
         FileHandle dir = Gdx.files.local(SAVE_DIR);
         if (!dir.exists() || dir.list(".json").length == 0) return null;
-        
+
         FileHandle latest = null;
         for (FileHandle file : dir.list(".json")) {
             if (latest == null || file.lastModified() > latest.lastModified()) {
@@ -141,6 +168,10 @@ public class SaveManager {
     }
 
     public static void renameSave(String oldName, String newName) {
+        if (oldName.equals(AUTO_SAVE_SLOT_NAME)) {
+            Gdx.app.log("SaveManager", "Attempted to rename auto-save slot, operation blocked.");
+            return; // Prevent renaming the auto-save slot
+        }
         FileHandle oldFile = Gdx.files.local(SAVE_DIR + oldName + ".json");
         FileHandle newFile = Gdx.files.local(SAVE_DIR + newName + ".json");
         if (oldFile.exists() && !newFile.exists()) {

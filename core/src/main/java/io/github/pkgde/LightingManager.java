@@ -51,7 +51,7 @@ public class LightingManager {
         }
     }
 
-    public void render(OrthographicCamera camera, SpriteBatch batch, ShapeRenderer shape) {
+    public void updateLightFbo(OrthographicCamera camera, ShapeRenderer shape) {
         if (isLit && lightRadius >= maxLightRadius) return;
 
         // THE GOLDEN FIX: Lock the FBO strictly to the camera's true viewport size!
@@ -99,6 +99,10 @@ public class LightingManager {
         shape.end();
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         lightFbo.end();
+    }
+
+    public void render(OrthographicCamera camera, SpriteBatch batch, ShapeRenderer shape) {
+        if (isLit && lightRadius >= maxLightRadius) return;
 
         // Draw FBO Output to Screen
         float cx = camera.position.x;
@@ -110,11 +114,12 @@ public class LightingManager {
         batch.begin();
 
         // Extract perfectly sized region
-        Texture tex = lightFbo.getColorBufferTexture();
-        TextureRegion fboRegion = new TextureRegion(tex, 0, 0, lightFbo.getWidth(), lightFbo.getHeight());
-        fboRegion.flip(false, true);
-
-        batch.draw(fboRegion, cx - drawW / 2f, cy - drawH / 2f, drawW, drawH);
+        if (lightFbo != null) {
+            Texture tex = lightFbo.getColorBufferTexture();
+            TextureRegion fboRegion = new TextureRegion(tex, 0, 0, lightFbo.getWidth(), lightFbo.getHeight());
+            fboRegion.flip(false, true);
+            batch.draw(fboRegion, cx - drawW / 2f, cy - drawH / 2f, drawW, drawH);
+        }
         batch.end();
     }
 

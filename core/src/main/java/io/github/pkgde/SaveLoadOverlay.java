@@ -135,11 +135,21 @@ public class SaveLoadOverlay {
         activeSaveName = saves.get(index);
         subMenuOpen = true;
         subOptions.clear();
-        if (mode == Mode.SAVE) subOptions.add("OVERWRITE");
-        subOptions.add("LOAD");
-        subOptions.add("RENAME");
-        subOptions.add("DELETE");
-        subOptions.add("CANCEL");
+
+        if (activeSaveName.equals("auto_save")) {
+            // Limited options for auto_save
+            subOptions.add("LOAD");
+            subOptions.add("DELETE");
+            subOptions.add("CANCEL");
+        } else {
+            // Full options for regular saves
+            if (mode == Mode.SAVE) subOptions.add("OVERWRITE");
+            subOptions.add("LOAD");
+            subOptions.add("RENAME");
+            subOptions.add("DELETE");
+            subOptions.add("CANCEL");
+        }
+
         subSelected = 0;
         return null;
     }
@@ -208,12 +218,14 @@ public class SaveLoadOverlay {
 
         if (!subMenuOpen) {
             shape.setColor(0, 0, 0, 0.85f);
-            shape.rect(centerX - 20, startY - (saves.size * (boxH + gap)) - 20, boxW + 40, (saves.size * (boxH + gap)) + 100);
+            float totalHeight = (saves.size * (boxH + gap)) - gap;
+            shape.rect(centerX - 20, startY - totalHeight - 20, boxW + 40, totalHeight + 40);
 
             for (int i = 0; i < saves.size; i++) {
+                float rectY = startY - i * (boxH + gap);
                 shape.setColor(selected == i ? accent : new Color(0.2f, 0.2f, 0.2f, 1f));
                 if (mode == Mode.SAVE && i == 0) shape.setColor(selected == i ? accent : new Color(0.2f, 0.6f, 0.2f, 1f));
-                shape.rect(centerX, startY - i * (boxH + gap), boxW, boxH);
+                shape.rect(centerX, rectY, boxW, boxH);
             }
         } else {
             shape.setColor(0, 0, 0, 0.6f);
@@ -224,6 +236,7 @@ public class SaveLoadOverlay {
 
             for (int i = 0; i < subOptions.size; i++) {
                 shape.setColor(subSelected == i ? accent : new Color(0.3f, 0.3f, 0.3f, 1f));
+                // Corrected the Y coordinate for drawing the background rectangle
                 shape.rect(subCenterX, subStartY - i * (subBoxH + subGap), subBoxW, subBoxH);
             }
         }
@@ -237,7 +250,9 @@ public class SaveLoadOverlay {
                 font.getData().setScale(fontScale * 1.1f);
                 glyphLayout.setText(font, saves.get(i));
                 font.setColor(Color.WHITE);
-                font.draw(batch, glyphLayout, centerX + (boxW - glyphLayout.width) / 2f, startY - i * (boxH + gap) + (boxH + glyphLayout.height) / 2f);
+                if (mode == Mode.SAVE && i == 0) font.setColor(Color.LIME);
+                float rectY = startY - i * (boxH + gap);
+                font.draw(batch, glyphLayout, centerX + (boxW - glyphLayout.width) / 2f, rectY + boxH / 2f + glyphLayout.height / 2f);
             }
         } else {
             float subBoxW = w * 0.25f, subBoxH = h * 0.07f, subGap = h * 0.015f;
@@ -249,7 +264,7 @@ public class SaveLoadOverlay {
                 glyphLayout.setText(font, subOptions.get(i));
                 font.setColor(Color.WHITE);
                 if (subOptions.get(i).equals("DELETE")) font.setColor(1f, 0.3f, 0.3f, 1f);
-                font.draw(batch, glyphLayout, subCenterX + (subBoxW - glyphLayout.width) / 2f, subStartY - i * (subBoxH + subGap) + (subBoxH + glyphLayout.height) / 2f);
+                font.draw(batch, glyphLayout, subCenterX + (subBoxW - glyphLayout.width) / 2f, subStartY - i * (subBoxH + subGap) + subBoxH / 2f + glyphLayout.height / 2f);
             }
         }
         font.getData().setScale(1f);
@@ -300,7 +315,8 @@ public class SaveLoadOverlay {
         float centerX = (w - boxW) / 2f;
         float startY = h * 0.85f;
         for (int i = 0; i < saves.size; i++) {
-            if (touch.x >= centerX && touch.x <= centerX + boxW && touch.y >= startY - i * (boxH + gap) && touch.y <= startY - i * (boxH + gap) + boxH) return i;
+            float rectY = startY - i * (boxH + gap);
+            if (touch.x >= centerX && touch.x <= centerX + boxW && touch.y >= rectY && touch.y <= rectY + boxH) return i;
         }
         return -1;
     }
@@ -312,9 +328,11 @@ public class SaveLoadOverlay {
         float h = viewport.getWorldHeight();
         float subBoxW = w * 0.25f, subBoxH = h * 0.07f, subGap = h * 0.015f;
         float subCenterX = (w - subBoxW) / 2f;
+        // Matches the corrected Y coordinate logic in render()
         float subStartY = h * 0.5f + (subOptions.size * (subBoxH + subGap)) / 2f;
         for (int i = 0; i < subOptions.size; i++) {
-            if (touch.x >= subCenterX && touch.x <= subCenterX + subBoxW && touch.y >= subStartY - i * (subBoxH + subGap) && touch.y <= subStartY - i * (subBoxH + subGap) + subBoxH) return i;
+            float rectY = subStartY - i * (subBoxH + subGap);
+            if (touch.x >= subCenterX && touch.x <= subCenterX + subBoxW && touch.y >= rectY && touch.y <= rectY + subBoxH) return i;
         }
         return -1;
     }

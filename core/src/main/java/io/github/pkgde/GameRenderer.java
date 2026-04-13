@@ -97,6 +97,7 @@ public class GameRenderer {
         // --- CONSOLIDATED LIGHTING RENDER ---
         // This ensures the lighting is drawn in the same pass as the world, with the same camera.
         world.getLightingManager().render(camera, batch, shape);
+        
 
         drawExitGate();
         drawInteractables();

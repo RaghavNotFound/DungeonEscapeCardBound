@@ -62,7 +62,7 @@ public class GameWorld {
         this.interactables = mapManager.getInteractables();
     }
 
-    public void update(float delta, OrthographicCamera camera) {
+    public void update(float delta, OrthographicCamera camera, com.badlogic.gdx.graphics.glutils.ShapeRenderer shape) {
         lightingManager.update(delta);
         player.update(delta, camera);
 
@@ -72,6 +72,9 @@ public class GameWorld {
         float pcx = pBounds.x + pBounds.width / 2f;
         float pcy = pBounds.y + pBounds.height / 2f;
         lightingManager.updatePlayerLight(pcx, pcy);
+
+        // Update the lighting FBO here, before main rendering starts
+        lightingManager.updateLightFbo(camera, shape);
 
         for (Enemy e : enemies) {
             e.update(delta, player);

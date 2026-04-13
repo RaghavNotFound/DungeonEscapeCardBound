@@ -44,7 +44,7 @@ public class Player {
     private final int HEIGHT = 128;
     private static final float HITBOX_WIDTH = 55f;
     private static final float HITBOX_HEIGHT = 80f;
-    private static final float HITBOX_OFFSET_X = 36f;
+    private static final float HITBOX_OFFSET_X = 28f;
     private static final float HITBOX_OFFSET_Y = 19f;
 
     // ===== MOVEMENT STATE =====
@@ -97,7 +97,7 @@ public class Player {
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
         int walkCount = 23, runCount = 12, idleCount = 18, blinkCount = 18;
         int hurtCount = 12, swordCount = 12, deathCount = 15;
-        
+
         for (int i = 0; i < walkCount; i++) manager.load("Movements/Player/walking/walking_" + (i + 1) + ".png", Texture.class);
         for (int i = 0; i < runCount; i++) manager.load("Movements/Player/running/running_" + (i + 1) + ".png", Texture.class);
         for (int i = 0; i < idleCount; i++) manager.load("Movements/Player/idle/idle_" + (i + 1) + ".png", Texture.class);
@@ -105,7 +105,7 @@ public class Player {
         for (int i = 0; i < hurtCount; i++) manager.load("Movements/Player/hurt/hurt_" + (i + 1) + ".png", Texture.class);
         for (int i = 0; i < swordCount; i++) manager.load("Movements/Player/kicking/kicking_" + (i + 1) + ".png", Texture.class);
         for (int i = 0; i < deathCount; i++) manager.load("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
-        
+
         manager.load("Vectors/Sword.png", Texture.class);
     }
 
@@ -395,8 +395,18 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
-        if (!collides(new Rectangle(newX + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
-        if (!collides(new Rectangle(position.x + HITBOX_OFFSET_X, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
+        // Use mirrored hitbox offset for collision checks too
+        float hx = facingRight
+            ? newX + HITBOX_OFFSET_X
+            : newX + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
+
+        if (!collides(new Rectangle(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
+
+        hx = facingRight
+            ? position.x + HITBOX_OFFSET_X
+            : position.x + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
+
+        if (!collides(new Rectangle(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
 
         return !MathUtils.isEqual(oldX, position.x, 0.001f) || !MathUtils.isEqual(oldY, position.y, 0.001f);
     }
@@ -417,7 +427,15 @@ public class Player {
         arrows.add(new Arrow(position.x + WIDTH / 2f, position.y + HEIGHT / 2f, dir));
     }
 
-    private void updateBoundsPosition() { bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y); }
+    // FIX: mirror the hitbox offset when facing left so it stays
+    // centred on the visible sprite regardless of direction
+    private void updateBoundsPosition()
+    {
+        float hx = facingRight
+            ? position.x + HITBOX_OFFSET_X
+            : position.x + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
+        bounds.setPosition(hx, position.y + HITBOX_OFFSET_Y);
+    }
 
     public void render(SpriteBatch batch) {
         float dW = facingRight ? WIDTH : -WIDTH;

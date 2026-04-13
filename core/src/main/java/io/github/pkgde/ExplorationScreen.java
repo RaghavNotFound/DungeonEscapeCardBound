@@ -16,6 +16,8 @@ import com.badlogic.gdx.math.MathUtils;
 public class ExplorationScreen implements Screen {
 
     private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
+    private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
+    private final float AUTO_SAVE_INTERVAL = 10f; // Auto-save every 10 seconds
 
     private final OrthographicCamera camera;
     private final Viewport viewport;
@@ -43,6 +45,9 @@ public class ExplorationScreen implements Screen {
     private FrameBuffer fbo;
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
+
+    // Auto-save
+    private float autoSaveTimer;
 
     public ExplorationScreen(String saveFileToLoad) {
         mapManager = new MapManager();
@@ -74,6 +79,8 @@ public class ExplorationScreen implements Screen {
         if (saveFileToLoad != null) {
             SaveManager.loadGame(world, saveFileToLoad);
         }
+
+        autoSaveTimer = AUTO_SAVE_INTERVAL; // Initialize auto-save timer
     }
 
     @Override
@@ -84,6 +91,16 @@ public class ExplorationScreen implements Screen {
         handleStateInput();
         updateGameLogic(delta);
         draw(delta);
+
+        // Auto-save logic
+        if (state == State.GAME) {
+            autoSaveTimer -= delta;
+            if (autoSaveTimer <= 0) {
+                SaveManager.saveGame(world, AUTO_SAVE_SLOT_NAME);
+                autoSaveTimer = AUTO_SAVE_INTERVAL;
+                Gdx.app.log("AutoSave", "Game auto-saved to: " + AUTO_SAVE_SLOT_NAME);
+            }
+        }
     }
 
     private void handleStateInput() {
@@ -140,7 +157,11 @@ public class ExplorationScreen implements Screen {
     }
 
     private void updateGameLogic(float delta) {
-        if (state != State.GAME) return;
+        if (state != State.GAME) {
+            // Need to update lighting even if paused so the FBO is ready for the blur
+            world.getLightingManager().updateLightFbo(camera, renderer.getShape());
+            return;
+        }
 
         float gameDelta = delta;
         boolean playerIsDead = !world.getPlayer().isAlive();
@@ -150,7 +171,7 @@ public class ExplorationScreen implements Screen {
             if (world.getPlayer().isDeathAnimationFinished()) state = State.GAME_OVER;
         }
 
-        world.update(gameDelta, camera);
+        world.update(gameDelta, camera, renderer.getShape());
 
         // Camera Shake logic
         if (world.isPlayerNearEnemy() && !playerIsDead) {
@@ -176,7 +197,22 @@ public class ExplorationScreen implements Screen {
         if (isOverlayActive) {
             // Render world to FBO for blurring
             fbo.begin();
-            renderer.render(offsetX, offsetY);
+            renderer.render(offsetX, offsetY); // Render the game first
+
+            // Darken background (now drawn into FBO to be blurred)
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            ShapeRenderer shape = renderer.getShape();
+            shape.setProjectionMatrix(camera.combined);
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            if (state == State.GAME_OVER) {
+                shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
+            } else {
+                shape.setColor(0, 0, 0, 0.5f); // General darkening for overlays
+            }
+            shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
+            shape.end();
+            Gdx.gl.glDisable(GL20.GL_BLEND); // Disable blend after drawing shape
+
             fbo.end();
 
             viewport.apply();
@@ -190,22 +226,11 @@ public class ExplorationScreen implements Screen {
                 camera.viewportWidth, camera.viewportHeight, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
             blurBatch.end();
 
-            // Darken background
-            Gdx.gl.glEnable(GL20.GL_BLEND);
-            ShapeRenderer shape = renderer.getShape();
-            shape.setProjectionMatrix(camera.combined);
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            if (state == State.GAME_OVER) {
-                shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
-            } else {
-                shape.setColor(0, 0, 0, 0.5f);
-            }
-            shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
-            shape.end();
-
             // Render Overlays
             renderUIOverlays();
         } else {
+            // Not paused, just render normally
+            world.getLightingManager().updateLightFbo(camera, renderer.getShape());
             renderer.render(offsetX, offsetY);
         }
     }
