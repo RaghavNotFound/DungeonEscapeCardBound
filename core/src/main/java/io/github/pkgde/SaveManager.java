@@ -89,7 +89,6 @@ public class SaveManager {
             e.setPosition(es.x, es.y);
             e.setHealth(es.health);
             e.setBoundaries(world.getMapManager().getCollisionRects());
-            e.setCollisionPolygons(world.getMapManager().getCollisionPolygons());
             e.setWorldBounds(0, 0, world.getMapManager().getMapWidth(), world.getMapManager().getMapHeight());
             world.getEnemies().add(e);
         }

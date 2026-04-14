@@ -11,6 +11,8 @@ public class SaveState {
     public Array<EnemyState> enemies = new Array<>();
     public Array<InteractableState> interactables = new Array<>();
     public boolean isCenterFireLit = false;
+    public String currentMapPath = "Maps/tutorial.ldtk";
+    public int currentLevelIndex = 0;
 
     public static class PlayerState {
         public float x, y, health, stamina, timeSurvived;

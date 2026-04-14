@@ -1,312 +1,349 @@
 package io.github.pkgde;
 
-import com.badlogic.gdx.maps.MapLayer;
-import com.badlogic.gdx.maps.MapObject;
-import com.badlogic.gdx.maps.tiled.*;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.math.Polygon;
-import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
-import com.badlogic.gdx.maps.objects.*;
-import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.JsonReader;
+import com.badlogic.gdx.utils.JsonValue;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
- * Handles TiledMap loading, object extraction (spawns, collisions, interactables),
- * and rendering. Provides fallback generation for missing map objects.
+ * Handles LDtk map loading, entity extraction, IntGrid collision,
+ * and tile layer rendering. Replaces the old TMX-based MapManager.
  */
 public class MapManager {
 
-    private TiledMap map;
-    private OrthogonalTiledMapRenderer renderer;
+    // Map dimensions in pixels
+    private float mapWidth;
+    private float mapHeight;
+    private int gridSize;
 
+    // Extracted game objects
     private final Vector2 playerSpawn = new Vector2();
     private final ArrayList<Vector2> enemySpawns = new ArrayList<>();
     private final ArrayList<Rectangle> collisionRects = new ArrayList<>();
-    private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
     private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
     private final ArrayList<Interactable> interactables = new ArrayList<>();
 
-    private static final float UNIT_SCALE = 1f;
+    // Tile rendering data
+    private final ArrayList<TileLayerData> tileLayers = new ArrayList<>();
+    private final HashMap<Integer, Texture> tilesetTextures = new HashMap<>();
+
+    // Cached tileset info from LDtk defs
+    private JsonValue tilesetDefs;
+
+    private String currentMapPath;
+    private int currentLevelIndex;
+
+    /**
+     * Represents one renderable tile layer (Ground, Wall, Objects, Campfire).
+     */
+    private static class TileLayerData {
+        String identifier;
+        ArrayList<TileInstance> tiles = new ArrayList<>();
+    }
+
+    /**
+     * Represents one tile instance within a layer.
+     */
+    private static class TileInstance {
+        float dstX, dstY;       // destination position in world (Y-flipped)
+        float srcX, srcY;       // source position in tileset texture
+        float width, height;    // tile size (gridSize)
+        int flipFlags;          // 0=none, 1=flipX, 2=flipY, 3=both
+        int tilesetUid;         // which tileset this tile uses
+    }
 
     public void load(String path) {
-        // Base logic: Uses Main.assets to safely manage memory
-        map = Main.assets.get(path, TiledMap.class);
-        renderer = new OrthogonalTiledMapRenderer(map, UNIT_SCALE);
+        load(path, 0);
+    }
 
+    public void load(String path, int levelIndex) {
         clearData();
+        this.currentMapPath = path;
+        this.currentLevelIndex = levelIndex;
 
-        loadCollisions();
-        loadSpawns();
-        loadTorches();
-        loadChests();
-        loadExitGates(); // Added from File 2
-        loadInteractables();
-    }
+        // Parse the LDtk JSON file
+        JsonReader reader = new JsonReader();
+        JsonValue root = reader.parse(Gdx.files.internal(path));
 
-    private void clearData() {
-        enemySpawns.clear();
-        collisionRects.clear();
-        collisionPolygons.clear();
-        torchRects.clear();
-        chestRects.clear();
-        exitGateRects.clear(); // Added from File 2
-        interactables.clear();
-    }
+        // Cache tileset definitions for later lookup
+        tilesetDefs = root.get("defs").get("tilesets");
 
-    public float getMapWidth() {
-        return map.getProperties().get("width", Integer.class) *
-            map.getProperties().get("tilewidth", Integer.class);
-    }
-
-    public float getMapHeight() {
-        return map.getProperties().get("height", Integer.class) *
-            map.getProperties().get("tileheight", Integer.class);
-    }
-
-    private MapLayer getObjectLayer() {
-        MapLayer layer = map.getLayers().get("object");
-        if (layer != null) return layer;
-        return map.getLayers().get("objects");
-    }
-
-    private void loadSpawns() {
-        MapLayer layer = getObjectLayer();
-        if (layer == null) return;
-
-        for (MapObject obj : layer.getObjects()) {
-            Vector2 pos = extractObjectPosition(obj);
-            if (pos == null) continue;
-
-            if (isObjectTag(obj, "playerSpawn")) {
-                playerSpawn.set(pos);
-            } else if (isObjectTag(obj, "enemySpawn")) {
-                enemySpawns.add(new Vector2(pos));
-            }
-        }
-    }
-
-    private void loadCollisions() {
-        MapLayer objectLayer = getObjectLayer();
-        if (objectLayer != null) {
-            for (MapObject obj : objectLayer.getObjects()) {
-                if (isObjectTag(obj, "wall") || isObjectTag(obj, "water") || isObjectTag(obj, "centerFire")) {
-                    processCollisionObject(obj);
-                }
-            }
-            return;
+        JsonValue levels = root.get("levels");
+        if (levelIndex >= levels.size) {
+            levelIndex = 0;
+            // You might want to handle this better in production
         }
 
-        // Legacy/Fallback Layer Processing
-        String[] legacyLayers = {"wall", "water", "centerFire"};
-        for (String layerName : legacyLayers) {
-            MapLayer layer = map.getLayers().get(layerName);
-            if (layer == null) continue;
-            for (MapObject obj : layer.getObjects()) {
-                processCollisionObject(obj);
-            }
-        }
-    }
+        JsonValue level = levels.get(levelIndex);
+        mapWidth = level.getInt("pxWid");
+        mapHeight = level.getInt("pxHei");
 
-    private void processCollisionObject(MapObject obj) {
-        if (obj instanceof PolygonMapObject) {
-            collisionPolygons.add(((PolygonMapObject) obj).getPolygon());
-        } else {
-            Rectangle r = extractObjectBounds(obj);
-            if (r != null) collisionRects.add(r);
-        }
-    }
+        // Determine grid size from the first layer
+        JsonValue layers = level.get("layerInstances");
+        gridSize = layers.get(0).getInt("__gridSize", 16);
 
-    private void loadTorches() {
-        MapLayer layer = getObjectLayer();
-        if (layer != null) {
-            for (MapObject obj : layer.getObjects()) {
-                if (isObjectTag(obj, "torch")) {
-                    Rectangle bounds = extractObjectBounds(obj);
-                    if (bounds != null) torchRects.add(bounds);
-                }
-            }
-        }
+        // Process layers (they come top-to-bottom in LDtk; we reverse for rendering)
+        for (int i = layers.size - 1; i >= 0; i--) {
+            JsonValue layer = layers.get(i);
+            String type = layer.getString("__type");
+            String identifier = layer.getString("__identifier");
 
-        // Base logic: Generate multiple random torches instead of just one fixed torch
-        if (torchRects.isEmpty()) {
-            generateRandomTorches(5);
-        }
-    }
-
-    private void generateRandomTorches(int count) {
-        float mapW = getMapWidth();
-        float mapH = getMapHeight();
-        for (int i = 0; i < count; i++) {
-            for (int attempt = 0; attempt < 50; attempt++) {
-                float x = MathUtils.random(60f, mapW - 60f);
-                float y = MathUtils.random(60f, mapH - 60f);
-                Rectangle r = new Rectangle(x, y, 32f, 32f);
-
-                if (!isPositionColliding(r)) {
-                    torchRects.add(r);
+            switch (type) {
+                case "IntGrid":
+                    if ("Collision".equals(identifier)) {
+                        loadIntGridCollision(layer);
+                    }
                     break;
-                }
-            }
-        }
-    }
-
-    private boolean isPositionColliding(Rectangle r) {
-        for (Rectangle wall : collisionRects) {
-            if (wall.overlaps(r)) return true;
-        }
-        for (Polygon poly : collisionPolygons) {
-            if (poly.getBoundingRectangle().overlaps(r)) return true;
-        }
-        return false;
-    }
-
-    private void loadChests() {
-        MapLayer layer = getObjectLayer();
-        if (layer == null) return;
-        for (MapObject obj : layer.getObjects()) {
-            if (isObjectTag(obj, "chest")) {
-                Rectangle bounds = extractObjectBounds(obj);
-                if (bounds != null) chestRects.add(bounds);
-            }
-        }
-    }
-
-    // Extracted from File 2
-    private void loadExitGates() {
-        MapLayer layer = getObjectLayer();
-        if (layer != null) {
-            for (MapObject obj : layer.getObjects()) {
-                if (isObjectTag(obj, "exitGate")) {
-                    Rectangle bounds = extractObjectBounds(obj);
-                    if (bounds != null) exitGateRects.add(bounds);
-                }
-            }
-        }
-    }
-
-    private void loadInteractables() {
-        MapLayer layer = getObjectLayer();
-        if (layer != null) {
-            for (MapObject obj : layer.getObjects()) {
-                Rectangle b = extractObjectBounds(obj);
-                if (b == null) continue;
-
-                if (isObjectTag(obj, "chest")) {
-                    interactables.add(new Interactable(Interactable.Type.CHEST, b.x, b.y, b.width, b.height));
-                } else if (isObjectTag(obj, "sign")) {
-                    Object textProp = obj.getProperties().get("text");
-                    String text = (textProp != null) ? textProp.toString() : "";
-                    interactables.add(new Interactable(Interactable.Type.SIGN, b.x, b.y, b.width, b.height, text));
-                } else if (isObjectTag(obj, "barrel")) {
-                    interactables.add(new Interactable(Interactable.Type.BARREL, b.x, b.y, b.width, b.height));
-                } else if (isObjectTag(obj, "centerFire")) {
-                    interactables.add(new Interactable(Interactable.Type.CENTER_FIRE, b.x, b.y, b.width, b.height));
-                }
+                case "Entities":
+                    loadEntities(layer);
+                    break;
+                case "Tiles":
+                    loadTileLayer(layer);
+                    break;
             }
         }
 
-        // Extract Center Fire interactables from the 'centerFire' layer
-        MapLayer cfLayer = map.getLayers().get("centerFire");
-        if (cfLayer != null) {
-            for (MapObject obj : cfLayer.getObjects()) {
-                Rectangle b = extractObjectBounds(obj);
-                if (b != null) interactables.add(new Interactable(Interactable.Type.CENTER_FIRE, b.x, b.y, b.width, b.height));
-            }
+        // Add only one torch at a specific location
+        if (torchRects.isEmpty()) {
+            torchRects.add(new Rectangle(mapWidth * 0.5f, mapHeight * 0.5f, 8f, 8f));
         }
 
+        // Generate fallback interactables if none found
         if (interactables.isEmpty()) {
             generateFallbackInteractables();
         }
+
+        // Load tileset textures
+        loadTilesetTextures(path);
     }
+
+    private void clearData() {
+        playerSpawn.setZero();
+        enemySpawns.clear();
+        collisionRects.clear();
+        torchRects.clear();
+        chestRects.clear();
+        exitGateRects.clear();
+        interactables.clear();
+        tileLayers.clear();
+        tilesetTextures.values().forEach(Texture::dispose);
+        tilesetTextures.clear();
+    }
+
+    public String getCurrentMapPath() {
+        return currentMapPath;
+    }
+
+    public int getCurrentLevelIndex() {
+        return currentLevelIndex;
+    }
+
+    // ===== COLLISION (IntGrid) =====
+
+    private void loadIntGridCollision(JsonValue layer) {
+        int layerGridSize = layer.getInt("__gridSize", gridSize);
+        int cWid = layer.getInt("__cWid");
+        JsonValue csv = layer.get("intGridCsv");
+
+        for (int idx = 0; idx < csv.size; idx++) {
+            if (csv.getInt(idx) != 0) {
+                int col = idx % cWid;
+                int row = idx / cWid;
+
+                // LDtk Y-down → LibGDX Y-up
+                float x = col * layerGridSize;
+                float y = mapHeight - (row + 1) * layerGridSize;
+
+                collisionRects.add(new Rectangle(x, y, layerGridSize, layerGridSize));
+            }
+        }
+    }
+
+    // ===== ENTITIES =====
+
+    private void loadEntities(JsonValue layer) {
+        JsonValue entities = layer.get("entityInstances");
+        if (entities == null) return;
+
+        for (JsonValue entity : entities) {
+            String id = entity.getString("__identifier");
+            JsonValue px = entity.get("px");
+            float ldtkX = px.getInt(0);
+            float ldtkY = px.getInt(1);
+            int eWidth = entity.getInt("width", 16);
+            int eHeight = entity.getInt("height", 16);
+
+            // LDtk Y-down → LibGDX Y-up
+            float x = ldtkX;
+            float y = mapHeight - ldtkY - eHeight;
+
+            System.out.println("[MapManager] Entity: " + id + " ldtk=(" + ldtkX + "," + ldtkY + ") -> libgdx=(" + x + "," + y + ") size=" + eWidth + "x" + eHeight);
+
+            switch (id) {
+                case "PlayerSpawn":
+                    playerSpawn.set(x, y);
+                    System.out.println("[MapManager] PlayerSpawn set to (" + x + ", " + y + ")");
+                    break;
+                case "Enemy":
+                    enemySpawns.add(new Vector2(x, y));
+                    break;
+                case "Chest":
+                    chestRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    interactables.add(new Interactable(Interactable.Type.CHEST, x, y, eWidth, eHeight));
+                    break;
+                case "Exit":
+                    exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+            }
+        }
+    }
+
+    // ===== TILE LAYERS =====
+
+    private void loadTileLayer(JsonValue layer) {
+        TileLayerData tld = new TileLayerData();
+        tld.identifier = layer.getString("__identifier");
+
+        int layerGridSize = layer.getInt("__gridSize", gridSize);
+        int tilesetUid = layer.getInt("__tilesetDefUid", -1);
+
+        // Override tileset if specified
+        int overrideUid = layer.getInt("overrideTilesetUid", -1);
+        if (overrideUid != -1) tilesetUid = overrideUid;
+
+        JsonValue gridTiles = layer.get("gridTiles");
+        if (gridTiles != null) {
+            for (JsonValue tile : gridTiles) {
+                TileInstance ti = new TileInstance();
+                JsonValue dstPx = tile.get("px");
+                JsonValue srcPx = tile.get("src");
+
+                ti.dstX = dstPx.getInt(0);
+                // LDtk Y-down → LibGDX Y-up
+                ti.dstY = mapHeight - dstPx.getInt(1) - layerGridSize;
+                ti.srcX = srcPx.getInt(0);
+                ti.srcY = srcPx.getInt(1);
+                ti.width = layerGridSize;
+                ti.height = layerGridSize;
+                ti.flipFlags = tile.getInt("f", 0);
+                ti.tilesetUid = tilesetUid;
+
+                tld.tiles.add(ti);
+            }
+        }
+
+        if (!tld.tiles.isEmpty()) {
+            tileLayers.add(tld);
+        }
+    }
+
+    // ===== TILESET LOADING =====
+
+    private void loadTilesetTextures(String mapPath) {
+        if (tilesetDefs == null) return;
+
+        // Determine the directory the LDtk file is in
+        String dir = "";
+        int lastSlash = mapPath.lastIndexOf('/');
+        if (lastSlash >= 0) dir = mapPath.substring(0, lastSlash + 1);
+
+        for (JsonValue ts : tilesetDefs) {
+            int uid = ts.getInt("uid");
+            String relPath = ts.getString("relPath", null);
+            String embedAtlas = ts.getString("embedAtlas", null);
+
+            // Skip embedded atlases (internal LDtk icons) and null paths
+            if (embedAtlas != null || relPath == null) continue;
+
+            // The relPath in the LDtk file is relative to the .ldtk file location.
+            // But it may contain absolute-like paths. We try loading:
+            // 1. Filename only from the Maps/ directory
+            // 2. The relative path as-is (fallback)
+            String filename = relPath;
+            int lastSep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'));
+            if (lastSep >= 0) filename = relPath.substring(lastSep + 1);
+
+            String assetPath = dir + filename;
+
+            try {
+                if (Gdx.files.internal(assetPath).exists()) {
+                    Texture tex = new Texture(Gdx.files.internal(assetPath));
+                    tex.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+                    tilesetTextures.put(uid, tex);
+                } else {
+                    System.out.println("[MapManager] Tileset not found: " + assetPath + " (uid=" + uid + ")");
+                }
+            } catch (Exception e) {
+                System.out.println("[MapManager] Failed to load tileset: " + assetPath + " — " + e.getMessage());
+            }
+        }
+    }
+
+    // ===== RENDERING =====
+
+    public void render(SpriteBatch batch, OrthographicCamera camera) {
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+
+        for (TileLayerData tld : tileLayers) {
+            for (TileInstance tile : tld.tiles) {
+                Texture tex = tilesetTextures.get(tile.tilesetUid);
+                if (tex == null) continue;
+
+                boolean flipX = (tile.flipFlags & 1) != 0;
+                boolean flipY = (tile.flipFlags & 2) != 0;
+
+                TextureRegion region = new TextureRegion(tex,
+                    (int) tile.srcX, (int) tile.srcY,
+                    (int) tile.width, (int) tile.height);
+                region.flip(flipX, flipY);
+
+                batch.draw(region, tile.dstX, tile.dstY, tile.width, tile.height);
+            }
+        }
+
+        batch.end();
+    }
+
+    // ===== FALLBACK GENERATORS =====
+
+
+
+
 
     private void generateFallbackInteractables() {
-        float mapW = getMapWidth();
-        float mapH = getMapHeight();
-        interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.3f, mapH * 0.6f, 40f, 35f));
-        interactables.add(new Interactable(Interactable.Type.CHEST, mapW * 0.7f, mapH * 0.4f, 40f, 35f));
-        interactables.add(new Interactable(Interactable.Type.SIGN, mapW * 0.5f, mapH * 0.8f, 30f, 40f, "Find the exit gate!"));
-        interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.2f, mapH * 0.3f, 32f, 38f));
-        interactables.add(new Interactable(Interactable.Type.BARREL, mapW * 0.8f, mapH * 0.7f, 32f, 38f));
+        interactables.add(new Interactable(Interactable.Type.SIGN, mapWidth * 0.5f, mapHeight * 0.8f, 8f, 10f, "Explore the dungeon!"));
+        interactables.add(new Interactable(Interactable.Type.BARREL, mapWidth * 0.2f, mapHeight * 0.3f, 8f, 10f));
+        interactables.add(new Interactable(Interactable.Type.BARREL, mapWidth * 0.8f, mapHeight * 0.7f, 8f, 10f));
     }
 
-    private boolean isObjectTag(MapObject obj, String expectedTag) {
-        String name = obj.getName();
-        if (expectedTag.equals(name)) return true;
-        Object type = obj.getProperties().get("type");
-        return expectedTag.equals(type);
-    }
+    // --- Getters for Extracted Data ---
 
-    private Vector2 extractObjectPosition(MapObject obj) {
-        if (obj instanceof RectangleMapObject) {
-            Rectangle rect = ((RectangleMapObject) obj).getRectangle();
-            return new Vector2(rect.x, rect.y);
-        }
-        if (obj instanceof EllipseMapObject) {
-            Circle c = ellipseAsCircle((EllipseMapObject) obj);
-            return new Vector2(c.x, c.y);
-        }
-        return null;
-    }
-
-    private Rectangle extractObjectBounds(MapObject obj) {
-        if (obj instanceof RectangleMapObject) {
-            Rectangle rect = ((RectangleMapObject) obj).getRectangle();
-            float rotation = obj.getProperties().get("rotation", 0f, Float.class);
-
-            if (MathUtils.isZero(rotation, 0.001f)) return new Rectangle(rect);
-
-            float radians = rotation * MathUtils.degreesToRadians;
-            float cos = MathUtils.cos(radians);
-            float sin = MathUtils.sin(radians);
-
-            float x0 = rect.x, y0 = rect.y;
-            float x1 = x0 + rect.width * cos, y1 = y0 + rect.width * sin;
-            float x2 = x0 + rect.width * cos - rect.height * sin, y2 = y0 + rect.width * sin + rect.height * cos;
-            float x3 = x0 - rect.height * sin, y3 = y0 + rect.height * cos;
-
-            float minX = Math.min(Math.min(x0, x1), Math.min(x2, x3));
-            float maxX = Math.max(Math.max(x0, x1), Math.max(x2, x3));
-            float minY = Math.min(Math.min(y0, y1), Math.min(y2, y3));
-            float maxY = Math.max(Math.max(y0, y1), Math.max(y2, y3));
-
-            return new Rectangle(minX, minY, maxX - minX, maxY - minY);
-        }
-        if (obj instanceof EllipseMapObject) {
-            Circle c = ellipseAsCircle((EllipseMapObject) obj);
-            return new Rectangle(c.x - c.radius, c.y - c.radius, c.radius * 2f, c.radius * 2f);
-        }
-        return null;
-    }
-
-    private Circle ellipseAsCircle(EllipseMapObject obj) {
-        float x = obj.getEllipse().x, y = obj.getEllipse().y;
-        float w = obj.getEllipse().width, h = obj.getEllipse().height;
-        float radius = Math.max(w, h) * 0.5f;
-        return new Circle(x + w * 0.5f, y + h * 0.5f, radius);
-    }
-
-    public void render(OrthographicCamera camera) {
-        renderer.setView(camera);
-        renderer.render();
-    }
-
-    // ===== GETTERS =====
+    public float getMapWidth() { return mapWidth; }
+    public float getMapHeight() { return mapHeight; }
     public Vector2 getPlayerSpawn() { return playerSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
-    public ArrayList<Polygon> getCollisionPolygons() { return collisionPolygons; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
-    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; } // Added from File 2
+    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {
-        if (renderer != null) renderer.dispose();
-        // Base logic: Assets are managed by Main.assets, so do NOT dispose map here!
+        for (Texture tex : tilesetTextures.values()) {
+            tex.dispose();
+        }
+        tilesetTextures.clear();
     }
 }
