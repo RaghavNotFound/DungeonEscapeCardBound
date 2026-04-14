@@ -43,7 +43,6 @@ public class DebugOverlay {
     private static final Color COLOR_COLLISION_OUTLINE = new Color(1f, 0.3f, 0.3f, 0.8f);
     private static final Color COLOR_BOUNDARY = new Color(1f, 0.6f, 0f, 0.9f);
     private static final Color COLOR_CHEST = new Color(1f, 0.85f, 0.1f, 0.8f);
-    private static final Color COLOR_EXIT = new Color(0.1f, 1f, 0.7f, 0.8f);
     private static final Color COLOR_PLAYER_SPAWN = new Color(0.3f, 0.6f, 1f, 0.9f);
     private static final Color COLOR_ENEMY_SPAWN = new Color(1f, 0.35f, 0.35f, 0.9f);
     private static final Color COLOR_PANEL_BG = new Color(0.05f, 0.05f, 0.12f, 0.88f);
@@ -61,20 +60,22 @@ public class DebugOverlay {
      * Call once per frame BEFORE update logic. Returns true if the overlay consumed the F3 key press.
      */
     public boolean handleInput() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F3)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F3) || Gdx.input.isKeyJustPressed(Input.Keys.GRAVE)) {
             visible = !visible;
             return true;
         }
 
         if (!visible) return false;
 
-        // Section toggles 1-4
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) showHitboxes = !showHitboxes;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) showBoundaries = !showBoundaries;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) showCollisions = !showCollisions;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) showInfo = !showInfo;
+        boolean consumed = false;
 
-        return false;
+        // Section toggles 1-4
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) { showHitboxes = !showHitboxes; consumed = true; }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) { showBoundaries = !showBoundaries; consumed = true; }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) { showCollisions = !showCollisions; consumed = true; }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) { showInfo = !showInfo; consumed = true; }
+
+        return consumed;
     }
 
     /**
@@ -94,7 +95,6 @@ public class DebugOverlay {
         if (showCollisions) {
             drawCollisionRects(shape, mapManager);
             drawChestHitboxes(shape, mapManager);
-            drawExitHitboxes(shape, mapManager);
             drawSpawnMarkers(shape, mapManager);
         }
 
@@ -170,36 +170,6 @@ public class DebugOverlay {
         // (Labels are drawn in info panel instead — world labels require SpriteBatch)
     }
 
-    // ==================== EXIT HITBOXES ====================
-
-    private void drawExitHitboxes(ShapeRenderer shape, MapManager mapManager) {
-        if (mapManager == null) return;
-        ArrayList<Rectangle> exits = mapManager.getExitGateRects();
-
-        shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(COLOR_EXIT.r, COLOR_EXIT.g, COLOR_EXIT.b, 0.2f);
-        for (Rectangle r : exits) {
-            shape.rect(r.x, r.y, r.width, r.height);
-        }
-        shape.end();
-
-        shape.begin(ShapeRenderer.ShapeType.Line);
-        Gdx.gl.glLineWidth(2f);
-        shape.setColor(COLOR_EXIT);
-        for (Rectangle r : exits) {
-            shape.rect(r.x, r.y, r.width, r.height);
-            // Draw arrow-like chevron to indicate exit
-            float cx = r.x + r.width / 2f;
-            float cy = r.y + r.height / 2f;
-            float s = Math.min(r.width, r.height) * 0.3f;
-            shape.line(cx - s, cy - s, cx, cy);
-            shape.line(cx, cy, cx - s, cy + s);
-            shape.line(cx, cy - s, cx + s, cy);
-            shape.line(cx + s, cy, cx, cy + s);
-        }
-        Gdx.gl.glLineWidth(1f);
-        shape.end();
-    }
 
     // ==================== SPAWN MARKERS ====================
 
@@ -418,16 +388,12 @@ public class DebugOverlay {
             ty -= lineH;
         }
 
-        // Chests / Exits
+        // Chests
         if (mapManager != null) {
             font.setColor(COLOR_LABEL);
             font.draw(batch, "Chests:", tx, ty);
             font.setColor(COLOR_CHEST);
             font.draw(batch, String.valueOf(mapManager.getChestRects().size()), tx + 50f, ty);
-            font.setColor(COLOR_LABEL);
-            font.draw(batch, "Exits:", tx + 68f, ty);
-            font.setColor(COLOR_EXIT);
-            font.draw(batch, String.valueOf(mapManager.getExitGateRects().size()), tx + 105f, ty);
             ty -= lineH;
         }
 

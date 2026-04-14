@@ -48,13 +48,15 @@ public class Enemy {
     private float forcedAggroTimer = 0f;
     private Vector2 forward = new Vector2(1, 0);
 
+    public static final float ENTITY_SCALE = 0.6f;
+
     // Dimensions & Hitbox
-    private final float WIDTH = 128, HEIGHT = 128;
-    private static final float HITBOX_WIDTH = 30f, HITBOX_HEIGHT = 40f;
-    private static final float HITBOX_OFFSET_X = 49f, HITBOX_OFFSET_Y = 40f;
+    private final float WIDTH = 128f * ENTITY_SCALE, HEIGHT = 128f * ENTITY_SCALE;
+    private final float HITBOX_WIDTH = 30f * ENTITY_SCALE, HITBOX_HEIGHT = 40f * ENTITY_SCALE;
+    private final float HITBOX_OFFSET_X = 49f * ENTITY_SCALE, HITBOX_OFFSET_Y = 40f * ENTITY_SCALE;
 
     // Combat Stats
-    public static final float ATTACK_RANGE = 76f;
+    public static final float ATTACK_RANGE = 76f * ENTITY_SCALE;
     private static final float MAX_HEALTH = 100f, ATTACK_DAMAGE = 14f;
     private static final float ATTACK_COOLDOWN = 1.2f, HURT_TIME = 0.24f;
 

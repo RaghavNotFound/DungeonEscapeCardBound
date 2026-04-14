@@ -61,7 +61,7 @@ public class LoadingScreen implements Screen {
 
         if (!assetsQueued) {
             Main.assets.setLoader(TiledMap.class, new TmxMapLoader(new InternalFileHandleResolver()));
-            Main.assets.load("Maps/safeRoom.tmx", TiledMap.class);
+// MapManager handles LDtk directly, no need to queue TiledMap.
             Player.queueAssets(Main.assets);
             Enemy.queueAssets(Main.assets);
             GameRenderer.queueAssets(Main.assets);

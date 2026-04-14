@@ -337,7 +337,6 @@ public class MapManager {
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
-    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {

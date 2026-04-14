@@ -37,15 +37,16 @@ public class Player {
     public Rectangle bounds;
     private final Rectangle swordHitbox = new Rectangle();
     private ArrayList<Rectangle> boundaries;
-    private ArrayList<Polygon> collisionPolygons;
     private float worldMinX = 0f, worldMinY = 0f, worldMaxX = Float.MAX_VALUE, worldMaxY = Float.MAX_VALUE;
 
-    private final int WIDTH = 128;
-    private final int HEIGHT = 128;
-    private static final float HITBOX_WIDTH = 55f;
-    private static final float HITBOX_HEIGHT = 80f;
-    private static final float HITBOX_OFFSET_X = 28f;
-    private static final float HITBOX_OFFSET_Y = 19f;
+    public static final float ENTITY_SCALE = 0.6f;
+
+    private final float WIDTH = 128f * ENTITY_SCALE;
+    private final float HEIGHT = 128f * ENTITY_SCALE;
+    private final float HITBOX_WIDTH = 55f * ENTITY_SCALE;
+    private final float HITBOX_HEIGHT = 80f * ENTITY_SCALE;
+    private final float HITBOX_OFFSET_X = (128f - 55f) / 2f * ENTITY_SCALE;
+    private final float HITBOX_OFFSET_Y = 19f * ENTITY_SCALE;
 
     // ===== MOVEMENT STATE =====
     private boolean isRunning;
@@ -202,7 +203,6 @@ public class Player {
     public void incrementEnemiesKilled() { enemiesKilled++; }
 
     public void setBoundaries(ArrayList<Rectangle> b) { this.boundaries = b; }
-    public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
         this.worldMinX = minX; this.worldMinY = minY;
         this.worldMaxX = maxX; this.worldMaxY = maxY;
@@ -306,7 +306,7 @@ public class Player {
         for (int i = arrows.size() - 1; i >= 0; i--) {
             Arrow a = arrows.get(i);
             a.update(delta);
-            if (a.isCollided(worldMaxX, worldMaxY, boundaries == null ? new ArrayList<>() : boundaries, collisionPolygons == null ? new ArrayList<>() : collisionPolygons)) {
+            if (a.isCollided(worldMaxX, worldMaxY, boundaries == null ? new ArrayList<Rectangle>() : boundaries)) {
                 arrows.remove(i);
             }
         }
@@ -338,7 +338,7 @@ public class Player {
     public void consumeSwordDamage() { swordDamageConsumed = true; }
 
     public Rectangle getSwordHitbox() {
-        float hitW = 78f, hitH = 60f;
+        float hitW = 78f * ENTITY_SCALE, hitH = 60f * ENTITY_SCALE;
         float hitX = facingRight ? position.x + WIDTH * 0.62f : position.x - hitW + WIDTH * 0.38f;
         float hitY = position.y + HEIGHT * 0.24f;
         swordHitbox.set(hitX, hitY, hitW, hitH);
@@ -395,16 +395,11 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
-        // Use mirrored hitbox offset for collision checks too
-        float hx = facingRight
-            ? newX + HITBOX_OFFSET_X
-            : newX + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
+        float hx = newX + HITBOX_OFFSET_X;
 
         if (!collides(new Rectangle(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
 
-        hx = facingRight
-            ? position.x + HITBOX_OFFSET_X
-            : position.x + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
+        hx = position.x + HITBOX_OFFSET_X;
 
         if (!collides(new Rectangle(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
 
@@ -413,10 +408,6 @@ public class Player {
 
     private boolean collides(Rectangle next) {
         if (boundaries != null) for (Rectangle r : boundaries) if (next.overlaps(r)) return true;
-        if (collisionPolygons != null) {
-            Polygon p = new Polygon(new float[]{next.x, next.y, next.x + next.width, next.y, next.x + next.width, next.y + next.height, next.x, next.y + next.height});
-            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(p, poly)) return true;
-        }
         return false;
     }
 
@@ -427,14 +418,9 @@ public class Player {
         arrows.add(new Arrow(position.x + WIDTH / 2f, position.y + HEIGHT / 2f, dir));
     }
 
-    // FIX: mirror the hitbox offset when facing left so it stays
-    // centred on the visible sprite regardless of direction
     private void updateBoundsPosition()
     {
-        float hx = facingRight
-            ? position.x + HITBOX_OFFSET_X
-            : position.x + WIDTH - HITBOX_OFFSET_X - HITBOX_WIDTH;
-        bounds.setPosition(hx, position.y + HITBOX_OFFSET_Y);
+        bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
     }
 
     public void render(SpriteBatch batch) {
@@ -444,7 +430,7 @@ public class Player {
 
         if (swordAttackTimer > 0f) {
             float prog = 1f - (swordAttackTimer / swordAnimation.getAnimationDuration());
-            float ox = 14f, oy = 8f, swW = 70f, swH = 22f;
+            float ox = 14f * ENTITY_SCALE, oy = 8f * ENTITY_SCALE, swW = 70f * ENTITY_SCALE, swH = 22f * ENTITY_SCALE;
             float ax = facingRight ? position.x + WIDTH * 0.68f : position.x + WIDTH * 0.32f;
             float ay = position.y + HEIGHT * 0.56f;
             float start = facingRight ? -80f : 260f, end = facingRight ? 40f : 140f;

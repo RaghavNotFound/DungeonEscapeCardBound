@@ -5,7 +5,6 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
 
 public class GameRenderer {
@@ -60,7 +59,7 @@ public class GameRenderer {
         shape.setProjectionMatrix(camera.combined);
 
         if (mapManager != null) {
-            mapManager.render(camera);
+            mapManager.render(batch, camera);
         }
 
         batch.begin();
@@ -97,13 +96,9 @@ public class GameRenderer {
         // --- CONSOLIDATED LIGHTING RENDER ---
         // This ensures the lighting is drawn in the same pass as the world, with the same camera.
         world.getLightingManager().render(camera, batch, shape);
-        
 
-        drawExitGate();
-        drawInteractables();
-        drawEnemyUI();
-        drawCollisionDebug();
-        drawChestBorders();
+
+        // drawUI is rendered last
         drawUI();
 
         camera.position.sub(offsetX, offsetY, 0);
@@ -127,32 +122,6 @@ public class GameRenderer {
         }
     }
 
-    private void drawCollisionDebug() {
-        shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(Color.RED);
-        if (mapManager != null) {
-            for (Rectangle r : mapManager.getCollisionRects()) shape.rect(r.x, r.y, r.width, r.height);
-            for (Polygon p : mapManager.getCollisionPolygons()) shape.polygon(p.getTransformedVertices());
-        }
-
-        shape.setColor(Color.GREEN);
-        Rectangle pBounds = world.getPlayer().getBounds();
-        shape.rect(pBounds.x, pBounds.y, pBounds.width, pBounds.height);
-
-        if (world.getPlayer().canDealSwordDamage()) {
-            shape.setColor(Color.YELLOW);
-            Rectangle sBounds = world.getPlayer().getSwordHitbox();
-            shape.rect(sBounds.x, sBounds.y, sBounds.width, sBounds.height);
-        }
-
-        shape.setColor(Color.MAGENTA);
-        for (Enemy enemy : world.getEnemies()) {
-            Rectangle eBounds = enemy.getBounds();
-            shape.rect(eBounds.x, eBounds.y, eBounds.width, eBounds.height);
-        }
-        shape.end();
-    }
-
     private void drawEnemyUI() {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shape.begin(ShapeRenderer.ShapeType.Filled);
@@ -163,10 +132,12 @@ public class GameRenderer {
             // --- Health Bar ---
             Rectangle eBounds = enemy.getBounds();
             float ratio = MathUtils.clamp(enemy.getHealthRatio(), 0f, 1f);
-            float barWidth = eBounds.width * 1.5f;
-            float barHeight = 6f;
+            float scale = 0.75f;
+
+            float barWidth = eBounds.width * scale;
+            float barHeight = 6f * scale;
             float x = eBounds.x + (eBounds.width - barWidth) * 0.5f;
-            float y = eBounds.y + eBounds.height + 12f;
+            float y = eBounds.y + eBounds.height + 12f * scale;
 
             // Background
             shape.setColor(0f, 0f, 0f, 0.8f);
@@ -193,49 +164,6 @@ public class GameRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void drawExitGate() {
-        if (world.getMapManager() == null) return;
-        java.util.ArrayList<Rectangle> gates = world.getMapManager().getExitGateRects();
-        if (gates.isEmpty()) return;
-
-        boolean unlocked = world.isExitGateUnlocked();
-        float time = (float) (System.nanoTime() / 1_000_000_000.0);
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        for (Rectangle gate : gates) {
-            float cx = gate.x + gate.width / 2f;
-            float cy = gate.y + gate.height / 2f;
-            float archHeight = 100f;
-            float pillarW = 15f;
-
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            if (unlocked) {
-                float pulse = 0.8f + 0.2f * MathUtils.sin(time * 4f);
-                shape.setColor(0.1f, 0.9f, 0.3f, 0.4f * pulse); // Portal energy
-                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
-                shape.setColor(0.2f, 1f, 0.4f, 0.15f + 0.1f * MathUtils.sin(time * 6f));
-                shape.circle(cx, cy, gate.width * 0.4f); // Core
-            } else {
-                shape.setColor(0.8f, 0.1f, 0.1f, 0.3f); // Red Barrier
-                shape.rect(gate.x + pillarW, gate.y, gate.width - pillarW * 2, archHeight - 15f);
-                shape.setColor(0.6f, 0.15f, 0.15f, 0.9f); // Lock Icon
-                shape.rect(cx - 3f, cy - 10f, 6f, 20f);
-                shape.rect(cx - 10f, cy - 3f, 20f, 6f);
-            }
-            shape.setColor(0.2f, 0.2f, 0.25f, 1f); // Stone Structure
-            shape.rect(gate.x, gate.y, pillarW, archHeight);
-            shape.rect(gate.x + gate.width - pillarW, gate.y, pillarW, archHeight);
-            shape.rect(gate.x - 5f, gate.y + archHeight - 15f, gate.width + 10f, 15f);
-            shape.end();
-
-            if (unlocked) {
-                batch.begin();
-                font.setColor(0.2f, 1f, 0.4f, 1f);
-                font.draw(batch, "EXIT", cx - 18f, gate.y + archHeight + 20f);
-                batch.end();
-            }
-        }
-    }
 
     private void drawInteractables() {
         if (world.getInteractables() == null) return;
@@ -246,14 +174,21 @@ public class GameRenderer {
     }
 
     private void drawUI() {
-        float x = camera.position.x - camera.viewportWidth / 2f + 30f;
-        float y = camera.position.y + camera.viewportHeight / 2f - 40f;
+        float uiScale = 0.75f;
+        float width = 220f * uiScale;
+        float height = 20f * uiScale;
+        float spacing = 30f * uiScale;
+        float offsetX = 30f * uiScale;
+        float offsetY = 40f * uiScale;
+
+        float x = camera.position.x - camera.viewportWidth / 2f + offsetX;
+        float y = camera.position.y + camera.viewportHeight / 2f - offsetY;
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        drawRoundedStatusBar(shape, x, y, 220f, 20f, world.getPlayer().getHealthRatio(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(1f, 0.25f, 0.25f, 1f));
-        drawRoundedStatusBar(shape, x, y - 30f, 220f, 20f, world.getPlayer().getStamina() / world.getPlayer().getMaxStamina(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.15f, 0.95f, 0.35f, 1f));
-        drawRoundedStatusBar(shape, x, y - 60f, 220f, 20f, world.getPlayer().getShootCooldownPercent(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.25f, 0.65f, 1f, 1f));
+        drawRoundedStatusBar(shape, x, y, width, height, world.getPlayer().getHealthRatio(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(1f, 0.25f, 0.25f, 1f));
+        drawRoundedStatusBar(shape, x, y - spacing, width, height, world.getPlayer().getStamina() / world.getPlayer().getMaxStamina(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.15f, 0.95f, 0.35f, 1f));
+        drawRoundedStatusBar(shape, x, y - spacing * 2, width, height, world.getPlayer().getShootCooldownPercent(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.25f, 0.65f, 1f, 1f));
 
         shape.end();
     }
@@ -333,13 +268,6 @@ public class GameRenderer {
         shape.circle(x + width - radius, y + radius, radius);
     }
 
-    private void drawChestBorders() {
-        if (mapManager == null) return;
-        shape.begin(ShapeRenderer.ShapeType.Line);
-        shape.setColor(Color.GOLD);
-        for (Rectangle r : mapManager.getChestRects()) shape.rect(r.x, r.y, r.width, r.height);
-        shape.end();
-    }
 
     public void dispose() {
         batch.dispose();

@@ -31,11 +31,7 @@ public class GameWorld {
     private final ArrayList<Interactable> interactables;
 
     private final ArrayList<Rectangle> boundaries;
-    private final ArrayList<Polygon> collisionPolygons;
-
-    // ===== EXIT GATE =====
-    private boolean exitGateUnlocked = false;
-    private boolean exitGateReached = false;
+    private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
 
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -43,17 +39,14 @@ public class GameWorld {
         this.player = new Player();
 
         this.boundaries = mapManager.getCollisionRects();
-        this.collisionPolygons = mapManager.getCollisionPolygons();
 
         player.setBoundaries(boundaries);
-        player.setCollisionPolygons(collisionPolygons);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
         player.getPosition().set(mapManager.getPlayerSpawn());
 
         for (Vector2 spawn : mapManager.getEnemySpawns()) {
             Enemy e = new Enemy();
             e.setBoundaries(boundaries);
-            e.setCollisionPolygons(collisionPolygons);
             e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
             e.setPosition(spawn.x, spawn.y);
             enemies.add(e);
@@ -145,9 +138,6 @@ public class GameWorld {
 
         // --- INTERACTABLES ---
         updateInteractables();
-
-        // --- EXIT GATE LOGIC ---
-        checkExitGateStatus();
     }
 
     private void handleEnemyDeath(Enemy e) {
@@ -250,36 +240,6 @@ public class GameWorld {
         }
     }
 
-    private void checkExitGateStatus() {
-        boolean allEnemiesDead = true;
-        for (Enemy e : enemies) {
-            if (e.isAlive()) {
-                allEnemiesDead = false;
-                break;
-            }
-        }
-
-        exitGateUnlocked = enemies.isEmpty() || allEnemiesDead;
-
-        if (exitGateUnlocked && mapManager.getExitGateRects() != null) {
-            Rectangle pBounds = player.getBounds();
-            float pcx = pBounds.x + pBounds.width / 2f;
-            float pcy = pBounds.y + pBounds.height / 2f;
-
-            for (Rectangle gateRect : mapManager.getExitGateRects()) {
-                float gcx = gateRect.x + gateRect.width / 2f;
-                float gcy = gateRect.y + gateRect.height / 2f;
-                float dx = pcx - gcx;
-                float dy = pcy - gcy;
-
-                // Trigger when player center is within 60px of gate center
-                if (dx * dx + dy * dy < 60f * 60f) {
-                    exitGateReached = true;
-                    break;
-                }
-            }
-        }
-    }
 
     private void spawnLoot(float x, float y) {
         float roll = MathUtils.random();
@@ -302,8 +262,6 @@ public class GameWorld {
     }
 
     // ===== GETTERS & SETTERS =====
-    public boolean isExitGateUnlocked() { return exitGateUnlocked; }
-    public boolean isExitGateReached() { return exitGateReached; }
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
     public LightingManager getLightingManager() { return lightingManager; }

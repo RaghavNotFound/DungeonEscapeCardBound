@@ -15,7 +15,7 @@ import com.badlogic.gdx.math.MathUtils;
  */
 public class ExplorationScreen implements Screen {
 
-    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.tmx";
+    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.ldtk";
     private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
     private final float AUTO_SAVE_INTERVAL = 10f; // Auto-save every 10 seconds
 
@@ -32,6 +32,7 @@ public class ExplorationScreen implements Screen {
     private final InventoryOverlay inventoryOverlay;
     private final GameOverOverlay gameOverOverlay;
     private final SaveLoadOverlay saveLoadOverlay;
+    private final DebugOverlay debugOverlay;
 
     public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD }
     private State state = State.GAME;
@@ -69,6 +70,7 @@ public class ExplorationScreen implements Screen {
         inventoryOverlay = new InventoryOverlay();
         gameOverOverlay = new GameOverOverlay();
         saveLoadOverlay = new SaveLoadOverlay();
+        debugOverlay = new DebugOverlay();
 
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
         fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
@@ -104,6 +106,10 @@ public class ExplorationScreen implements Screen {
     }
 
     private void handleStateInput() {
+        if (debugOverlay.handleInput()) {
+            return;
+        }
+
         if (state == State.GAME) {
             InputHandler.Action action = input.handle();
             switch (action) {
@@ -232,6 +238,11 @@ public class ExplorationScreen implements Screen {
             // Not paused, just render normally
             world.getLightingManager().updateLightFbo(camera, renderer.getShape());
             renderer.render(offsetX, offsetY);
+        }
+
+        // Render debug overlay last, on top of everything, without needing alpha blend overrides
+        if (state == State.GAME) {
+            debugOverlay.render(renderer.getShape(), renderer.getBatch(), renderer.getFont(), camera, world, mapManager);
         }
     }
 

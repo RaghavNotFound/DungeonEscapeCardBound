@@ -7,6 +7,8 @@ import io.github.pkgde.Main;
 /** Launches the desktop (LWJGL3) application. */
 public class Lwjgl3Launcher {
 
+    public static final int SCALE = 1;
+
     public static void main(String[] args) {
         if (StartupHelper.startNewJvmIfRequired()) return;
         createApplication();
@@ -28,7 +30,7 @@ public class Lwjgl3Launcher {
         );
 
         // Window Configuration (Preserved from File 1: Exact 1280x720 size)
-        configuration.setWindowedMode(1280, 720);
+        configuration.setWindowedMode(1280 * SCALE, 720 * SCALE);
         configuration.setDecorated(true);
         configuration.setMaximized(false);
         configuration.setResizable(false);
