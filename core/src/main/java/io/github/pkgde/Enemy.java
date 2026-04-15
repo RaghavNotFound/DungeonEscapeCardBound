@@ -5,7 +5,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.graphics.GL20;
+
 import java.util.ArrayList;
 
 /**
@@ -48,7 +48,7 @@ public class Enemy {
     private float forcedAggroTimer = 0f;
     private Vector2 forward = new Vector2(1, 0);
 
-    public static final float ENTITY_SCALE = 0.6f;
+    public static final float ENTITY_SCALE = 0.16f;
 
     // Dimensions & Hitbox
     private final float WIDTH = 128f * ENTITY_SCALE, HEIGHT = 128f * ENTITY_SCALE;

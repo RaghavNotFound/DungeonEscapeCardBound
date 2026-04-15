@@ -15,7 +15,7 @@ import com.badlogic.gdx.math.MathUtils;
  */
 public class ExplorationScreen implements Screen {
 
-    private static final String SAFE_ROOM_MAP = "Maps/safeRoom.ldtk";
+    private static final String SAFE_ROOM_MAP = "Maps/tutorial.ldtk";
     private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
     private final float AUTO_SAVE_INTERVAL = 10f; // Auto-save every 10 seconds
 
@@ -134,6 +134,7 @@ public class ExplorationScreen implements Screen {
                         state = State.SAVE_LOAD;
                         saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE);
                     }
+                    case RESTART -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
                     case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
                     case EXIT -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                 }
@@ -257,10 +258,9 @@ public class ExplorationScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
-        if (state == State.PAUSE || state == State.SETTINGS || state == State.SAVE_LOAD) {
+        if (state == State.PAUSE || (state == State.SETTINGS && settingsOverlay.getTransitionProgress() < 1f)) {
             float alpha = 1f;
             if (state == State.SETTINGS) alpha = 1f - settingsOverlay.getTransitionProgress();
-            if (state == State.SAVE_LOAD) alpha = 0.3f; // Dim the pause menu out of the way
             pauseOverlay.render(shape, batch, font, viewport, alpha);
         }
         settingsOverlay.render(shape, batch, font, viewport);

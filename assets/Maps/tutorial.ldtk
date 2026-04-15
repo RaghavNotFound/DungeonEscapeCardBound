@@ -459,7 +459,7 @@
 			"limitScope": "PerLevel",
 			"limitBehavior": "MoveLastOne",
 			"pivotX": 0.5,
-			"pivotY": 1,
+			"pivotY": 0,
 			"fieldDefs": []
 		},
 		{
@@ -861,6 +861,22 @@
 							}] }],
 							"__worldX": 40,
 							"__worldY": 128
+						},
+						{
+							"__identifier": "PlayerSpawn",
+							"__grid": [12,6],
+							"__pivot": [0.5,0],
+							"__tags": ["playerSpawn"],
+							"__tile": null,
+							"__smartColor": "#D1C7C4",
+							"iid": "e8ffc9e0-21a0-11f1-b047-f329a4096553",
+							"width": 16,
+							"height": 16,
+							"defUid": 36,
+							"px": [200,96],
+							"fieldInstances": [],
+							"__worldX": 200,
+							"__worldY": 208
 						}
 					]
 				},
@@ -1057,24 +1073,7 @@
 					"seed": 2881246,
 					"overrideTilesetUid": null,
 					"gridTiles": [],
-					"entityInstances": [
-						{
-							"__identifier": "PlayerSpawn",
-							"__grid": [12,7],
-							"__pivot": [0.5,1],
-							"__tags": ["playerSpawn"],
-							"__tile": null,
-							"__smartColor": "#D1C7C4",
-							"iid": "e8ffc9e0-21a0-11f1-b047-f329a4096553",
-							"width": 16,
-							"height": 16,
-							"defUid": 36,
-							"px": [200,128],
-							"fieldInstances": [],
-							"__worldX": 200,
-							"__worldY": 240
-						}
-					]
+					"entityInstances": []
 				},
 				{
 					"__identifier": "Collision",
@@ -1443,6 +1442,22 @@
 							}] }],
 							"__worldX": -136,
 							"__worldY": 256
+						},
+						{
+							"__identifier": "PlayerSpawn",
+							"__grid": [2,7],
+							"__pivot": [0.5,0],
+							"__tags": ["playerSpawn"],
+							"__tile": null,
+							"__smartColor": "#D1C7C4",
+							"iid": "3362e370-21a0-11f1-80db-7f98a59cadeb",
+							"width": 16,
+							"height": 16,
+							"defUid": 36,
+							"px": [40,112],
+							"fieldInstances": [],
+							"__worldX": -232,
+							"__worldY": 224
 						}
 					]
 				},
@@ -1551,22 +1566,6 @@
 					"overrideTilesetUid": null,
 					"gridTiles": [],
 					"entityInstances": [
-						{
-							"__identifier": "PlayerSpawn",
-							"__grid": [2,7],
-							"__pivot": [0.5,1],
-							"__tags": ["playerSpawn"],
-							"__tile": null,
-							"__smartColor": "#D1C7C4",
-							"iid": "3362e370-21a0-11f1-80db-7f98a59cadeb",
-							"width": 16,
-							"height": 16,
-							"defUid": 36,
-							"px": [40,128],
-							"fieldInstances": [],
-							"__worldX": -232,
-							"__worldY": 240
-						},
 						{
 							"__identifier": "Steps",
 							"__grid": [2,5],
@@ -2232,6 +2231,22 @@
 							}] }],
 							"__worldX": -408,
 							"__worldY": 128
+						},
+						{
+							"__identifier": "PlayerSpawn",
+							"__grid": [7,7],
+							"__pivot": [0.5,0],
+							"__tags": ["playerSpawn"],
+							"__tile": null,
+							"__smartColor": "#D1C7C4",
+							"iid": "5853f2e0-21a0-11f1-9a6d-f11bd4309c32",
+							"width": 16,
+							"height": 16,
+							"defUid": 36,
+							"px": [120,112],
+							"fieldInstances": [],
+							"__worldX": -424,
+							"__worldY": 224
 						}
 					]
 				},
@@ -2542,24 +2557,7 @@
 					"seed": 837956,
 					"overrideTilesetUid": null,
 					"gridTiles": [],
-					"entityInstances": [
-						{
-							"__identifier": "PlayerSpawn",
-							"__grid": [7,7],
-							"__pivot": [0.5,1],
-							"__tags": ["playerSpawn"],
-							"__tile": null,
-							"__smartColor": "#D1C7C4",
-							"iid": "5853f2e0-21a0-11f1-9a6d-f11bd4309c32",
-							"width": 16,
-							"height": 16,
-							"defUid": 36,
-							"px": [120,128],
-							"fieldInstances": [],
-							"__worldX": -424,
-							"__worldY": 240
-						}
-					]
+					"entityInstances": []
 				},
 				{
 					"__identifier": "Collision",
@@ -2918,6 +2916,22 @@
 							}] }],
 							"__worldX": -680,
 							"__worldY": 128
+						},
+						{
+							"__identifier": "PlayerSpawn",
+							"__grid": [7,7],
+							"__pivot": [0.5,0],
+							"__tags": ["playerSpawn"],
+							"__tile": null,
+							"__smartColor": "#D1C7C4",
+							"iid": "30e434c0-21a0-11f1-9a6d-8f732776a002",
+							"width": 16,
+							"height": 16,
+							"defUid": 36,
+							"px": [120,112],
+							"fieldInstances": [],
+							"__worldX": -696,
+							"__worldY": 224
 						}
 					]
 				},
@@ -3141,24 +3155,7 @@
 					"seed": 2107853,
 					"overrideTilesetUid": null,
 					"gridTiles": [],
-					"entityInstances": [
-						{
-							"__identifier": "PlayerSpawn",
-							"__grid": [7,7],
-							"__pivot": [0.5,1],
-							"__tags": ["playerSpawn"],
-							"__tile": null,
-							"__smartColor": "#D1C7C4",
-							"iid": "30e434c0-21a0-11f1-9a6d-8f732776a002",
-							"width": 16,
-							"height": 16,
-							"defUid": 36,
-							"px": [120,128],
-							"fieldInstances": [],
-							"__worldX": -696,
-							"__worldY": 240
-						}
-					]
+					"entityInstances": []
 				},
 				{
 					"__identifier": "Collision",
@@ -3179,11 +3176,11 @@
 					"visible": true,
 					"optionalRules": [],
 					"intGridCsv": [
-						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-						0,0,0,0
+						1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,
+						0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,
+						0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,
+						0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,
+						1,1,1,1
 					],
 					"autoLayerTiles": [],
 					"seed": 7382975,

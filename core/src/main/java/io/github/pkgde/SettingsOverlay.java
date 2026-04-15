@@ -54,6 +54,7 @@ public class SettingsOverlay {
 
     private int lastMouseX = -1;
     private int lastMouseY = -1;
+
     public void show() {
         if (state == State.INACTIVE || state == State.TRANSITION_OUT) {
             state = State.TRANSITION_IN;
@@ -78,7 +79,7 @@ public class SettingsOverlay {
 
         updateLayout(viewport);
         updatePointer(viewport);
-        
+
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
         lastMouseX = Gdx.input.getX();
         lastMouseY = Gdx.input.getY();
@@ -88,7 +89,7 @@ public class SettingsOverlay {
             hide();
             return;
         }
-        
+
         // --- Keyboard Navigation ---
         boolean keyPressed = false;
         if (Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
@@ -156,17 +157,12 @@ public class SettingsOverlay {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        if (w == lastLayoutWidth && h == lastLayoutHeight) return;
-
-        lastLayoutWidth = w;
-        lastLayoutHeight = h;
-
-        boxW = w * 0.25f;
+        boxW = w * 0.45f; // Increased box width to fit text
         boxH = h * 0.08f;
-        float gap = h * 0.03f;
+        float gap = h * 0.035f;
 
         centerX = w * 0.5f - boxW * 0.5f;
-        float baseY = h * 0.55f;
+        float baseY = h * 0.65f;
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             ys[i] = baseY - i * (boxH + gap);
@@ -244,19 +240,24 @@ public class SettingsOverlay {
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
-            float textScale = scale * 1.18f * (selected == i ? 1.05f + pulse : 1f);
+            float s = (selected == i) ? 1.05f + pulse : 1f;
 
-            font.getData().setScale(textScale);
+            font.getData().setScale(scale * 1.2f * s);
+
+            // Initial layout call just to get width/height for centering
             glyphLayout.setText(font, LABELS[i]);
-
             float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
-            float textY = ys[i] + (boxH + glyphLayout.height) * 0.5f + yOffset;
+            float textY = ys[i] + boxH * 0.5f + glyphLayout.height * 0.5f + yOffset;
             float shadow = Math.max(1.3f, w * 0.0012f);
 
+            // FIXED: Set color, THEN call setText so the shadow renders black
             font.setColor(0f, 0f, 0f, 0.72f * progress);
+            glyphLayout.setText(font, LABELS[i]);
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
 
+            // Set color, THEN call setText so the main text renders white
             font.setColor(1f, 1f, 1f, (selected == i ? 1f : 0.9f) * progress);
+            glyphLayout.setText(font, LABELS[i]);
             font.draw(batch, glyphLayout, textX, textY);
         }
 

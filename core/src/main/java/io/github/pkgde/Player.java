@@ -39,7 +39,7 @@ public class Player {
     private ArrayList<Rectangle> boundaries;
     private float worldMinX = 0f, worldMinY = 0f, worldMaxX = Float.MAX_VALUE, worldMaxY = Float.MAX_VALUE;
 
-    public static final float ENTITY_SCALE = 0.6f;
+    public static final float ENTITY_SCALE = 0.16f; // Scaled down from 0.6f
 
     private final float WIDTH = 128f * ENTITY_SCALE;
     private final float HEIGHT = 128f * ENTITY_SCALE;

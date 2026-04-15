@@ -14,6 +14,7 @@ public class PauseOverlay {
     private static final String[] OPTIONS = {
         "RESUME",
         "SAVE GAME",
+        "RESTART",
         "SETTINGS",
         "EXIT"
     };
@@ -29,8 +30,6 @@ public class PauseOverlay {
 
     private float animTime = 0f;
 
-    private float lastLayoutWidth = -1f;
-    private float lastLayoutHeight = -1f;
     private float boxW;
     private float boxH;
     private float centerX;
@@ -40,6 +39,7 @@ public class PauseOverlay {
     public enum Action {
         NONE,
         RESUME,
+        RESTART,
         SAVE,
         SETTINGS,
         EXIT
@@ -48,7 +48,7 @@ public class PauseOverlay {
     public Action handleInput(Viewport viewport) {
         updateLayout(viewport);
         updatePointer(viewport);
-        
+
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
         lastMouseX = Gdx.input.getX();
         lastMouseY = Gdx.input.getY();
@@ -76,7 +76,7 @@ public class PauseOverlay {
             }
         }
 
-        // --- Mouse Hover (only if mouse moved and no keyboard input) ---
+        // --- Mouse Hover ---
         if (mouseMovedThisFrame && !keyPressed) {
             int hovered = pointerIndex();
             if (hovered >= 0) {
@@ -89,16 +89,12 @@ public class PauseOverlay {
 
     private Action toAction(int optionIndex) {
         switch (optionIndex) {
-            case 0:
-                return Action.RESUME;
-            case 1:
-                return Action.SAVE;
-            case 2:
-                return Action.SETTINGS;
-            case 3:
-                return Action.EXIT;
-            default:
-                return Action.NONE;
+            case 0: return Action.RESUME;
+            case 1: return Action.SAVE;
+            case 2: return Action.RESTART;
+            case 3: return Action.SETTINGS;
+            case 4: return Action.EXIT;
+            default: return Action.NONE;
         }
     }
 
@@ -106,35 +102,29 @@ public class PauseOverlay {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        if (w == lastLayoutWidth && h == lastLayoutHeight) {
-            return;
-        }
-
-        lastLayoutWidth = w;
-        lastLayoutHeight = h;
-
         boxW = w * 0.35f;
         boxH = h * 0.08f;
         float gap = h * 0.035f;
 
         centerX = w * 0.5f - boxW * 0.5f;
-        float baseY = h * 0.55f;
+        float baseY = h * 0.65f;
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             ys[i] = baseY - i * (boxH + gap);
         }
     }
 
-    public void render(ShapeRenderer shape, SpriteBatch batch,
-                       BitmapFont font, Viewport viewport) {
+    public void render(ShapeRenderer shape, SpriteBatch batch, BitmapFont font, Viewport viewport) {
         render(shape, batch, font, viewport, 1f);
     }
 
-    public void render(ShapeRenderer shape, SpriteBatch batch,
-                       BitmapFont font, Viewport viewport, float alpha) {
+    public void render(ShapeRenderer shape, SpriteBatch batch, BitmapFont font, Viewport viewport, float alpha) {
         updateLayout(viewport);
         float w = viewport.getWorldWidth();
         animTime += Gdx.graphics.getDeltaTime();
+
+        shape.setProjectionMatrix(viewport.getCamera().combined);
+        batch.setProjectionMatrix(viewport.getCamera().combined);
 
         // ===== SHAPES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
@@ -168,20 +158,25 @@ public class PauseOverlay {
         float oldScaleY = font.getData().scaleY;
 
         for (int i = 0; i < OPTION_COUNT; i++) {
-
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float s = (selected == i) ? 1.05f + pulse : 1f;
 
             font.getData().setScale(scale * 1.2f * s);
-            glyphLayout.setText(font, OPTIONS[i]);
 
+            // Initial layout call just to get width/height for centering
+            glyphLayout.setText(font, OPTIONS[i]);
             float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
-            float textY = ys[i] + (boxH + glyphLayout.height) * 0.5f;
+            float textY = ys[i] + boxH * 0.5f + glyphLayout.height * 0.5f;
             float shadow = Math.max(1.3f, w * 0.0012f);
 
+            // FIXED: Set color, THEN call setText so the shadow renders black
             font.setColor(0f, 0f, 0f, 0.72f * alpha);
+            glyphLayout.setText(font, OPTIONS[i]);
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
+
+            // Set color, THEN call setText so the main text renders white
             font.setColor(1f, 1f, 1f, (selected == i ? 1f : 0.9f) * alpha);
+            glyphLayout.setText(font, OPTIONS[i]);
             font.draw(batch, glyphLayout, textX, textY);
         }
 
