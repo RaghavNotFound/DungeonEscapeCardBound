@@ -132,7 +132,7 @@ public class GameRenderer {
             // --- Health Bar ---
             Rectangle eBounds = enemy.getBounds();
             float ratio = MathUtils.clamp(enemy.getHealthRatio(), 0f, 1f);
-            float scale = 0.75f;
+            float scale = 0.75f * Player.ENTITY_SCALE;
 
             float barWidth = eBounds.width * scale;
             float barHeight = 6f * scale;
@@ -174,7 +174,7 @@ public class GameRenderer {
     }
 
     private void drawUI() {
-        float uiScale = 0.75f;
+        float uiScale = 0.75f * Player.ENTITY_SCALE;
         float width = 220f * uiScale;
         float height = 20f * uiScale;
         float spacing = 30f * uiScale;

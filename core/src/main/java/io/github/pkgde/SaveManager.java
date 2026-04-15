@@ -7,6 +7,13 @@ import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonWriter;
 import java.util.Comparator;
 
+// --- NEW IMPORTS FOR BULLETPROOF FILE HANDLING ---
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.io.IOException;
+
 /**
  * Handles saving and loading game state to/from JSON files.
  */
@@ -166,15 +173,26 @@ public class SaveManager {
         }
     }
 
+    // --- REWRITTEN NATIVE RENAME METHOD ---
     public static void renameSave(String oldName, String newName) {
         if (oldName.equals(AUTO_SAVE_SLOT_NAME)) {
             Gdx.app.log("SaveManager", "Attempted to rename auto-save slot, operation blocked.");
-            return; // Prevent renaming the auto-save slot
+            return;
         }
+
         FileHandle oldFile = Gdx.files.local(SAVE_DIR + oldName + ".json");
         FileHandle newFile = Gdx.files.local(SAVE_DIR + newName + ".json");
-        if (oldFile.exists() && !newFile.exists()) {
-            oldFile.moveTo(newFile);
+
+        if (oldFile.exists()) {
+            try {
+                // Use Java NIO to force the OS to completely replace and clean up the file
+                Path source = Paths.get(oldFile.file().getAbsolutePath());
+                Path target = Paths.get(newFile.file().getAbsolutePath());
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                Gdx.app.log("SaveManager", "Successfully renamed " + oldName + " to " + newName);
+            } catch (IOException e) {
+                Gdx.app.error("SaveManager", "Critical failure renaming file: " + e.getMessage());
+            }
         }
     }
 
