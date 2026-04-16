@@ -37,6 +37,7 @@ public class Player {
     public Rectangle bounds;
     private final Rectangle swordHitbox = new Rectangle();
     private ArrayList<Rectangle> boundaries;
+    private ArrayList<Polygon> collisionPolygons;
     private float worldMinX = 0f, worldMinY = 0f, worldMaxX = Float.MAX_VALUE, worldMaxY = Float.MAX_VALUE;
 
     public static final float ENTITY_SCALE = 0.16f; // Scaled down from 0.6f
@@ -203,6 +204,7 @@ public class Player {
     public void incrementEnemiesKilled() { enemiesKilled++; }
 
     public void setBoundaries(ArrayList<Rectangle> b) { this.boundaries = b; }
+    public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
         this.worldMinX = minX; this.worldMinY = minY;
         this.worldMaxX = maxX; this.worldMaxY = maxY;
@@ -408,6 +410,15 @@ public class Player {
 
     private boolean collides(Rectangle next) {
         if (boundaries != null) for (Rectangle r : boundaries) if (next.overlaps(r)) return true;
+        if (collisionPolygons != null) {
+            Polygon nextPoly = new Polygon(new float[]{
+                next.x, next.y,
+                next.x + next.width, next.y,
+                next.x + next.width, next.y + next.height,
+                next.x, next.y + next.height
+            });
+            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(nextPoly, poly)) return true;
+        }
         return false;
     }
 

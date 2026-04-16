@@ -30,6 +30,9 @@ public class DebugOverlay {
     private boolean showCollisions = true;
     private boolean showInfo = true;
 
+    private boolean tpMode = false;
+    private boolean spawnMode = false;
+
     private static final Color COLOR_PLAYER_HITBOX = new Color(0.2f, 1f, 0.3f, 0.85f);
     private static final Color COLOR_ENEMY_HITBOX = new Color(1f, 0.2f, 0.8f, 0.85f);
     private static final Color COLOR_SWORD_HITBOX = new Color(1f, 1f, 0.2f, 0.85f);
@@ -52,7 +55,7 @@ public class DebugOverlay {
     public boolean isVisible() { return visible; }
 
     public boolean handleInput() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F3) || Gdx.input.isKeyJustPressed(Input.Keys.GRAVE)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F3)) {
             visible = !visible;
             return true;
         }
@@ -64,7 +67,46 @@ public class DebugOverlay {
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) { showCollisions = !showCollisions; consumed = true; }
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) { showInfo = !showInfo; consumed = true; }
 
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_8)) { tpMode = !tpMode; consumed = true; }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_9)) { spawnMode = !spawnMode; consumed = true; }
+        // NUM_0 used right inside handleCheats
+
         return consumed;
+    }
+
+    public void handleCheats(OrthographicCamera camera, GameWorld world, MapManager mapManager) {
+        if (!visible) return;
+
+        // Skip Level Cheat: '0'
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0)) {
+            // Instantly clear level by killing all enemies and moving player to exit
+            for (Enemy e : world.getEnemies()) {
+                e.setHealth(0);
+            }
+            if (!mapManager.getExitGateRects().isEmpty()) {
+                Rectangle exit = mapManager.getExitGateRects().get(0);
+                world.getPlayer().setPosition(exit.x, exit.y);
+            } else {
+                // Force a level transition by setting level complete manually? No such exposed method, just kill enemies and hope mapping works
+            }
+        }
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            com.badlogic.gdx.math.Vector3 mousePos = new com.badlogic.gdx.math.Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+            camera.unproject(mousePos);
+
+            if (tpMode) {
+                world.getPlayer().setPosition(mousePos.x, mousePos.y);
+                tpMode = false;
+            } else if (spawnMode) {
+                Enemy e = new Enemy();
+                e.setBoundaries(world.getBoundaries());
+                e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                e.setPosition(mousePos.x, mousePos.y);
+                world.getEnemies().add(e);
+                spawnMode = false;
+            }
+        }
     }
 
     public void render(ShapeRenderer shape, SpriteBatch batch, BitmapFont font,
@@ -300,8 +342,8 @@ public class DebugOverlay {
         float uiScale = camera.viewportWidth / 400f;
         font.getData().setScale(0.35f * uiScale);
 
-        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf" };
-        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo };
+        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf", "[8] TP", "[9] Spwn", "[0] Skip" };
+        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo, tpMode, spawnMode, false };
 
         // FIXED: Expanded the tab padding so text doesn't squish
         float tabPadding = 24f * uiScale;

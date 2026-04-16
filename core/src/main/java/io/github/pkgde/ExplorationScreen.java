@@ -47,12 +47,13 @@ public class ExplorationScreen implements Screen {
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
 
-    // Auto-save
-    private float autoSaveTimer;
-
     public ExplorationScreen(String saveFileToLoad) {
+        this(saveFileToLoad, SAFE_ROOM_MAP, 0);
+    }
+
+    public ExplorationScreen(String saveFileToLoad, String mapPath, int levelIndex) {
         mapManager = new MapManager();
-        mapManager.load(SAFE_ROOM_MAP);
+        mapManager.load(mapPath, levelIndex);
         float mapW = mapManager.getMapWidth();
         float mapH = mapManager.getMapHeight();
         camera = new OrthographicCamera();
@@ -80,9 +81,13 @@ public class ExplorationScreen implements Screen {
 
         if (saveFileToLoad != null) {
             SaveManager.loadGame(world, saveFileToLoad);
+            // After loading stats from a checkpoint/save when constructing a map,
+            // ensure the player spawns exactly at the start of THIS specific new map.
+            world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
+        } else {
+            // Ensure bounds update properly manually anyway
+            world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
         }
-
-        autoSaveTimer = AUTO_SAVE_INTERVAL; // Initialize auto-save timer
     }
 
     @Override
@@ -94,13 +99,20 @@ public class ExplorationScreen implements Screen {
         updateGameLogic(delta);
         draw(delta);
 
-        // Auto-save logic
-        if (state == State.GAME) {
-            autoSaveTimer -= delta;
-            if (autoSaveTimer <= 0) {
-                SaveManager.saveGame(world, AUTO_SAVE_SLOT_NAME);
-                autoSaveTimer = AUTO_SAVE_INTERVAL;
-                Gdx.app.log("AutoSave", "Game auto-saved to: " + AUTO_SAVE_SLOT_NAME);
+        if (world.isLevelComplete() && state == State.GAME) {
+            // Move to next level
+            int nextLevelIndex = mapManager.getCurrentLevelIndex() + 1;
+            SaveManager.saveGame(world, "checkpoint");
+
+            if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk")) {
+                if (nextLevelIndex < 4) {
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen("checkpoint", "Maps/tutorial.ldtk", nextLevelIndex));
+                } else {
+                    // Load safe room
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null, "Maps/safeRoom.ldtk", 0));
+                }
+            } else if (mapManager.getCurrentMapPath().equals("Maps/safeRoom.ldtk")) {
+                // Done playing map
             }
         }
     }
@@ -109,6 +121,7 @@ public class ExplorationScreen implements Screen {
         if (debugOverlay.handleInput()) {
             return;
         }
+        debugOverlay.handleCheats(camera, world, mapManager);
 
         if (state == State.GAME) {
             InputHandler.Action action = input.handle();

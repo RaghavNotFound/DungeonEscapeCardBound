@@ -114,8 +114,8 @@ public class MapManager {
             }
         }
 
-        // Add only one torch at a specific location
-        if (torchRects.isEmpty()) {
+        // Add torch only if it's the safeRoom level
+        if (currentMapPath.contains("safeRoom.ldtk") && torchRects.isEmpty()) {
             torchRects.add(new Rectangle(mapWidth * 0.5f, mapHeight * 0.5f, 8f, 8f));
         }
 
@@ -184,9 +184,17 @@ public class MapManager {
             int eWidth = entity.getInt("width", 16);
             int eHeight = entity.getInt("height", 16);
 
-            // LDtk Y-down → LibGDX Y-up
-            float x = ldtkX;
-            float y = mapHeight - ldtkY - eHeight;
+            JsonValue pivot = entity.get("__pivot");
+            float pivotX = pivot != null ? pivot.getFloat(0) : 0f;
+            float pivotY = pivot != null ? pivot.getFloat(1) : 0f;
+
+            // LDtk px is at the pivot. Calculate top-left in LDtk:
+            float leftLdtk = ldtkX - (pivotX * eWidth);
+            float topLdtk = ldtkY - (pivotY * eHeight);
+
+            // Convert Top-Left to LibGDX Y-up (bottom-left)
+            float x = leftLdtk;
+            float y = mapHeight - topLdtk - eHeight;
 
             System.out.println("[MapManager] Entity: " + id + " ldtk=(" + ldtkX + "," + ldtkY + ") -> libgdx=(" + x + "," + y + ") size=" + eWidth + "x" + eHeight);
 
@@ -196,6 +204,8 @@ public class MapManager {
                     System.out.println("[MapManager] PlayerSpawn set to (" + x + ", " + y + ")");
                     break;
                 case "Enemy":
+                case "EnemySpawn":
+                case "Enemy_spawn":
                     enemySpawns.add(new Vector2(x, y));
                     break;
                 case "Chest":
@@ -203,6 +213,7 @@ public class MapManager {
                     interactables.add(new Interactable(Interactable.Type.CHEST, x, y, eWidth, eHeight));
                     break;
                 case "Exit":
+                case "ExitDoor":
                     exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
                     break;
             }
@@ -337,6 +348,7 @@ public class MapManager {
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
+    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {

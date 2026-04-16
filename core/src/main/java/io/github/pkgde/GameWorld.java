@@ -33,6 +33,13 @@ public class GameWorld {
     private final ArrayList<Rectangle> boundaries;
     private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
 
+    private boolean levelComplete = false; // flag for level completion
+
+    private boolean isTutorialBossWaveActive = false;
+    private int tutorialWavePhase = 0;
+    private final ArrayList<Vector2> tutorialWaveSpawns = new ArrayList<>();
+    private final ArrayList<Enemy> enemiesToSpawn = new ArrayList<>();
+
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
         this.lightingManager = new LightingManager();
@@ -44,12 +51,27 @@ public class GameWorld {
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
         player.getPosition().set(mapManager.getPlayerSpawn());
 
-        for (Vector2 spawn : mapManager.getEnemySpawns()) {
+        if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk") && mapManager.getCurrentLevelIndex() == 3) {
+            isTutorialBossWaveActive = true;
+            tutorialWavePhase = 1;
+            tutorialWaveSpawns.addAll(mapManager.getEnemySpawns());
+
+            float centerX = mapManager.getMapWidth() / 2f;
+            float centerY = tutorialWaveSpawns.isEmpty() ? mapManager.getMapHeight() / 2f : tutorialWaveSpawns.get(0).y;
+
             Enemy e = new Enemy();
             e.setBoundaries(boundaries);
             e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-            e.setPosition(spawn.x, spawn.y);
+            e.setPosition(centerX, centerY);
             enemies.add(e);
+        } else {
+            for (Vector2 spawn : mapManager.getEnemySpawns()) {
+                Enemy e = new Enemy();
+                e.setBoundaries(boundaries);
+                e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                e.setPosition(spawn.x, spawn.y);
+                enemies.add(e);
+            }
         }
 
         this.interactables = mapManager.getInteractables();
@@ -138,6 +160,32 @@ public class GameWorld {
 
         // --- INTERACTABLES ---
         updateInteractables();
+
+        // --- TUTORIAL BOSS WAVES ---
+        if (isTutorialBossWaveActive && tutorialWavePhase == 1) {
+            boolean allDead = true;
+            for (Enemy e : enemies) {
+                if (e.isAlive()) {
+                    allDead = false;
+                    break;
+                }
+            }
+            if (allDead) {
+                tutorialWavePhase = 2;
+                for (Vector2 spawn : tutorialWaveSpawns) {
+                    Enemy waveEnemy = new Enemy();
+                    waveEnemy.setBoundaries(boundaries);
+                    waveEnemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                    waveEnemy.setPosition(spawn.x, spawn.y);
+                    enemiesToSpawn.add(waveEnemy);
+                }
+            }
+        }
+
+        if (!enemiesToSpawn.isEmpty()) {
+            enemies.addAll(enemiesToSpawn);
+            enemiesToSpawn.clear();
+        }
     }
 
     private void handleEnemyDeath(Enemy e) {
@@ -205,6 +253,22 @@ public class GameWorld {
     }
 
     private void updateInteractables() {
+        // --- LEVEL EXIT LOGIC ---
+        for (Rectangle exit : mapManager.getExitGateRects()) {
+            if (player.getBounds().overlaps(exit)) {
+                boolean allEnemiesDead = true;
+                for (Enemy e : enemies) {
+                    if (e.isAlive()) {
+                        allEnemiesDead = false;
+                        break;
+                    }
+                }
+                if (allEnemiesDead) {
+                    levelComplete = true; // flag to be read by ExplorationScreen
+                }
+            }
+        }
+
         for (Interactable interactable : interactables) {
             interactable.update(Gdx.graphics.getDeltaTime());
 
@@ -269,6 +333,7 @@ public class GameWorld {
     public ArrayList<Interactable> getInteractables() { return interactables; }
     public MapManager getMapManager() { return mapManager; }
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
+    public boolean isLevelComplete() { return levelComplete; } // Getter for levelComplete
 
     public void dispose() {
         player.dispose();
