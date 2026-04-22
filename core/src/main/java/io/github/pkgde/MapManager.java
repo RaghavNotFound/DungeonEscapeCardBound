@@ -119,6 +119,21 @@ public class MapManager {
             torchRects.add(new Rectangle(mapWidth * 0.5f, mapHeight * 0.5f, 8f, 8f));
         }
 
+        // Add the boss trigger automatically if this is the final tutorial level
+        if (currentMapPath.contains("tutorial.ldtk") && currentLevelIndex == 3) {
+            // Place it at the center
+            float cx = mapWidth / 2f;
+            float cy = mapHeight / 2f;
+            // We only add it if there isn't already one defined via LDtk entity
+            boolean hasBoss = false;
+            for (Interactable i : interactables) {
+                if (i.getType() == Interactable.Type.BOSS_TRIGGER) hasBoss = true;
+            }
+            if (!hasBoss) {
+                interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, cx - 16f, cy - 16f, 32f, 32f));
+            }
+        }
+
         // Generate fallback interactables if none found
         if (interactables.isEmpty()) {
             generateFallbackInteractables();
@@ -215,6 +230,10 @@ public class MapManager {
                 case "Exit":
                 case "ExitDoor":
                     exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+                case "Boss":
+                case "BossSpawn":
+                    interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, x, y, eWidth, eHeight));
                     break;
             }
         }

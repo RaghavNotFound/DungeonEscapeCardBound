@@ -115,6 +115,17 @@ public class ExplorationScreen implements Screen {
                 // Done playing map
             }
         }
+
+        // Check for Boss Trigger interaction
+        if (state == State.GAME) {
+            for (Interactable i : world.getInteractables()) {
+                if (i.getType() == Interactable.Type.BOSS_TRIGGER && i.isInteracted()) {
+                    // You can change the boss name right here!
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE LICH KING"));
+                    return;
+                }
+            }
+        }
     }
 
     private void handleStateInput() {

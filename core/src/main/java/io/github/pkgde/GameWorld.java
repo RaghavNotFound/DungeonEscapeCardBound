@@ -272,7 +272,16 @@ public class GameWorld {
         for (Interactable interactable : interactables) {
             interactable.update(Gdx.graphics.getDeltaTime());
 
-            if (interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
+            boolean inRange = interactable.isPlayerInRange(player);
+
+            // 1. AUTO-TRIGGER BOSS FIGHT
+            if (inRange && interactable.getType() == Interactable.Type.BOSS_TRIGGER) {
+                if (!interactable.isInteracted()) {
+                    interactable.interact(player);
+                }
+            }
+            // 2. MANUAL TRIGGER (Press G)
+            else if (inRange && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
                 if (interactable.getType() == Interactable.Type.CENTER_FIRE) {
                     if (!lightingManager.isLit()) {
                         if (player.hasTorch()) {
