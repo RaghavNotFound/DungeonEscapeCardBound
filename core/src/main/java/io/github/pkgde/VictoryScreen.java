@@ -9,22 +9,15 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-/**
- * A full-screen victory celebration shown after the player escapes or defeats all enemies.
- * Displays animated title, game stats, golden particle effects, and menu navigation.
- */
 public class VictoryScreen implements Screen {
 
-    // ===== OPTIONS =====
     private static final String[] OPTIONS = {"CONTINUE", "RETRY"};
     private static final int OPTION_COUNT = OPTIONS.length;
 
-    // ===== STATS =====
     private final int enemiesDefeated;
     private final int torchesCollected;
     private final float timeSurvived;
 
-    // ===== RENDERING =====
     private final OrthographicCamera camera;
     private final Viewport viewport;
     private final SpriteBatch batch;
@@ -32,7 +25,6 @@ public class VictoryScreen implements Screen {
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
 
-    // ===== PARTICLES =====
     private static final int PARTICLE_COUNT = 60;
     private final float[] pX = new float[PARTICLE_COUNT];
     private final float[] pY = new float[PARTICLE_COUNT];
@@ -42,7 +34,6 @@ public class VictoryScreen implements Screen {
     private final float[] pMaxLife = new float[PARTICLE_COUNT];
     private final float[] pSize = new float[PARTICLE_COUNT];
 
-    // ===== UI STATE =====
     private int selected = 0;
     private float animTime = 0f;
     private float appearTimer = 0f;
@@ -72,7 +63,6 @@ public class VictoryScreen implements Screen {
         font = new BitmapFont();
         font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
-        // Initialize particles
         for (int i = 0; i < PARTICLE_COUNT; i++) {
             respawnParticle(i, true);
         }
@@ -105,7 +95,6 @@ public class VictoryScreen implements Screen {
         float worldW = viewport.getWorldWidth();
         float worldH = viewport.getWorldHeight();
 
-        // ===== INPUT =====
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
         lastMouseX = Gdx.input.getX();
         lastMouseY = Gdx.input.getY();
@@ -143,7 +132,6 @@ public class VictoryScreen implements Screen {
             }
         }
 
-        // ===== UPDATE PARTICLES =====
         for (int i = 0; i < PARTICLE_COUNT; i++) {
             pLife[i] += delta;
             pX[i] += pVx[i] * delta;
@@ -156,7 +144,6 @@ public class VictoryScreen implements Screen {
 
         updateLayout();
 
-        // ===== DRAW BACKGROUND GRADIENT =====
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
@@ -169,7 +156,6 @@ public class VictoryScreen implements Screen {
         shape.circle(worldW / 2f, worldH * 0.6f, 300f);
         shape.end();
 
-        // ===== DRAW PARTICLES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < PARTICLE_COUNT; i++) {
             float lifeRatio = pLife[i] / pMaxLife[i];
@@ -180,7 +166,6 @@ public class VictoryScreen implements Screen {
         }
         shape.end();
 
-        // ===== DRAW OPTION BOXES =====
         shape.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < OPTION_COUNT; i++) {
             if (selected == i) {
@@ -202,13 +187,11 @@ public class VictoryScreen implements Screen {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // ===== DRAW TEXT =====
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         float scale = worldW / 800f;
         float shadow = Math.max(1.5f, worldW * 0.0015f);
 
-        // --- Title ---
         float titleScale = 2.8f + 0.15f * MathUtils.sin(animTime * 3f);
         font.getData().setScale(scale * titleScale);
         glyphLayout.setText(font, "VICTORY ACHIEVED");
@@ -222,14 +205,12 @@ public class VictoryScreen implements Screen {
         font.setColor(goldAccent.r * titleGlow, goldAccent.g * titleGlow, goldAccent.b, appear);
         font.draw(batch, glyphLayout, titleX, titleY);
 
-        // --- Decorative line ---
         font.getData().setScale(scale * 0.8f);
         glyphLayout.setText(font, "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~");
         float lineX = (worldW - glyphLayout.width) / 2f;
         font.setColor(goldAccent.r, goldAccent.g, goldAccent.b, 0.4f * appear);
         font.draw(batch, glyphLayout, lineX, titleY - 40f);
 
-        // --- Stats ---
         float statsY = worldH * 0.62f;
         font.getData().setScale(scale * 1.1f);
         String[] statLabels = {
@@ -249,7 +230,6 @@ public class VictoryScreen implements Screen {
             font.draw(batch, glyphLayout, sx, sy);
         }
 
-        // --- Options ---
         for (int i = 0; i < OPTION_COUNT; i++) {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float s = (selected == i) ? 1.05f + pulse : 1f;
@@ -273,8 +253,14 @@ public class VictoryScreen implements Screen {
     private void executeOption(int index) {
         Main main = (Main) Gdx.app.getApplicationListener();
         switch (index) {
-            case 0 -> main.setScreen(new HomeScreen());
-            case 1 -> main.setScreen(new ExplorationScreen(null));
+            case 0 -> {
+                main.setScreen(new HomeScreen());
+                this.dispose();
+            }
+            case 1 -> {
+                main.setScreen(new ExplorationScreen(null));
+                this.dispose();
+            }
         }
     }
 

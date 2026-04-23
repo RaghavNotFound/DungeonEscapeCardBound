@@ -8,15 +8,6 @@ import java.util.ArrayList;
 
 public class Arrow {
 
-    private static Texture texture;
-
-    private static Texture getTexture() {
-        if (texture == null) {
-            texture = new Texture("Vectors/Arrow.png");
-        }
-        return texture;
-    }
-
     private Rectangle bounds;
     private Vector2 position;
     private Vector2 direction;
@@ -40,7 +31,7 @@ public class Arrow {
     }
 
     public void render(SpriteBatch batch) {
-        Texture tex = getTexture();
+        Texture tex = Main.assets.get("Vectors/Arrow.png", Texture.class);
         float angle = direction.angleDeg();
 
         batch.draw(
@@ -75,12 +66,4 @@ public class Arrow {
 
         return false;
     }
-
-    public static void disposeTexture() {
-        if (texture != null) {
-            texture.dispose();
-            texture = null;
-        }
-    }
 }
-

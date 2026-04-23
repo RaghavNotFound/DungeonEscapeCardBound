@@ -25,8 +25,6 @@ public class GameOverOverlay {
 
     private float animTime = 0f;
 
-    private float lastLayoutWidth = -1f;
-    private float lastLayoutHeight = -1f;
     private float boxW;
     private float boxH;
     private float centerX;
@@ -38,7 +36,7 @@ public class GameOverOverlay {
     public Action handleInput(Viewport viewport) {
         updateLayout(viewport);
         updatePointer(viewport);
-        
+
         boolean mouseMovedThisFrame = (Gdx.input.getX() != lastMouseX || Gdx.input.getY() != lastMouseY);
         lastMouseX = Gdx.input.getX();
         lastMouseY = Gdx.input.getY();
@@ -89,19 +87,15 @@ public class GameOverOverlay {
         float w = viewport.getWorldWidth();
         float h = viewport.getWorldHeight();
 
-        if (w == lastLayoutWidth && h == lastLayoutHeight) {
-            return;
-        }
-
-        lastLayoutWidth = w;
-        lastLayoutHeight = h;
+        float camX = viewport.getCamera().position.x;
+        float camY = viewport.getCamera().position.y;
 
         boxW = w * 0.35f;
         boxH = h * 0.08f;
         float gap = h * 0.035f;
 
-        centerX = w * 0.5f - boxW * 0.5f;
-        float baseY = h * 0.45f; // Lowered for title
+        centerX = camX - boxW * 0.5f;
+        float baseY = camY - h * 0.05f; // Adjust center relatively
 
         for (int i = 0; i < OPTION_COUNT; i++) {
             ys[i] = baseY - i * (boxH + gap);
@@ -138,17 +132,21 @@ public class GameOverOverlay {
         float scale = w / 800f;
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
+        float camX = viewport.getCamera().position.x;
 
         // Draw Title
         font.getData().setScale(scale * 2.5f);
-        glyphLayout.setText(font, "GAME OVER");
-        float titleX = (w - glyphLayout.width) / 2f;
-        float titleY = ys[0] + boxH + glyphLayout.height + 40f;
         float shadow = Math.max(1.5f, w * 0.0015f);
 
         font.setColor(0f, 0f, 0f, 0.7f);
+        glyphLayout.setText(font, "GAME OVER");
+        float titleX = camX - glyphLayout.width / 2f;
+        float titleY = ys[0] + boxH + glyphLayout.height + 40f;
+
         font.draw(batch, glyphLayout, titleX + shadow, titleY - shadow);
+
         font.setColor(accent);
+        glyphLayout.setText(font, "GAME OVER");
         font.draw(batch, glyphLayout, titleX, titleY);
 
         // Draw Options
@@ -156,14 +154,18 @@ public class GameOverOverlay {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float s = (selected == i) ? 1.05f + pulse : 1f;
             font.getData().setScale(scale * 1.2f * s);
+
+            // Set color first before setText
+            font.setColor(0f, 0f, 0f, 0.72f);
             glyphLayout.setText(font, OPTIONS[i]);
 
             float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
             float textY = ys[i] + (boxH + glyphLayout.height) * 0.5f;
 
-            font.setColor(0f, 0f, 0f, 0.72f);
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
+
             font.setColor(Color.WHITE);
+            glyphLayout.setText(font, OPTIONS[i]);
             font.draw(batch, glyphLayout, textX, textY);
         }
 

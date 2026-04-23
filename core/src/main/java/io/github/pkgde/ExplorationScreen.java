@@ -9,15 +9,11 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
 
-/**
- * The main gameplay screen. Manages the game state, camera effects,
- * and coordinate synchronization between the world and UI overlays.
- */
 public class ExplorationScreen implements Screen {
 
     private static final String SAFE_ROOM_MAP = "Maps/tutorial.ldtk";
     private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
-    private final float AUTO_SAVE_INTERVAL = 10f; // Auto-save every 10 seconds
+    private final float AUTO_SAVE_INTERVAL = 10f;
 
     private final OrthographicCamera camera;
     private final Viewport viewport;
@@ -37,12 +33,10 @@ public class ExplorationScreen implements Screen {
     public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD }
     private State state = State.GAME;
 
-    // Juice Effects
     private float shakeTime = 0f;
     private final float shakeDuration = 0.25f;
     private boolean shakeTriggered = false;
 
-    // Post-Processing
     private FrameBuffer fbo;
     private final ShaderProgram blurShader;
     private final SpriteBatch blurBatch;
@@ -81,11 +75,8 @@ public class ExplorationScreen implements Screen {
 
         if (saveFileToLoad != null) {
             SaveManager.loadGame(world, saveFileToLoad);
-            // After loading stats from a checkpoint/save when constructing a map,
-            // ensure the player spawns exactly at the start of THIS specific new map.
             world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
         } else {
-            // Ensure bounds update properly manually anyway
             world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
         }
     }
@@ -100,20 +91,25 @@ public class ExplorationScreen implements Screen {
         draw(delta);
 
         if (world.isLevelComplete() && state == State.GAME) {
-            // Move to next level
             int nextLevelIndex = mapManager.getCurrentLevelIndex() + 1;
             SaveManager.saveGame(world, "checkpoint");
 
             if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk")) {
                 if (nextLevelIndex < 4) {
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen("checkpoint", "Maps/tutorial.ldtk", nextLevelIndex));
+                    this.dispose();
                 } else {
-                    // Load safe room
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null, "Maps/safeRoom.ldtk", 0));
+                    this.dispose();
                 }
-            } else if (mapManager.getCurrentMapPath().equals("Maps/safeRoom.ldtk")) {
-                // Done playing map
             }
+        }
+
+        // Check for Boss Trigger interaction
+        if (world.isBossFightTriggered()) {
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE LICH KING"));
+            this.dispose();
+            return;
         }
     }
 
@@ -129,7 +125,10 @@ public class ExplorationScreen implements Screen {
                 case TOGGLE_PAUSE -> state = State.PAUSE;
                 case TOGGLE_INVENTORY -> state = State.INVENTORY;
                 case OPEN_SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
-                case EXIT_TO_MENU -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                case EXIT_TO_MENU -> {
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    this.dispose();
+                }
             }
         } else if (state == State.INVENTORY) {
             inventoryOverlay.handleInput();
@@ -147,9 +146,15 @@ public class ExplorationScreen implements Screen {
                         state = State.SAVE_LOAD;
                         saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE);
                     }
-                    case RESTART -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                    case RESTART -> {
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                        this.dispose();
+                    }
                     case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
-                    case EXIT -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    case EXIT -> {
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                        this.dispose();
+                    }
                 }
             }
         } else if (state == State.SETTINGS) {
@@ -160,9 +165,10 @@ public class ExplorationScreen implements Screen {
             if (res != null) {
                 if (res.action == SaveLoadOverlay.ResultAction.LOAD) {
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(res.saveName));
+                    this.dispose();
                 } else if (res.action == SaveLoadOverlay.ResultAction.SAVE) {
                     SaveManager.saveGame(world, res.saveName);
-                    state = State.GAME; // Auto resume on successful save
+                    state = State.GAME;
                 }
             } else if (!saveLoadOverlay.isVisible()) {
                 state = State.PAUSE;
@@ -170,15 +176,20 @@ public class ExplorationScreen implements Screen {
         } else if (state == State.GAME_OVER) {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             switch (action) {
-                case RETRY -> ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
-                case MAIN_MENU -> ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                case RETRY -> {
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                    this.dispose();
+                }
+                case MAIN_MENU -> {
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                    this.dispose();
+                }
             }
         }
     }
 
     private void updateGameLogic(float delta) {
         if (state != State.GAME) {
-            // Need to update lighting even if paused so the FBO is ready for the blur
             world.getLightingManager().updateLightFbo(camera, renderer.getShape());
             return;
         }
@@ -187,13 +198,12 @@ public class ExplorationScreen implements Screen {
         boolean playerIsDead = !world.getPlayer().isAlive();
 
         if (playerIsDead) {
-            gameDelta *= 0.3f; // Slow motion on death
+            gameDelta *= 0.3f;
             if (world.getPlayer().isDeathAnimationFinished()) state = State.GAME_OVER;
         }
 
         world.update(gameDelta, camera, renderer.getShape());
 
-        // Camera Shake logic
         if (world.isPlayerNearEnemy() && !playerIsDead) {
             if (!shakeTriggered) {
                 shakeTime = shakeDuration;
@@ -215,23 +225,21 @@ public class ExplorationScreen implements Screen {
         boolean isOverlayActive = (state != State.GAME);
 
         if (isOverlayActive) {
-            // Render world to FBO for blurring
             fbo.begin();
-            renderer.render(offsetX, offsetY); // Render the game first
+            renderer.render(offsetX, offsetY);
 
-            // Darken background (now drawn into FBO to be blurred)
             Gdx.gl.glEnable(GL20.GL_BLEND);
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
             if (state == State.GAME_OVER) {
-                shape.setColor(0.5f, 0, 0, 0.65f); // Red tint for Game Over
+                shape.setColor(0.5f, 0, 0, 0.65f);
             } else {
-                shape.setColor(0, 0, 0, 0.5f); // General darkening for overlays
+                shape.setColor(0, 0, 0, 0.5f);
             }
             shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
             shape.end();
-            Gdx.gl.glDisable(GL20.GL_BLEND); // Disable blend after drawing shape
+            Gdx.gl.glDisable(GL20.GL_BLEND);
 
             fbo.end();
 
@@ -246,15 +254,12 @@ public class ExplorationScreen implements Screen {
                 camera.viewportWidth, camera.viewportHeight, 0, 0, tex.getWidth(), tex.getHeight(), false, true);
             blurBatch.end();
 
-            // Render Overlays
             renderUIOverlays();
         } else {
-            // Not paused, just render normally
             world.getLightingManager().updateLightFbo(camera, renderer.getShape());
             renderer.render(offsetX, offsetY);
         }
 
-        // Render debug overlay last, on top of everything, without needing alpha blend overrides
         if (state == State.GAME) {
             debugOverlay.render(renderer.getShape(), renderer.getBatch(), renderer.getFont(), camera, world, mapManager);
         }

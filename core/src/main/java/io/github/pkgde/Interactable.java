@@ -15,7 +15,7 @@ import com.badlogic.gdx.math.Rectangle;
  */
 public class Interactable {
 
-    public enum Type { CHEST, SIGN, BARREL, DOOR, CENTER_FIRE }
+    public enum Type { CHEST, SIGN, BARREL, DOOR, CENTER_FIRE, BOSS_TRIGGER }
 
     private final Type type;
     private final Rectangle bounds;
@@ -52,6 +52,12 @@ public class Interactable {
         float iy = bounds.y + bounds.height / 2f;
         float dx = px - ix;
         float dy = py - iy;
+
+        // FIXED: Reduced boss trigger from 4f down to 1.5f so it doesn't cover the whole room!
+        if (type == Type.BOSS_TRIGGER) {
+            return (dx * dx + dy * dy) <= (INTERACT_RANGE * 1.5f) * (INTERACT_RANGE * 1.5f);
+        }
+
         return (dx * dx + dy * dy) <= INTERACT_RANGE * INTERACT_RANGE;
     }
 
@@ -83,10 +89,11 @@ public class Interactable {
             case SIGN -> renderSign(shape, playerInRange);
             case BARREL -> renderBarrel(shape, playerInRange);
             case CENTER_FIRE -> renderCenterFire(shape, playerInRange);
+            case BOSS_TRIGGER -> renderBossTrigger(shape, playerInRange);
         }
 
         // 2. Draw "Press [G]" Prompt
-        if (playerInRange && (!interacted || type == Type.SIGN)) {
+        if (playerInRange && (!interacted || type == Type.SIGN) && type != Type.BOSS_TRIGGER) {
             renderPrompt(batch, shape, font, cx);
         }
 
@@ -244,7 +251,29 @@ public class Interactable {
         shape.end();
     }
 
-    // ===== GETTERS & SETTERS =====
+    private void renderBossTrigger(ShapeRenderer shape, boolean playerInRange) {
+        float cx = bounds.x + bounds.width / 2f;
+        float cy = bounds.y + bounds.height / 2f;
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(0.2f, 0.1f, 0.3f, 1f);
+        shape.rect(cx - 20f, cy - 10f, 40f, 50f);
+        shape.setColor(0.6f, 0.1f, 0.1f, 1f);
+        shape.rect(cx - 15f, cy, 30f, 30f);
+        shape.setColor(0.8f, 0.2f, 0.2f, 1f);
+        shape.circle(cx, cy + 35f, 12f);
+        shape.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        float pulse = 0.5f + 0.5f * MathUtils.sin(animTime * 3f);
+        shape.setColor(1f, 0f, 0f, 0.5f * pulse);
+        Gdx.gl.glLineWidth(3f);
+        // FIXED: Shrunk visual ring to match the new 1.5f hitbox size
+        shape.circle(cx, cy, INTERACT_RANGE * 1.5f);
+        Gdx.gl.glLineWidth(1f);
+        shape.end();
+    }
+
     public Type getType() { return type; }
     public Rectangle getBounds() { return bounds; }
     public boolean isInteracted() { return interacted; }
