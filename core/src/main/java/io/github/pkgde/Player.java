@@ -8,11 +8,6 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
 import java.util.ArrayList;
 
-/**
- * Represents the playable character in DungeonEscapeCardbound.
- * Handles movement, stamina-based dashing/running, sword and bow combat,
- * and state-based animations.
- */
 public class Player {
 
     // ===== ANIMATIONS =====
@@ -40,7 +35,7 @@ public class Player {
     private ArrayList<Polygon> collisionPolygons;
     private float worldMinX = 0f, worldMinY = 0f, worldMaxX = Float.MAX_VALUE, worldMaxY = Float.MAX_VALUE;
 
-    public static final float ENTITY_SCALE = 0.16f; // Scaled down from 0.6f
+    public static final float ENTITY_SCALE = 0.16f;
 
     private final float WIDTH = 128f * ENTITY_SCALE;
     private final float HEIGHT = 128f * ENTITY_SCALE;
@@ -109,17 +104,16 @@ public class Player {
         for (int i = 0; i < deathCount; i++) manager.load("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
 
         manager.load("Vectors/Sword.png", Texture.class);
+        manager.load("Vectors/Arrow.png", Texture.class);
     }
 
     public Player() {
         position = new Vector2(200, 200);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
-        // Frame counts
         int walkCount = 23, runCount = 12, idleCount = 18, blinkCount = 18;
         int hurtCount = 12, swordCount = 12, deathCount = 15;
 
-        // Init Texture Arrays
         walkingTextures = new Texture[walkCount];
         runTextures = new Texture[runCount];
         idleTextures = new Texture[idleCount];
@@ -179,7 +173,6 @@ public class Player {
         currentFrame = idleFrames[0];
     }
 
-    // ===== GETTERS & SETTERS =====
     public float getStamina() { return stamina; }
     public float getMaxStamina() { return maxStamina; }
     public float getShootCooldownPercent() { return MathUtils.clamp(1f - (shootTimer / SHOOT_COOLDOWN), 0f, 1f); }
@@ -218,7 +211,6 @@ public class Player {
     public void setEnemiesKilled(int k) { enemiesKilled = k; }
     public void setTimeSurvived(float t) { timeSurvived = t; }
 
-    // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
         timeSurvived += delta;
 
@@ -229,14 +221,12 @@ public class Player {
             return;
         }
 
-        // Timers
         if (damageInvulnTimer > 0f) damageInvulnTimer -= delta;
         if (hurtTimer > 0f) { hurtTimer -= delta; hurtStateTime += delta; }
         if (swordCooldownTimer > 0f) swordCooldownTimer -= delta;
         if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
         if (shootTimer > 0) shootTimer -= delta;
 
-        // Dash logic
         if (dashTimer > 0f) {
             dashTimer -= delta;
             if (dashTimer <= 0f) isDashing = false;
@@ -257,7 +247,6 @@ public class Player {
             dashDirection.set(dx, dy).nor();
         }
 
-        // Sword Input
         if (swordAttackTimer > 0f) {
             swordAttackTimer -= delta;
             swordAttackStateTime += delta;
@@ -274,7 +263,6 @@ public class Player {
         boolean moved = handleMovement(delta);
         stateTime += delta;
 
-        // Animation State
         if (hurtTimer > 0f) {
             currentFrame = hurtAnimation.getKeyFrame(hurtStateTime, false);
         } else if (swordAttackTimer > 0f) {
@@ -287,7 +275,6 @@ public class Player {
             currentFrame = getIdleLoopFrame(idleLoopTime);
         }
 
-        // Stamina Regen/Drain
         boolean runningNow = isRunning && moved && stamina > 0;
         if (!isDashing) {
             if (runningNow) stamina -= STAMINA_DRAIN_RATE * delta;
@@ -298,13 +285,11 @@ public class Player {
         updateRunLockState();
         updateBoundsPosition();
 
-        // Shooting
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && shootTimer <= 0f) {
             shootArrow(camera);
             shootTimer = SHOOT_COOLDOWN;
         }
 
-        // Arrow Updates
         for (int i = arrows.size() - 1; i >= 0; i--) {
             Arrow a = arrows.get(i);
             a.update(delta);
@@ -398,11 +383,9 @@ public class Player {
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
         float hx = newX + HITBOX_OFFSET_X;
-
         if (!collides(new Rectangle(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
 
         hx = position.x + HITBOX_OFFSET_X;
-
         if (!collides(new Rectangle(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
 
         return !MathUtils.isEqual(oldX, position.x, 0.001f) || !MathUtils.isEqual(oldY, position.y, 0.001f);
@@ -429,8 +412,7 @@ public class Player {
         arrows.add(new Arrow(position.x + WIDTH / 2f, position.y + HEIGHT / 2f, dir));
     }
 
-    private void updateBoundsPosition()
-    {
+    private void updateBoundsPosition() {
         bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
     }
 
@@ -452,7 +434,5 @@ public class Player {
         for (Arrow a : arrows) a.render(batch);
     }
 
-    public void dispose() {
-        // Assets are managed globally by Main.assets, so no manual disposal needed here!
-    }
+    public void dispose() { }
 }

@@ -28,6 +28,7 @@ public class MapManager {
     // Extracted game objects
     private final Vector2 playerSpawn = new Vector2();
     private final ArrayList<Vector2> enemySpawns = new ArrayList<>();
+    private final Vector2 bossSpawn = new Vector2(-1, -1);
     private final ArrayList<Rectangle> collisionRects = new ArrayList<>();
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
@@ -119,21 +120,6 @@ public class MapManager {
             torchRects.add(new Rectangle(mapWidth * 0.5f, mapHeight * 0.5f, 8f, 8f));
         }
 
-        // Add the boss trigger automatically if this is the final tutorial level
-        if (currentMapPath.contains("tutorial.ldtk") && currentLevelIndex == 3) {
-            // Place it at the center
-            float cx = mapWidth / 2f;
-            float cy = mapHeight / 2f;
-            // We only add it if there isn't already one defined via LDtk entity
-            boolean hasBoss = false;
-            for (Interactable i : interactables) {
-                if (i.getType() == Interactable.Type.BOSS_TRIGGER) hasBoss = true;
-            }
-            if (!hasBoss) {
-                interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, cx - 16f, cy - 16f, 32f, 32f));
-            }
-        }
-
         // Generate fallback interactables if none found
         if (interactables.isEmpty()) {
             generateFallbackInteractables();
@@ -146,6 +132,7 @@ public class MapManager {
     private void clearData() {
         playerSpawn.setZero();
         enemySpawns.clear();
+        bossSpawn.set(-1, -1);
         collisionRects.clear();
         torchRects.clear();
         chestRects.clear();
@@ -233,8 +220,21 @@ public class MapManager {
                     break;
                 case "Boss":
                 case "BossSpawn":
-                    interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, x, y, eWidth, eHeight));
+                    bossSpawn.set(x, y);
                     break;
+            }
+        }
+
+        // Dynamic tutorial boss logic: if we are on tutorial level 3 and no explicit Boss entity was found,
+        // convert the first enemy spawn into the boss spawn.
+        if (currentMapPath.contains("tutorial.ldtk") && currentLevelIndex == 3) {
+            if (bossSpawn.x == -1 && bossSpawn.y == -1) {
+                if (!enemySpawns.isEmpty()) {
+                    Vector2 p = enemySpawns.remove(0);
+                    bossSpawn.set(p.x, p.y);
+                } else {
+                    bossSpawn.set(mapWidth / 2f, mapHeight / 2f);
+                }
             }
         }
     }
@@ -364,6 +364,7 @@ public class MapManager {
     public float getMapHeight() { return mapHeight; }
     public Vector2 getPlayerSpawn() { return playerSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
+    public Vector2 getBossSpawn() { return bossSpawn; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }

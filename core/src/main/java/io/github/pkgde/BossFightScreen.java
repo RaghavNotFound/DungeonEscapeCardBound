@@ -7,10 +7,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.*;
 
-/**
- * Screen where a turn-based card fight against a boss takes place.
- * Uses live sprite animations and a dedicated turn-state machine.
- */
 public class BossFightScreen implements Screen {
 
     private final OrthographicCamera camera;
@@ -24,17 +20,14 @@ public class BossFightScreen implements Screen {
     private final String bossName;
     private Texture background;
 
-    // Integrates your existing Game Over screen directly into the fight
     private final GameOverOverlay gameOverOverlay;
 
-    // Animations
     private Animation<TextureRegion> playerIdle, playerHurt;
     private Animation<TextureRegion> bossIdle, bossHurt;
     private float stateTime = 0f;
     private float playerHurtTimer = 0f;
     private float bossHurtTimer = 0f;
 
-    // Combat Stats
     private float playerMaxHealth;
     private float playerHealth;
     private int playerEnergy = 3;
@@ -45,7 +38,6 @@ public class BossFightScreen implements Screen {
     private int bossEnergy = 3;
     private int bossMaxEnergy = 3;
 
-    // Turn Machine (Replaces freezing Thread.sleep)
     private enum TurnState { PLAYER_TURN, BOSS_THINKING, VICTORY, GAME_OVER }
     private TurnState turnState = TurnState.PLAYER_TURN;
     private float bossThinkTimer = 0f;
@@ -72,11 +64,9 @@ public class BossFightScreen implements Screen {
 
         loadAnimations();
 
-        // ========================================================
-        // ---> CHANGE YOUR BACKGROUND IMAGE PATH RIGHT HERE <---
-        // ========================================================
+        // FIXED: Removed "assets/" so it works perfectly in compiled JARs too!
         try {
-            background = new Texture(Gdx.files.internal("assets/BossScreen/BossScreen.png"));
+            background = new Texture(Gdx.files.internal("BossScreen/BossScreen.png"));
             background.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         } catch (Exception e) {
             Gdx.app.log("BossFightScreen", "Background image not found. Using solid color fallback.");
@@ -84,7 +74,6 @@ public class BossFightScreen implements Screen {
     }
 
     private void loadAnimations() {
-        // Load Player Animations (1-indexed)
         Array<TextureRegion> pIdle = new Array<>();
         for(int i = 1; i <= 18; i++) pIdle.add(new TextureRegion(Main.assets.get("Movements/Player/idle/idle_" + i + ".png", Texture.class)));
         playerIdle = new Animation<>(0.08f, pIdle, Animation.PlayMode.LOOP);
@@ -93,7 +82,6 @@ public class BossFightScreen implements Screen {
         for(int i = 1; i <= 12; i++) pHurt.add(new TextureRegion(Main.assets.get("Movements/Player/hurt/hurt_" + i + ".png", Texture.class)));
         playerHurt = new Animation<>(0.05f, pHurt, Animation.PlayMode.NORMAL);
 
-        // Load Boss Animations (0-indexed padding)
         Array<TextureRegion> bIdle = new Array<>();
         for(int i = 0; ; i++) {
             String path = "Movements/Enemy/Left/Idle/Left - Idle_" + String.format("%03d", i) + ".png";
@@ -125,14 +113,12 @@ public class BossFightScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         shape.setProjectionMatrix(camera.combined);
 
-        // 1. Draw Background
         batch.begin();
         if (background != null) {
             batch.draw(background, 0, 0, GameWorld.WORLD_WIDTH, GameWorld.WORLD_HEIGHT);
         }
         batch.end();
 
-        // 2. Draw Dark UI Bar Overlay
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shape.begin(ShapeRenderer.ShapeType.Filled);
         shape.setColor(0.05f, 0.05f, 0.05f, 0.85f);
@@ -140,10 +126,7 @@ public class BossFightScreen implements Screen {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // 3. Draw Animations
         batch.begin();
-
-        // Render Player (Left side)
         TextureRegion pFrame;
         if (playerHurtTimer > 0) {
             pFrame = playerHurt.getKeyFrame(playerHurt.getAnimationDuration() - playerHurtTimer, false);
@@ -152,7 +135,6 @@ public class BossFightScreen implements Screen {
         }
         batch.draw(pFrame, 150, 250, 384, 384);
 
-        // Render Boss (Right side)
         TextureRegion bFrame;
         if (bossHurtTimer > 0) {
             bFrame = bossHurt.getKeyFrame(bossHurt.getAnimationDuration() - bossHurtTimer, false);
@@ -161,7 +143,6 @@ public class BossFightScreen implements Screen {
         }
         batch.draw(bFrame, 750, 250, 384, 384);
 
-        // 4. Draw Text & Stats
         font.getData().setScale(3.5f);
         glyphLayout.setText(font, bossName);
         float titleX = (GameWorld.WORLD_WIDTH - glyphLayout.width) / 2f;
@@ -183,7 +164,6 @@ public class BossFightScreen implements Screen {
         font.draw(batch, "HP: " + (int)bossHealth + " / " + (int)bossMaxHealth, 900, 140);
         font.draw(batch, "Energy: " + bossEnergy + " / " + bossMaxEnergy, 900, 110);
 
-        // Draw Center Log
         glyphLayout.setText(font, combatLog);
         font.draw(batch, glyphLayout, (GameWorld.WORLD_WIDTH - glyphLayout.width) / 2f, 180);
 
@@ -198,11 +178,10 @@ public class BossFightScreen implements Screen {
 
         batch.end();
 
-        // 5. Draw Game Over Overlay (If dead)
         if (turnState == TurnState.GAME_OVER) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            shape.setColor(0.5f, 0, 0, 0.65f); // Red death tint
+            shape.setColor(0.5f, 0, 0, 0.65f);
             shape.rect(0, 0, GameWorld.WORLD_WIDTH, GameWorld.WORLD_HEIGHT);
             shape.end();
             Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -223,7 +202,6 @@ public class BossFightScreen implements Screen {
             turnState = TurnState.GAME_OVER;
         }
 
-        // Timer replaces Thread.sleep so animations can actually play
         if (turnState == TurnState.BOSS_THINKING) {
             bossThinkTimer -= delta;
             if (bossThinkTimer <= 0) {
@@ -237,8 +215,10 @@ public class BossFightScreen implements Screen {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             if (action == GameOverOverlay.Action.RETRY) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                this.dispose();
             } else if (action == GameOverOverlay.Action.MAIN_MENU) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                this.dispose();
             }
             return;
         }
@@ -246,6 +226,7 @@ public class BossFightScreen implements Screen {
         if (turnState == TurnState.VICTORY) {
             if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen("checkpoint"));
+                this.dispose();
             }
             return;
         }
@@ -255,14 +236,14 @@ public class BossFightScreen implements Screen {
                 if (playerEnergy >= 1) {
                     playerEnergy -= 1;
                     bossHealth -= 20;
-                    bossHurtTimer = bossHurt.getAnimationDuration(); // Trigger boss hurt animation
+                    bossHurtTimer = bossHurt.getAnimationDuration();
                     combatLog = "Player used Attack! Boss takes 20 dmg.";
                 } else {
                     combatLog = "Not enough energy!";
                 }
             } else if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
                 turnState = TurnState.BOSS_THINKING;
-                bossThinkTimer = 1.5f; // Wait 1.5 seconds before boss attacks
+                bossThinkTimer = 1.5f;
                 bossEnergy = bossMaxEnergy;
                 combatLog = "Player ended turn. Boss is thinking...";
             }
@@ -272,7 +253,7 @@ public class BossFightScreen implements Screen {
     private void executeBossTurn() {
         bossEnergy -= 2;
         playerHealth -= 15;
-        playerHurtTimer = playerHurt.getAnimationDuration(); // Trigger player hurt animation
+        playerHurtTimer = playerHurt.getAnimationDuration();
         combatLog = bossName + " used Smash! Player takes 15 dmg.";
 
         if (playerHealth > 0) {

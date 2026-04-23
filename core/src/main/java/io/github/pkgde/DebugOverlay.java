@@ -14,13 +14,6 @@ import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
 
-/**
- * F3 Debug Overlay — provides visual debugging overlays for:
- * [1] Hitboxes   — Player, enemy, sword, arrow hitboxes
- * [2] Boundaries — Map border, world bounds visualization
- * [3] Collisions — IntGrid collision rects, chest/exit hitboxes, spawn markers
- * [4] Info       — FPS counter, entity counts, player stats text panel
- */
 public class DebugOverlay {
 
     private boolean visible = false;
@@ -69,7 +62,6 @@ public class DebugOverlay {
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_8)) { tpMode = !tpMode; consumed = true; }
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_9)) { spawnMode = !spawnMode; consumed = true; }
-        // NUM_0 used right inside handleCheats
 
         return consumed;
     }
@@ -79,16 +71,25 @@ public class DebugOverlay {
 
         // Skip Level Cheat: '0'
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0)) {
-            // Instantly clear level by killing all enemies and moving player to exit
             for (Enemy e : world.getEnemies()) {
                 e.setHealth(0);
             }
             if (!mapManager.getExitGateRects().isEmpty()) {
                 Rectangle exit = mapManager.getExitGateRects().get(0);
                 world.getPlayer().setPosition(exit.x, exit.y);
-            } else {
-                // Force a level transition by setting level complete manually? No such exposed method, just kill enemies and hope mapping works
             }
+        }
+
+        // INSTANT BOSS SPAWN CHEAT: 'B'
+        // Lets you test the boss fight anywhere, anytime without having to walk to room 4!
+        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
+            Enemy boss = new Enemy();
+            boss.setBoundaries(world.getBoundaries());
+            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            boss.setPosition(world.getPlayer().getPosition().x + 80f, world.getPlayer().getPosition().y);
+            boss.setBoss(true);
+            boss.forceChase(Float.MAX_VALUE);
+            world.getEnemies().add(boss);
         }
 
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
@@ -265,14 +266,11 @@ public class DebugOverlay {
         shape.end();
     }
 
-    // ==================== INFO PANEL ====================
-
     private void drawInfoPanel(ShapeRenderer shape, SpriteBatch batch, BitmapFont font,
                                OrthographicCamera camera, GameWorld world, MapManager mapManager) {
 
         float uiScale = camera.viewportWidth / 400f;
 
-        // FIXED: Widened panel and column offset so long labels never touch the numbers
         float panelW = 165f * uiScale;
         float panelH = 135f * uiScale;
         float panelX = camera.position.x + camera.viewportWidth / 2f - panelW - 5f * uiScale;
@@ -294,8 +292,6 @@ public class DebugOverlay {
         float lineH = 11f * uiScale;
         float tx = panelX + 8f * uiScale;
         float ty = panelY + panelH - 8f * uiScale;
-
-        // Push the values perfectly to the right so they NEVER overlap the labels
         float colOffset = 80f * uiScale;
 
         font.setColor(COLOR_ACTIVE_TAB);
@@ -336,16 +332,14 @@ public class DebugOverlay {
         font.draw(batch, value, x + colOffset, y);
     }
 
-    // ==================== TAB BAR ====================
-
     private void drawTabBar(ShapeRenderer shape, SpriteBatch batch, BitmapFont font, OrthographicCamera camera) {
         float uiScale = camera.viewportWidth / 400f;
         font.getData().setScale(0.35f * uiScale);
 
-        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf", "[8] TP", "[9] Spwn", "[0] Skip" };
-        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo, tpMode, spawnMode, false };
+        // Added the [B] Boss cheat text to the bottom tab bar!
+        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf", "[8] TP", "[9] Spwn", "[0] Skip", "[B] Boss" };
+        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo, tpMode, spawnMode, false, false };
 
-        // FIXED: Expanded the tab padding so text doesn't squish
         float tabPadding = 24f * uiScale;
 
         float totalTabW = 0;
@@ -378,7 +372,6 @@ public class DebugOverlay {
             layout.setText(font, tabs[i]);
             font.draw(batch, layout, tx, ty);
 
-            // Move over exactly the width of the word + safe padding to prevent horizontal collision
             tx += layout.width + tabPadding;
         }
 

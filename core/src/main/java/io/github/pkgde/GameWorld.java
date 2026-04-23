@@ -19,6 +19,11 @@ public class GameWorld {
     private static final float NEAR_ENEMY_DISTANCE_SQ = NEAR_ENEMY_DISTANCE * NEAR_ENEMY_DISTANCE;
     private static final float ARROW_DAMAGE = 20f;
 
+    // FIXED: Increased trigger distance to 150f. Hitboxes were physically preventing
+    // the player and boss from getting within 60 pixels of each other!
+    private static final float BOSS_TRIGGER_DIST = 150f;
+    private static final float BOSS_TRIGGER_DIST_SQ = BOSS_TRIGGER_DIST * BOSS_TRIGGER_DIST;
+
     public static final float WORLD_WIDTH = 1280;
     public static final float WORLD_HEIGHT = 720;
     public static final float FLOOR_OFFSET = 120f;
@@ -33,12 +38,10 @@ public class GameWorld {
     private final ArrayList<Rectangle> boundaries;
     private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
 
-    private boolean levelComplete = false; // flag for level completion
+    private boolean levelComplete = false;
 
-    private boolean isTutorialBossWaveActive = false;
-    private int tutorialWavePhase = 0;
-    private final ArrayList<Vector2> tutorialWaveSpawns = new ArrayList<>();
-    private final ArrayList<Enemy> enemiesToSpawn = new ArrayList<>();
+    // Boss State
+    private boolean bossFightTriggered = false;
 
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -51,27 +54,25 @@ public class GameWorld {
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
         player.getPosition().set(mapManager.getPlayerSpawn());
 
-        if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk") && mapManager.getCurrentLevelIndex() == 3) {
-            isTutorialBossWaveActive = true;
-            tutorialWavePhase = 1;
-            tutorialWaveSpawns.addAll(mapManager.getEnemySpawns());
+        // Spawn Boss if a boss spawn point was found by MapManager
+        Vector2 bossSpawn = mapManager.getBossSpawn();
+        if (bossSpawn.x != -1 && bossSpawn.y != -1) {
+            Enemy boss = new Enemy();
+            boss.setBoundaries(boundaries);
+            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            boss.setPosition(bossSpawn.x, bossSpawn.y);
+            boss.setBoss(true);
+            boss.forceChase(Float.MAX_VALUE);
+            enemies.add(boss);
+        }
 
-            float centerX = mapManager.getMapWidth() / 2f;
-            float centerY = tutorialWaveSpawns.isEmpty() ? mapManager.getMapHeight() / 2f : tutorialWaveSpawns.get(0).y;
-
+        // Spawn normal enemies
+        for (Vector2 spawn : mapManager.getEnemySpawns()) {
             Enemy e = new Enemy();
             e.setBoundaries(boundaries);
             e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-            e.setPosition(centerX, centerY);
+            e.setPosition(spawn.x, spawn.y);
             enemies.add(e);
-        } else {
-            for (Vector2 spawn : mapManager.getEnemySpawns()) {
-                Enemy e = new Enemy();
-                e.setBoundaries(boundaries);
-                e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-                e.setPosition(spawn.x, spawn.y);
-                enemies.add(e);
-            }
         }
 
         this.interactables = mapManager.getInteractables();
@@ -81,21 +82,31 @@ public class GameWorld {
         lightingManager.update(delta);
         player.update(delta, camera);
 
-        // Reverted to the old, simpler lighting logic.
-        // The light is always on and centered on the player's hitbox.
         Rectangle pBounds = player.getBounds();
         float pcx = pBounds.x + pBounds.width / 2f;
         float pcy = pBounds.y + pBounds.height / 2f;
         lightingManager.updatePlayerLight(pcx, pcy);
 
-        // Update the lighting FBO here, before main rendering starts
         lightingManager.updateLightFbo(camera, shape);
 
         for (Enemy e : enemies) {
             e.update(delta, player);
+
+            // ---> THE BOSS PROXIMITY TRIGGER <---
+            if (e.isAlive() && e.isBoss() && !bossFightTriggered) {
+                float bossCX = e.getBounds().x + e.getBounds().width / 2f;
+                float bossCY = e.getBounds().y + e.getBounds().height / 2f;
+                float dx = pcx - bossCX;
+                float dy = pcy - bossCY;
+
+                // Triggers instantly the moment the boss touches you
+                if (dx * dx + dy * dy <= BOSS_TRIGGER_DIST_SQ) {
+                    bossFightTriggered = true;
+                }
+            }
         }
 
-        // --- WORLD TORCHES (Map Objects) ---
+        // --- WORLD TORCHES ---
         ArrayList<Rectangle> torches = mapManager.getTorchRects();
         for (int i = torches.size() - 1; i >= 0; i--) {
             if (player.getBounds().overlaps(torches.get(i))) {
@@ -140,7 +151,7 @@ public class GameWorld {
                 if (e.isAlive() && arrow.getBounds().overlaps(e.getBounds())) {
                     boolean wasAlive = e.isAlive();
                     e.takeDamage(ARROW_DAMAGE);
-                    e.forceChase(10f); // Aggro triggered by projectile hit
+                    e.forceChase(10f);
 
                     if (wasAlive && !e.isAlive()) {
                         handleEnemyDeath(e);
@@ -152,48 +163,15 @@ public class GameWorld {
             }
         }
 
-        // --- GROUP AGGRO MECHANIC ---
         updateGroupAggro();
-
-        // --- LOOT DROPS LOGIC ---
         updateLootDrops(delta);
-
-        // --- INTERACTABLES ---
         updateInteractables();
-
-        // --- TUTORIAL BOSS WAVES ---
-        if (isTutorialBossWaveActive && tutorialWavePhase == 1) {
-            boolean allDead = true;
-            for (Enemy e : enemies) {
-                if (e.isAlive()) {
-                    allDead = false;
-                    break;
-                }
-            }
-            if (allDead) {
-                tutorialWavePhase = 2;
-                for (Vector2 spawn : tutorialWaveSpawns) {
-                    Enemy waveEnemy = new Enemy();
-                    waveEnemy.setBoundaries(boundaries);
-                    waveEnemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-                    waveEnemy.setPosition(spawn.x, spawn.y);
-                    enemiesToSpawn.add(waveEnemy);
-                }
-            }
-        }
-
-        if (!enemiesToSpawn.isEmpty()) {
-            enemies.addAll(enemiesToSpawn);
-            enemiesToSpawn.clear();
-        }
     }
 
     private void handleEnemyDeath(Enemy e) {
         player.incrementEnemiesKilled();
         float cx = e.getBounds().x + e.getBounds().width / 2f;
         float cy = e.getBounds().y + e.getBounds().height / 2f;
-
-        // Enemies always drop a card, plus random chance loot
         lootDrops.add(new LootDrop(LootDrop.Type.CARD, cx, cy));
         spawnLoot(cx, cy);
     }
@@ -253,18 +231,17 @@ public class GameWorld {
     }
 
     private void updateInteractables() {
-        // --- LEVEL EXIT LOGIC ---
         for (Rectangle exit : mapManager.getExitGateRects()) {
             if (player.getBounds().overlaps(exit)) {
                 boolean allEnemiesDead = true;
                 for (Enemy e : enemies) {
-                    if (e.isAlive()) {
+                    if (e.isAlive() && !e.isBoss()) {
                         allEnemiesDead = false;
                         break;
                     }
                 }
                 if (allEnemiesDead) {
-                    levelComplete = true; // flag to be read by ExplorationScreen
+                    levelComplete = true;
                 }
             }
         }
@@ -274,19 +251,12 @@ public class GameWorld {
 
             boolean inRange = interactable.isPlayerInRange(player);
 
-            // 1. AUTO-TRIGGER BOSS FIGHT
-            if (inRange && interactable.getType() == Interactable.Type.BOSS_TRIGGER) {
-                if (!interactable.isInteracted()) {
-                    interactable.interact(player);
-                }
-            }
-            // 2. MANUAL TRIGGER (Press G)
-            else if (inRange && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
+            if (inRange && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
                 if (interactable.getType() == Interactable.Type.CENTER_FIRE) {
                     if (!lightingManager.isLit()) {
                         if (player.hasTorch()) {
                             player.removeTorch();
-                            interactable.interact(player); // Hides the "Press [G]" prompt
+                            interactable.interact(player);
                             Rectangle b = interactable.getBounds();
                             lightingManager.triggerLighting(b.x + b.width / 2f, b.y + b.height / 2f);
                         } else {
@@ -313,7 +283,6 @@ public class GameWorld {
         }
     }
 
-
     private void spawnLoot(float x, float y) {
         float roll = MathUtils.random();
         if (roll < 0.30f) lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, x, y));
@@ -334,7 +303,6 @@ public class GameWorld {
         return false;
     }
 
-    // ===== GETTERS & SETTERS =====
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
     public LightingManager getLightingManager() { return lightingManager; }
@@ -342,7 +310,8 @@ public class GameWorld {
     public ArrayList<Interactable> getInteractables() { return interactables; }
     public MapManager getMapManager() { return mapManager; }
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
-    public boolean isLevelComplete() { return levelComplete; } // Getter for levelComplete
+    public boolean isLevelComplete() { return levelComplete; }
+    public boolean isBossFightTriggered() { return bossFightTriggered; }
 
     public void dispose() {
         player.dispose();

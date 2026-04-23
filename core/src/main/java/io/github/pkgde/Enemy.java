@@ -63,6 +63,9 @@ public class Enemy {
     private float health = MAX_HEALTH, hurtTimer, attackTimer, attackCooldownTimer;
     private boolean attackDamageConsumed, disposed;
 
+    // Boss properties
+    private boolean isBoss = false;
+
     // Collision
     private ArrayList<Rectangle> boundaries;
     private ArrayList<Polygon> collisionPolygons;
@@ -204,7 +207,7 @@ public class Enemy {
             }
         } else if (state == State.CHASE) {
             if (!isAttacking && hurtTimer <= 0f) {
-                if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f) {
+                if (distance <= ATTACK_RANGE && attackCooldownTimer <= 0f && !isBoss) {
                     startAttack();
                 } else {
                     handleChaseMovement(playerPos, speed, delta, distance, toPlayer);
@@ -223,6 +226,11 @@ public class Enemy {
     }
 
     private void updateAIState(float distance, Vector2 toPlayer, float delta) {
+        if (isBoss) {
+            state = State.CHASE;
+            return;
+        }
+
         boolean inRange = (state == State.CHASE) ? distance <= alertRange : distance <= baseRange;
         boolean inCone = false;
         if (inRange) {
@@ -329,6 +337,7 @@ public class Enemy {
 
     public void takeDamage(float damage) {
         if (damage <= 0f || !isAlive() || disposed) return;
+        if (isBoss) return; // Bosses are invincible in the overworld
         health = Math.max(0f, health - damage);
         if (!isAlive()) {
             deathStateTime = 0f; attackTimer = 0f; hurtTimer = 0f;
@@ -341,6 +350,7 @@ public class Enemy {
 
     public void applyKnockback(Vector2 forceDir, float forceAmt) {
         if (!isAlive() || disposed) return;
+        if (isBoss) return; // Boss doesn't get knocked back
         knockbackVelocity.add(new Vector2(forceDir).nor().scl(forceAmt));
     }
 
@@ -412,7 +422,14 @@ public class Enemy {
     public void render(SpriteBatch batch) {
         if (disposed) return;
         if (hurtTimer > 0f) batch.setColor(1f, 0.5f, 0.5f, 1f);
-        batch.draw(currentFrame, position.x, position.y, WIDTH, HEIGHT);
+        // Boss has red tint
+        if (isBoss) batch.setColor(1f, 0.5f, 0.5f, 1f);
+
+        // Make boss bigger maybe? (Optional)
+        float w = isBoss ? WIDTH * 1.5f : WIDTH;
+        float h = isBoss ? HEIGHT * 1.5f : HEIGHT;
+
+        batch.draw(currentFrame, position.x, position.y, w, h);
         batch.setColor(1f, 1f, 1f, 1f);
     }
 
@@ -441,4 +458,12 @@ public class Enemy {
     public float getAttackTimer() { return attackTimer; }
     public float getAttackAnimDuration() { return getAttackAnimation().getAnimationDuration(); }
     public void dispose() { if (!disposed) { shape.dispose(); disposed = true; } }
+
+    public boolean isBoss() { return isBoss; }
+    public void setBoss(boolean boss) {
+        this.isBoss = boss;
+        if (boss) {
+            this.health = Float.MAX_VALUE;
+        }
+    }
 }
