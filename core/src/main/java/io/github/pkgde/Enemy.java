@@ -61,6 +61,7 @@ public class Enemy {
     private static final float ATTACK_COOLDOWN = 1.2f, HURT_TIME = 0.24f;
 
     private float health = MAX_HEALTH, hurtTimer, attackTimer, attackCooldownTimer;
+    private float animatedHealth = MAX_HEALTH;
     private boolean attackDamageConsumed, disposed;
 
     // Collision
@@ -149,18 +150,12 @@ public class Enemy {
     }
 
     public void update(float delta, Player player) {
-        if (disposed) return;
-
-        // Process Knockback
-        if (knockbackVelocity.len2() > 0) {
-            float currentSpeed = knockbackVelocity.len();
-            currentSpeed -= KNOCKBACK_FRICTION * delta;
-            if (currentSpeed <= 0) {
-                knockbackVelocity.setZero();
-            } else {
-                knockbackVelocity.setLength(currentSpeed);
-                moveBy(knockbackVelocity.x * delta, knockbackVelocity.y * delta);
-            }
+        // Health animation logic
+        if (animatedHealth > health) {
+            animatedHealth -= 40f * delta;
+            if (animatedHealth < health) animatedHealth = health;
+        } else if (animatedHealth < health) {
+            animatedHealth = health;
         }
 
         if (!isAlive()) {
@@ -430,9 +425,10 @@ public class Enemy {
     public void setPosition(float x, float y) { position.set(x, y); bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y); }
     public Vector2 getPosition() { return position; }
     public float getHealth() { return health; }
-    public void setHealth(float h) { health = h; }
+    public void setHealth(float h) { health = h; animatedHealth = h; }
     public boolean isAlive() { return health > 0f; }
     public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
+    public float getAnimatedHealthRatio() { return MathUtils.clamp(animatedHealth / MAX_HEALTH, 0f, 1f); }
     public float getDamage() { return ATTACK_DAMAGE; }
     public void consumeAttackDamage() { attackDamageConsumed = true; }
     public void forceChase(float duration) { if (isAlive()) { forcedAggroTimer = Math.max(forcedAggroTimer, duration); state = State.CHASE; } }

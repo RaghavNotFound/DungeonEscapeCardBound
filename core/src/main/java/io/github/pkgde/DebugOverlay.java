@@ -43,6 +43,7 @@ public class DebugOverlay {
     private static final Color COLOR_CHEST = new Color(1f, 0.85f, 0.1f, 0.8f);
     private static final Color COLOR_PLAYER_SPAWN = new Color(0.3f, 0.6f, 1f, 0.9f);
     private static final Color COLOR_ENEMY_SPAWN = new Color(1f, 0.35f, 0.35f, 0.9f);
+    private static final Color COLOR_LAVA = new Color(1f, 0.4f, 0f, 0.6f);
     private static final Color COLOR_PANEL_BG = new Color(0.05f, 0.05f, 0.12f, 0.88f);
     private static final Color COLOR_PANEL_BORDER = new Color(0.3f, 0.3f, 0.5f, 0.9f);
     private static final Color COLOR_ACTIVE_TAB = new Color(0.25f, 0.85f, 0.55f, 1f);
@@ -122,6 +123,7 @@ public class DebugOverlay {
             drawCollisionRects(shape, mapManager);
             drawChestHitboxes(shape, mapManager);
             drawSpawnMarkers(shape, mapManager);
+            drawLavaRects(shape, mapManager);
         }
         if (showBoundaries) drawMapBorder(shape, mapManager);
         if (showHitboxes) drawEntityHitboxes(shape, world);
@@ -161,6 +163,27 @@ public class DebugOverlay {
         Gdx.gl.glLineWidth(2f);
         shape.setColor(COLOR_CHEST);
         for (Rectangle r : chests) {
+            shape.rect(r.x, r.y, r.width, r.height);
+            shape.line(r.x, r.y, r.x + r.width, r.y + r.height);
+            shape.line(r.x + r.width, r.y, r.x, r.y + r.height);
+        }
+        Gdx.gl.glLineWidth(1f);
+        shape.end();
+    }
+
+    private void drawLavaRects(ShapeRenderer shape, MapManager mapManager) {
+        if (mapManager == null) return;
+        ArrayList<Rectangle> lavas = mapManager.getLavaRects();
+
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(COLOR_LAVA.r, COLOR_LAVA.g, COLOR_LAVA.b, 0.3f);
+        for (Rectangle r : lavas) shape.rect(r.x, r.y, r.width, r.height);
+        shape.end();
+
+        shape.begin(ShapeRenderer.ShapeType.Line);
+        Gdx.gl.glLineWidth(2f);
+        shape.setColor(COLOR_LAVA);
+        for (Rectangle r : lavas) {
             shape.rect(r.x, r.y, r.width, r.height);
             shape.line(r.x, r.y, r.x + r.width, r.y + r.height);
             shape.line(r.x + r.width, r.y, r.x, r.y + r.height);

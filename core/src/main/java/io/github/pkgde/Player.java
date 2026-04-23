@@ -54,6 +54,12 @@ public class Player {
     private boolean facingRight = true;
     private Vector2 knockbackVelocity = new Vector2();
     private static final float KNOCKBACK_FRICTION = 600f;
+    private boolean sinkingInLava = false;
+    private float sinkOffset = 0f;
+    private float lavaRotation = 0f;
+    private float targetLavaRotation = 0f;
+    private Vector2 lastVelocity = new Vector2();
+    private Vector2 lavaVelocity = new Vector2();
 
     // ===== DASH =====
     private static final float DASH_DURATION = 0.22f;
@@ -78,6 +84,7 @@ public class Player {
     private static final float DAMAGE_INVULNERABILITY = 0.45f;
     private static final float HURT_ANIM_TIME = 0.28f;
     private float health = MAX_HEALTH;
+    private float animatedHealth = MAX_HEALTH;
     private float damageInvulnTimer, hurtTimer, hurtStateTime;
 
     private static final float SWORD_DAMAGE = 35f;
@@ -184,8 +191,10 @@ public class Player {
     public float getMaxStamina() { return maxStamina; }
     public float getShootCooldownPercent() { return MathUtils.clamp(1f - (shootTimer / SHOOT_COOLDOWN), 0f, 1f); }
     public float getHealth() { return health; }
+    public float getAnimatedHealth() { return animatedHealth; }
     public float getMaxHealth() { return MAX_HEALTH; }
     public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
+    public float getAnimatedHealthRatio() { return MathUtils.clamp(animatedHealth / MAX_HEALTH, 0f, 1f); }
     public void addHealth(float amount) { health = Math.min(health + amount, MAX_HEALTH); }
     public float getSwordDamage() { return SWORD_DAMAGE; }
     public Vector2 getPosition() { return position; }
@@ -211,18 +220,49 @@ public class Player {
     }
 
     public void setPosition(float x, float y) { position.set(x, y); updateBoundsPosition(); }
-    public void setHealth(float h) { health = h; }
+    public void setHealth(float h) { health = h; animatedHealth = h; }
     public void setStamina(float s) { stamina = s; }
     public void setTorchCount(int t) { torchCount = t; }
     public void setCardsCount(int c) { cardsCount = c; }
     public void setEnemiesKilled(int k) { enemiesKilled = k; }
     public void setTimeSurvived(float t) { timeSurvived = t; }
 
+    public void triggerLavaDeath() {
+        if (!isAlive()) return;
+        health = 0;
+        sinkingInLava = true;
+        deathStateTime = 0f;
+        hurtTimer = 0f;
+        lavaVelocity.set(lastVelocity).scl(0.4f); // keep 40% velocity
+        if (Math.abs(lavaVelocity.x) > Math.abs(lavaVelocity.y)) {
+            targetLavaRotation = lavaVelocity.x > 0 ? -90f : 90f;
+        } else {
+            targetLavaRotation = 0f;
+        }
+        lavaRotation = 0f;
+    }
+
     // ===== UPDATE =====
     public void update(float delta, OrthographicCamera camera) {
         timeSurvived += delta;
 
+        // Health animation logic
+        if (animatedHealth > health) {
+            animatedHealth -= 25f * delta; // Adjust speed of damage trail bar
+            if (animatedHealth < health) {
+                animatedHealth = health;
+            }
+        } else if (animatedHealth < health) {
+            animatedHealth = health; // Instantly catch up on heals
+        }
+
         if (!isAlive()) {
+            if (sinkingInLava) {
+                sinkOffset += 30f * delta;
+                position.add(lavaVelocity.x * delta, lavaVelocity.y * delta);
+                lavaVelocity.scl(0.95f); // gradually stop
+                lavaRotation = MathUtils.lerp(lavaRotation, targetLavaRotation, 2.5f * delta);
+            }
             deathStateTime += delta;
             currentFrame = deathAnimation.getKeyFrame(deathStateTime, false);
             updateBoundsPosition();
@@ -270,8 +310,12 @@ public class Player {
             swordDamageConsumed = false;
         }
 
+        float oldX = position.x, oldY = position.y;
         updateRunLockState();
         boolean moved = handleMovement(delta);
+        if (isAlive()) {
+            lastVelocity.set(position.x - oldX, position.y - oldY).scl(1f / delta);
+        }
         stateTime += delta;
 
         // Animation State
@@ -437,7 +481,23 @@ public class Player {
     public void render(SpriteBatch batch) {
         float dW = facingRight ? WIDTH : -WIDTH;
         float dX = facingRight ? position.x : position.x + WIDTH;
-        batch.draw(currentFrame, dX, position.y, dW, HEIGHT);
+
+        if (sinkingInLava) {
+            float renderedHeight = Math.max(0, HEIGHT - sinkOffset);
+            TextureRegion cropped = new TextureRegion(currentFrame);
+            float cropRatio = renderedHeight / HEIGHT;
+
+            // To drown upwards/crop from bottom up:
+            // Region height is reduced, Y is drawn shifted up by sinkOffset so feet disappear under lava.
+            cropped.setRegionHeight((int)(cropped.getRegionHeight() * cropRatio));
+
+            float originX = facingRight ? WIDTH / 2f : -WIDTH / 2f;
+            float originY = renderedHeight / 2f;
+
+            batch.draw(cropped, dX, position.y + sinkOffset, originX, originY, dW, renderedHeight, 1f, 1f, lavaRotation);
+        } else {
+            batch.draw(currentFrame, dX, position.y, dW, HEIGHT);
+        }
 
         if (swordAttackTimer > 0f) {
             float prog = 1f - (swordAttackTimer / swordAnimation.getAnimationDuration());

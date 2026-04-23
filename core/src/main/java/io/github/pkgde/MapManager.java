@@ -32,6 +32,7 @@ public class MapManager {
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
     private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
+    private final ArrayList<Rectangle> lavaRects = new ArrayList<>();
     private final ArrayList<Interactable> interactables = new ArrayList<>();
 
     // Tile rendering data
@@ -135,6 +136,7 @@ public class MapManager {
         torchRects.clear();
         chestRects.clear();
         exitGateRects.clear();
+        lavaRects.clear();
         interactables.clear();
         tileLayers.clear();
         tilesetTextures.values().forEach(Texture::dispose);
@@ -215,6 +217,9 @@ public class MapManager {
                 case "Exit":
                 case "ExitDoor":
                     exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+                case "LavaDamage":
+                    lavaRects.add(new Rectangle(x, y, eWidth, eHeight));
                     break;
             }
         }
@@ -349,6 +354,7 @@ public class MapManager {
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }
     public ArrayList<Rectangle> getChestRects() { return chestRects; }
     public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
+    public ArrayList<Rectangle> getLavaRects() { return lavaRects; }
     public ArrayList<Interactable> getInteractables() { return interactables; }
 
     public void dispose() {

@@ -81,6 +81,32 @@ public class GameWorld {
         lightingManager.update(delta);
         player.update(delta, camera);
 
+        // --- LAVA DEATH LOGIC ---
+        if (player.isAlive()) {
+            Rectangle pBounds = player.getBounds();
+            for (Rectangle lava : mapManager.getLavaRects()) {
+                if (pBounds.overlaps(lava)) {
+                    // Calculate horizontal overlap
+                    float overlapXStart = Math.max(pBounds.x, lava.x);
+                    float overlapXEnd = Math.min(pBounds.x + pBounds.width, lava.x + lava.width);
+                    float overlapWidth = overlapXEnd - overlapXStart;
+
+                    // Calculate vertical overlap (from the bottom of player to lava's top)
+                    float overlapYStart = Math.max(pBounds.y, lava.y);
+                    float overlapYEnd = Math.min(pBounds.y + pBounds.height, lava.y + lava.height);
+                    float overlapHeight = overlapYEnd - overlapYStart;
+
+                    // Trigger death if:
+                    // 1) Horizontal overlap is more than half the player's width
+                    // 2) Player's bottom is touching the lava
+                    if (overlapWidth > pBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, pBounds.y, 1f)) {
+                        player.triggerLavaDeath();
+                        break;
+                    }
+                }
+            }
+        }
+
         // Reverted to the old, simpler lighting logic.
         // The light is always on and centered on the player's hitbox.
         Rectangle pBounds = player.getBounds();

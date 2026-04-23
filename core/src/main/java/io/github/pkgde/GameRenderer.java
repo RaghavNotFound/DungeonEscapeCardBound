@@ -134,6 +134,7 @@ public class GameRenderer {
             // --- Health Bar ---
             Rectangle eBounds = enemy.getBounds();
             float ratio = MathUtils.clamp(enemy.getHealthRatio(), 0f, 1f);
+            float animRatio = MathUtils.clamp(enemy.getAnimatedHealthRatio(), 0f, 1f);
             float scale = 0.75f * Player.ENTITY_SCALE;
 
             float barWidth = eBounds.width * scale;
@@ -144,6 +145,10 @@ public class GameRenderer {
             // Background
             shape.setColor(0f, 0f, 0f, 0.8f);
             shape.rect(x - 1f, y - 1f, barWidth + 2f, barHeight + 2f);
+
+            // Animated damage trail
+            shape.setColor(1f, 0.6f, 0.6f, 1f);
+            shape.rect(x, y, barWidth * animRatio, barHeight);
 
             // Health Fill
             if (ratio > 0.6f) shape.setColor(0.2f, 0.9f, 0.2f, 1f);
@@ -188,7 +193,11 @@ public class GameRenderer {
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
 
-        drawRoundedStatusBar(shape, x, y, width, height, world.getPlayer().getHealthRatio(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(1f, 0.25f, 0.25f, 1f));
+        // Player health animation trail
+        drawRoundedStatusBar(shape, x, y, width, height, world.getPlayer().getAnimatedHealthRatio(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(1f, 0.6f, 0.6f, 1f));
+        // Player actual health
+        drawRoundedStatusBar(shape, x, y, width, height, world.getPlayer().getHealthRatio(), new Color(0f, 0f, 0f, 0f), new Color(1f, 0.25f, 0.25f, 1f));
+
         drawRoundedStatusBar(shape, x, y - spacing, width, height, world.getPlayer().getStamina() / world.getPlayer().getMaxStamina(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.15f, 0.95f, 0.35f, 1f));
         drawRoundedStatusBar(shape, x, y - spacing * 2, width, height, world.getPlayer().getShootCooldownPercent(), new Color(0.2f, 0.2f, 0.2f, 1f), new Color(0.25f, 0.65f, 1f, 1f));
 
