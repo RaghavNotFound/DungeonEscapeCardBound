@@ -343,6 +343,7 @@ public class MapManager {
 
     public float getMapWidth() { return mapWidth; }
     public float getMapHeight() { return mapHeight; }
+    public int getGridSize() { return gridSize; }
     public Vector2 getPlayerSpawn() { return playerSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }

@@ -40,12 +40,20 @@ public class GameWorld {
     private final ArrayList<Vector2> tutorialWaveSpawns = new ArrayList<>();
     private final ArrayList<Enemy> enemiesToSpawn = new ArrayList<>();
 
+    // Shared A* pathfinder for all enemies
+    private AStar pathfinder;
+
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
         this.lightingManager = new LightingManager();
         this.player = new Player();
 
         this.boundaries = mapManager.getCollisionRects();
+
+        // Build shared A* grid from map collision data
+        int gridSize = mapManager.getGridSize();
+        if (gridSize <= 0) gridSize = 16;
+        this.pathfinder = new AStar(mapManager.getMapWidth(), mapManager.getMapHeight(), gridSize, boundaries);
 
         player.setBoundaries(boundaries);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
@@ -62,6 +70,7 @@ public class GameWorld {
             Enemy e = new Enemy();
             e.setBoundaries(boundaries);
             e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            e.setPathfinder(pathfinder);
             e.setPosition(centerX, centerY);
             enemies.add(e);
         } else {
@@ -69,6 +78,7 @@ public class GameWorld {
                 Enemy e = new Enemy();
                 e.setBoundaries(boundaries);
                 e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                e.setPathfinder(pathfinder);
                 e.setPosition(spawn.x, spawn.y);
                 enemies.add(e);
             }
@@ -176,6 +186,7 @@ public class GameWorld {
                     Enemy waveEnemy = new Enemy();
                     waveEnemy.setBoundaries(boundaries);
                     waveEnemy.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                    waveEnemy.setPathfinder(pathfinder);
                     waveEnemy.setPosition(spawn.x, spawn.y);
                     enemiesToSpawn.add(waveEnemy);
                 }
