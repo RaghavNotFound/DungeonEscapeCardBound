@@ -34,6 +34,7 @@ public class GameWorld {
     private final ArrayList<Polygon> collisionPolygons = new ArrayList<>();
 
     private boolean levelComplete = false; // flag for level completion
+    private boolean bossFightTriggered = false;
 
     private boolean isTutorialBossWaveActive = false;
     private int tutorialWavePhase = 0;
@@ -298,6 +299,17 @@ public class GameWorld {
         for (Interactable interactable : interactables) {
             interactable.update(Gdx.graphics.getDeltaTime());
 
+            if (
+                interactable.getType() == Interactable.Type.BOSS_TRIGGER &&
+                player.isAlive() &&
+                !interactable.isInteracted() &&
+                interactable.isPlayerInRange(player)
+            ) {
+                interactable.interact(player);
+                bossFightTriggered = true;
+                continue;
+            }
+
             if (interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
                 if (interactable.getType() == Interactable.Type.CENTER_FIRE) {
                     if (!lightingManager.isLit()) {
@@ -360,6 +372,7 @@ public class GameWorld {
     public MapManager getMapManager() { return mapManager; }
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
     public boolean isLevelComplete() { return levelComplete; } // Getter for levelComplete
+    public boolean isBossFightTriggered() { return bossFightTriggered; }
 
     public void dispose() {
         player.dispose();
