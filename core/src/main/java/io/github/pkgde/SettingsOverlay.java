@@ -25,7 +25,7 @@ public class SettingsOverlay {
         "800 x 600",
         "1280 x 720",
         "Borderless Fullscreen",
-        "Windowed Fullscreen",
+        "Exclusive Fullscreen",
         "BACK (ESC)"
     };
 
@@ -127,24 +127,22 @@ public class SettingsOverlay {
     private void applySelection() {
         switch (selected) {
             case OPTION_WINDOW_800_600:
-                Gdx.graphics.setUndecorated(false);
-                Gdx.graphics.setWindowedMode(800, 600);
+                WindowModeManager.applyWindowedMode(800, 600);
                 break;
 
             case OPTION_WINDOW_1280_720:
-                Gdx.graphics.setUndecorated(false);
-                Gdx.graphics.setWindowedMode(1280, 720);
+                WindowModeManager.applyWindowedMode(
+                    WindowModeManager.DEFAULT_WINDOW_WIDTH,
+                    WindowModeManager.DEFAULT_WINDOW_HEIGHT
+                );
                 break;
 
             case OPTION_BORDERLESS:
-                Gdx.graphics.setUndecorated(true);
-                Graphics.DisplayMode mode = Gdx.graphics.getDisplayMode();
-                Gdx.graphics.setFullscreenMode(mode);
+                WindowModeManager.applyBorderlessFullscreen();
                 break;
 
             case OPTION_WINDOWED_FULLSCREEN:
-                Gdx.graphics.setUndecorated(false);
-                Gdx.graphics.setWindowedMode(1920, 1025);
+                WindowModeManager.applyExclusiveFullscreen();
                 break;
 
             case OPTION_BACK:

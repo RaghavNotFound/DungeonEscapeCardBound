@@ -214,6 +214,9 @@ public class MapManager {
                     chestRects.add(new Rectangle(x, y, eWidth, eHeight));
                     interactables.add(new Interactable(Interactable.Type.CHEST, x, y, eWidth, eHeight));
                     break;
+                case "BossSpawn":
+                    interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, x, y, eWidth, eHeight));
+                    break;
                 case "Exit":
                 case "ExitDoor":
                     exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
