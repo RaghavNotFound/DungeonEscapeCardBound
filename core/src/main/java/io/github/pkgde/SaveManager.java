@@ -5,27 +5,37 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Json;
 import com.badlogic.gdx.utils.JsonWriter;
+import com.badlogic.gdx.math.Vector2;
 import java.util.Comparator;
 
-// --- NEW IMPORTS FOR BULLETPROOF FILE HANDLING ---
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.io.IOException;
 
-/**
- * Handles saving and loading game state to/from JSON files.
- */
 public class SaveManager {
 
     private static final String SAVE_DIR = "saves/";
     private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
 
+    // FIXED: Reads the file safely without loading the whole world so we know what map to load!
+    public static SaveState peekSave(String slotName) {
+        FileHandle file = Gdx.files.local(SAVE_DIR + slotName + ".json");
+        if (!file.exists()) return null;
+        return new Json().fromJson(SaveState.class, file);
+    }
+
     public static void saveGame(GameWorld world, String slotName) {
+        saveGameWithLocation(world, slotName, world.getMapManager().getCurrentMapPath(), world.getMapManager().getCurrentLevelIndex());
+    }
+
+    public static void saveGameWithLocation(GameWorld world, String slotName, String mapPath, int levelIndex) {
         SaveState state = new SaveState();
 
-        // 1. Capture Player State
+        state.currentMapPath = mapPath;
+        state.currentLevelIndex = levelIndex;
+
         Player p = world.getPlayer();
         state.player.x = p.getPosition().x;
         state.player.y = p.getPosition().y;
@@ -36,7 +46,6 @@ public class SaveManager {
         state.player.enemiesKilled = p.getEnemiesKilled();
         state.player.timeSurvived = p.getTimeSurvived();
 
-        // 2. Capture Enemy States
         for (Enemy e : world.getEnemies()) {
             if (!e.isAlive()) continue;
             SaveState.EnemyState es = new SaveState.EnemyState();
@@ -46,7 +55,6 @@ public class SaveManager {
             state.enemies.add(es);
         }
 
-        // 3. Capture Interactable States
         for (Interactable i : world.getInteractables()) {
             SaveState.InteractableState is = new SaveState.InteractableState();
             is.x = i.getBounds().x;
@@ -56,12 +64,55 @@ public class SaveManager {
             state.interactables.add(is);
         }
 
-        // 4. Capture World State
         if (world.getLightingManager() != null) {
             state.isCenterFireLit = world.getLightingManager().isLit();
         }
 
-        // 5. Write to file
+        FileHandle file = Gdx.files.local(SAVE_DIR + slotName + ".json");
+        Json json = new Json();
+        json.setOutputType(JsonWriter.OutputType.json);
+        file.writeString(json.prettyPrint(state), false);
+    }
+
+    public static void saveLevelTransition(GameWorld world, String slotName, String mapPath, int levelIndex) {
+        SaveState state = new SaveState();
+
+        state.currentMapPath = mapPath;
+        state.currentLevelIndex = levelIndex;
+        state.isLevelTransition = true;
+
+        Player p = world.getPlayer();
+        state.player.x = p.getPosition().x;
+        state.player.y = p.getPosition().y;
+        state.player.health = p.getHealth();
+        state.player.stamina = p.getStamina();
+        state.player.torches = p.getTorchCount();
+        state.player.cards = p.getCardsCount();
+        state.player.enemiesKilled = p.getEnemiesKilled();
+        state.player.timeSurvived = p.getTimeSurvived();
+
+        for (Enemy e : world.getEnemies()) {
+            if (!e.isAlive()) continue;
+            SaveState.EnemyState es = new SaveState.EnemyState();
+            es.x = e.getPosition().x;
+            es.y = e.getPosition().y;
+            es.health = e.getHealth();
+            state.enemies.add(es);
+        }
+
+        for (Interactable i : world.getInteractables()) {
+            SaveState.InteractableState is = new SaveState.InteractableState();
+            is.x = i.getBounds().x;
+            is.y = i.getBounds().y;
+            is.type = i.getType().name();
+            is.interacted = i.isInteracted();
+            state.interactables.add(is);
+        }
+
+        if (world.getLightingManager() != null) {
+            state.isCenterFireLit = world.getLightingManager().isLit();
+        }
+
         FileHandle file = Gdx.files.local(SAVE_DIR + slotName + ".json");
         Json json = new Json();
         json.setOutputType(JsonWriter.OutputType.json);
@@ -79,9 +130,16 @@ public class SaveManager {
         Json json = new Json();
         SaveState state = json.fromJson(SaveState.class, file);
 
-        // 1. Restore Player
         Player p = world.getPlayer();
-        p.setPosition(state.player.x, state.player.y);
+
+        if (!state.isLevelTransition) {
+            p.setPosition(state.player.x, state.player.y);
+        } else {
+            // FIX: Force the player to the actual map spawn point for the new room!
+            Vector2 spawn = world.getMapManager().getPlayerSpawn();
+            p.setPosition(spawn.x, spawn.y);
+        }
+
         p.setHealth(state.player.health);
         p.setStamina(state.player.stamina);
         p.setTorchCount(state.player.torches);
@@ -89,7 +147,6 @@ public class SaveManager {
         p.setEnemiesKilled(state.player.enemiesKilled);
         p.setTimeSurvived(state.player.timeSurvived);
 
-        // 2. Restore Enemies
         world.getEnemies().clear();
         for (SaveState.EnemyState es : state.enemies) {
             Enemy e = new Enemy();
@@ -100,7 +157,6 @@ public class SaveManager {
             world.getEnemies().add(e);
         }
 
-        // 3. Restore Interactables
         for (SaveState.InteractableState is : state.interactables) {
             for (Interactable i : world.getInteractables()) {
                 if (Math.abs(i.getBounds().x - is.x) < 1f && Math.abs(i.getBounds().y - is.y) < 1f) {
@@ -110,7 +166,6 @@ public class SaveManager {
             }
         }
 
-        // 4. Restore Lighting
         if (state.isCenterFireLit && world.getLightingManager() != null) {
             for (Interactable i : world.getInteractables()) {
                 if (i.getType() == Interactable.Type.CENTER_FIRE) {
@@ -137,15 +192,12 @@ public class SaveManager {
             }
         }
 
-        // Sort other saves by last modified date (newest first)
         otherSaves.sort(Comparator.comparingLong(FileHandle::lastModified).reversed());
 
-        // Add auto-save first if it exists
         if (autoSaveFile != null) {
             saves.add(autoSaveFile.nameWithoutExtension());
         }
 
-        // Add the rest of the sorted saves
         for (FileHandle file : otherSaves) {
             saves.add(file.nameWithoutExtension());
         }
@@ -173,7 +225,6 @@ public class SaveManager {
         }
     }
 
-    // --- REWRITTEN NATIVE RENAME METHOD ---
     public static void renameSave(String oldName, String newName) {
         if (oldName.equals(AUTO_SAVE_SLOT_NAME)) {
             Gdx.app.log("SaveManager", "Attempted to rename auto-save slot, operation blocked.");
@@ -185,7 +236,6 @@ public class SaveManager {
 
         if (oldFile.exists()) {
             try {
-                // Use Java NIO to force the OS to completely replace and clean up the file
                 Path source = Paths.get(oldFile.file().getAbsolutePath());
                 Path target = Paths.get(newFile.file().getAbsolutePath());
                 Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);

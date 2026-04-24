@@ -82,6 +82,9 @@ public class VictoryScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        // BULLETPROOFING: Capture the current screen
+        Screen currentScreen = ((Game) Gdx.app.getApplicationListener()).getScreen();
+
         animTime += delta;
         appearTimer = Math.min(appearTimer + delta, 1.5f);
         float appear = MathUtils.clamp(appearTimer / 1.0f, 0f, 1f);
@@ -110,6 +113,7 @@ public class VictoryScreen implements Screen {
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             executeOption(selected);
+            if (((Game) Gdx.app.getApplicationListener()).getScreen() != currentScreen) return;
             return;
         }
 
@@ -121,6 +125,7 @@ public class VictoryScreen implements Screen {
             if (clicked >= 0) {
                 selected = clicked;
                 executeOption(clicked);
+                if (((Game) Gdx.app.getApplicationListener()).getScreen() != currentScreen) return;
                 return;
             }
         }
@@ -194,21 +199,22 @@ public class VictoryScreen implements Screen {
 
         float titleScale = 2.8f + 0.15f * MathUtils.sin(animTime * 3f);
         font.getData().setScale(scale * titleScale);
+
+        font.setColor(0.4f, 0.3f, 0f, 0.8f * appear);
         glyphLayout.setText(font, "VICTORY ACHIEVED");
         float titleX = (worldW - glyphLayout.width) / 2f;
         float titleY = worldH * 0.82f;
-
-        font.setColor(0.4f, 0.3f, 0f, 0.8f * appear);
         font.draw(batch, glyphLayout, titleX + shadow * 2, titleY - shadow * 2);
 
         float titleGlow = 0.85f + 0.15f * MathUtils.sin(animTime * 4f);
         font.setColor(goldAccent.r * titleGlow, goldAccent.g * titleGlow, goldAccent.b, appear);
+        glyphLayout.setText(font, "VICTORY ACHIEVED");
         font.draw(batch, glyphLayout, titleX, titleY);
 
         font.getData().setScale(scale * 0.8f);
+        font.setColor(goldAccent.r, goldAccent.g, goldAccent.b, 0.4f * appear);
         glyphLayout.setText(font, "~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~");
         float lineX = (worldW - glyphLayout.width) / 2f;
-        font.setColor(goldAccent.r, goldAccent.g, goldAccent.b, 0.4f * appear);
         font.draw(batch, glyphLayout, lineX, titleY - 40f);
 
         float statsY = worldH * 0.62f;
@@ -220,13 +226,14 @@ public class VictoryScreen implements Screen {
         };
 
         for (int i = 0; i < statLabels.length; i++) {
+            font.setColor(0f, 0f, 0f, 0.6f * appear);
             glyphLayout.setText(font, statLabels[i]);
             float sx = (worldW - glyphLayout.width) / 2f;
             float sy = statsY - i * 35f;
-
-            font.setColor(0f, 0f, 0f, 0.6f * appear);
             font.draw(batch, glyphLayout, sx + shadow, sy - shadow);
+
             font.setColor(0.9f, 0.85f, 0.7f, appear);
+            glyphLayout.setText(font, statLabels[i]);
             font.draw(batch, glyphLayout, sx, sy);
         }
 
@@ -234,14 +241,15 @@ public class VictoryScreen implements Screen {
             float pulse = selected == i ? 0.02f * MathUtils.sin(animTime * 7f) : 0f;
             float s = (selected == i) ? 1.05f + pulse : 1f;
             font.getData().setScale(scale * 1.2f * s);
-            glyphLayout.setText(font, OPTIONS[i]);
-
-            float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
-            float textY = optionYs[i] + (boxH + glyphLayout.height) * 0.5f;
 
             font.setColor(0f, 0f, 0f, 0.72f * appear);
+            glyphLayout.setText(font, OPTIONS[i]);
+            float textX = centerX + (boxW - glyphLayout.width) * 0.5f;
+            float textY = optionYs[i] + (boxH + glyphLayout.height) * 0.5f;
             font.draw(batch, glyphLayout, textX + shadow, textY - shadow);
+
             font.setColor(1f, 1f, 1f, appear);
+            glyphLayout.setText(font, OPTIONS[i]);
             font.draw(batch, glyphLayout, textX, textY);
         }
 

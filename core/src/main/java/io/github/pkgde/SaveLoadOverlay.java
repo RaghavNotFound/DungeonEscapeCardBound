@@ -45,7 +45,6 @@ public class SaveLoadOverlay {
     private String renameText = "";
     private InputProcessor previousProcessor;
 
-    // Layout scaling variables
     private float uiScale;
     private float boxW, boxH, gap, centerX, startY, totalHeight;
     private float subBoxW, subBoxH, subGap, subCenterX, subStartY;
@@ -75,7 +74,7 @@ public class SaveLoadOverlay {
 
         uiScale = Math.max(0.5f, w / 800f);
 
-        boxW = w * 0.35f;
+        boxW = w * 0.45f;
         boxH = h * 0.09f;
         gap = h * 0.02f;
         centerX = (w - boxW) / 2f;
@@ -91,7 +90,7 @@ public class SaveLoadOverlay {
 
     public Result handleInput(Viewport viewport) {
         if (!visible) return null;
-        if (isRenaming) return null; // Input handled by InputProcessor
+        if (isRenaming) return null;
 
         updateLayout(viewport);
 
@@ -120,7 +119,7 @@ public class SaveLoadOverlay {
             if (Gdx.input.justTouched()) {
                 int clicked = getSubPointerSelection(viewport);
                 if (clicked != -1) return executeSubOption(clicked);
-                else subMenuOpen = false; // Click outside cancels
+                else subMenuOpen = false;
             }
 
             if (mouseMoved && !keyPressed) {
@@ -174,7 +173,6 @@ public class SaveLoadOverlay {
             subOptions.add("DELETE");
             subOptions.add("CANCEL");
         }
-
         subSelected = 0;
         return null;
     }
@@ -201,7 +199,6 @@ public class SaveLoadOverlay {
                     }
                     return false;
                 }
-
                 @Override
                 public boolean keyTyped(char character) {
                     if (character == '\b' && renameText.length() > 0) {
@@ -224,8 +221,6 @@ public class SaveLoadOverlay {
     }
 
     public void finishRenaming(boolean apply) {
-        // FIXED: Execute this on the NEXT frame so the ENTER key press doesn't bleed through
-        // and accidentally trigger the "NEW SAVE" button underneath it.
         Gdx.app.postRunnable(() -> {
             isRenaming = false;
             Gdx.input.setInputProcessor(previousProcessor);
@@ -294,10 +289,6 @@ public class SaveLoadOverlay {
         shape.end();
 
         batch.begin();
-
-        boolean oldIntegerPositions = font.usesIntegerPositions();
-        font.setUseIntegerPositions(false);
-
         float fontScale = w / 800f;
 
         if (isRenaming) {
@@ -305,43 +296,77 @@ public class SaveLoadOverlay {
             float inputX = (w - inputW) / 2f, inputY = (h - inputH) / 2f;
 
             font.getData().setScale(fontScale * 0.8f);
+
+            font.setColor(Color.BLACK);
             glyphLayout.setText(font, "ENTER NEW NAME (Press ENTER to Save, ESC to Cancel)");
+            font.draw(batch, glyphLayout, inputX + 2f, inputY + inputH + (h * 0.03f) - 2f);
+
             font.setColor(Color.LIGHT_GRAY);
+            glyphLayout.setText(font, "ENTER NEW NAME (Press ENTER to Save, ESC to Cancel)");
             font.draw(batch, glyphLayout, inputX, inputY + inputH + (h * 0.03f));
 
             font.getData().setScale(fontScale * 1.2f);
             boolean cursorVisible = (System.currentTimeMillis() / 500) % 2 == 0;
-            glyphLayout.setText(font, renameText + (cursorVisible ? "|" : ""));
+            String text = renameText + (cursorVisible ? "|" : "");
+
+            font.setColor(Color.BLACK);
+            glyphLayout.setText(font, text);
+            font.draw(batch, glyphLayout, inputX + (w * 0.02f) + 2f, inputY + inputH / 2f + glyphLayout.height / 2f - 2f);
+
             font.setColor(Color.WHITE);
+            glyphLayout.setText(font, text);
             font.draw(batch, glyphLayout, inputX + (w * 0.02f), inputY + inputH / 2f + glyphLayout.height / 2f);
 
         } else if (!subMenuOpen) {
             for (int i = 0; i < saves.size; i++) {
                 font.getData().setScale(fontScale * 1.1f);
-                glyphLayout.setText(font, saves.get(i));
-
-                if (mode == Mode.SAVE && i == 0) font.setColor(Color.LIME);
-                else font.setColor(Color.WHITE);
-
+                String saveText = saves.get(i);
                 float rectY = startY - i * (boxH + gap);
-                font.draw(batch, glyphLayout, centerX + (boxW - glyphLayout.width) / 2f, rectY + boxH / 2f + glyphLayout.height / 2f);
+
+                font.setColor(0f, 0f, 0f, 0.72f);
+                glyphLayout.setText(font, saveText);
+                float textX = centerX + (boxW - glyphLayout.width) / 2f;
+                float textY = rectY + boxH / 2f + glyphLayout.height / 2f;
+                font.draw(batch, glyphLayout, textX + 2f, textY - 2f);
+
+                if (selected == i) {
+                    font.setColor(Color.BLACK);
+                } else if (mode == Mode.SAVE && i == 0) {
+                    font.setColor(Color.LIME);
+                } else {
+                    font.setColor(Color.WHITE);
+                }
+
+                glyphLayout.setText(font, saveText);
+                font.draw(batch, glyphLayout, textX, textY);
             }
         } else {
             for (int i = 0; i < subOptions.size; i++) {
                 font.getData().setScale(fontScale * 0.9f);
-                glyphLayout.setText(font, subOptions.get(i));
-
-                if (subOptions.get(i).equals("DELETE")) font.setColor(new Color(1f, 0.3f, 0.3f, 1f));
-                else font.setColor(Color.WHITE);
-
+                String optText = subOptions.get(i);
                 float rectY = subStartY - i * (subBoxH + subGap);
-                font.draw(batch, glyphLayout, subCenterX + (subBoxW - glyphLayout.width) / 2f, rectY + subBoxH / 2f + glyphLayout.height / 2f);
+
+                font.setColor(0f, 0f, 0f, 0.72f);
+                glyphLayout.setText(font, optText);
+                float textX = subCenterX + (subBoxW - glyphLayout.width) / 2f;
+                float textY = rectY + subBoxH / 2f + glyphLayout.height / 2f;
+                font.draw(batch, glyphLayout, textX + 2f, textY - 2f);
+
+                if (subSelected == i) {
+                    font.setColor(Color.BLACK);
+                } else if (optText.equals("DELETE")) {
+                    font.setColor(new Color(1f, 0.3f, 0.3f, 1f));
+                } else {
+                    font.setColor(Color.WHITE);
+                }
+
+                glyphLayout.setText(font, optText);
+                font.draw(batch, glyphLayout, textX, textY);
             }
         }
 
-        font.setUseIntegerPositions(oldIntegerPositions);
-        font.getData().setScale(1f);
         font.setColor(Color.WHITE);
+        font.getData().setScale(1f);
         batch.end();
     }
 

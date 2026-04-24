@@ -58,31 +58,36 @@ public class GameWorld {
 
         player.setBoundaries(boundaries);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+
+        // Spawn player properly!
         player.getPosition().set(mapManager.getPlayerSpawn());
+
+        Vector2 bossSpawn = mapManager.getBossSpawn();
+        if (bossSpawn.x != -1 && bossSpawn.y != -1) {
+            Enemy boss = new Enemy();
+            boss.setBoundaries(boundaries);
+            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            boss.setPathfinder(pathfinder);
+            boss.setPosition(bossSpawn.x, bossSpawn.y);
+            boss.setBoss(true);
+            boss.forceChase(Float.MAX_VALUE);
+            enemies.add(boss);
+        }
+
+        // Spawn enemies
+        for (Vector2 spawn : mapManager.getEnemySpawns()) {
+            Enemy e = new Enemy();
+            e.setBoundaries(boundaries);
+            e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            e.setPathfinder(pathfinder);
+            e.setPosition(spawn.x, spawn.y);
+            enemies.add(e);
+        }
 
         if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk") && mapManager.getCurrentLevelIndex() == 3) {
             isTutorialBossWaveActive = true;
             tutorialWavePhase = 1;
             tutorialWaveSpawns.addAll(mapManager.getEnemySpawns());
-
-            float centerX = mapManager.getMapWidth() / 2f;
-            float centerY = tutorialWaveSpawns.isEmpty() ? mapManager.getMapHeight() / 2f : tutorialWaveSpawns.get(0).y;
-
-            Enemy e = new Enemy();
-            e.setBoundaries(boundaries);
-            e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-            e.setPathfinder(pathfinder);
-            e.setPosition(centerX, centerY);
-            enemies.add(e);
-        } else {
-            for (Vector2 spawn : mapManager.getEnemySpawns()) {
-                Enemy e = new Enemy();
-                e.setBoundaries(boundaries);
-                e.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-                e.setPathfinder(pathfinder);
-                e.setPosition(spawn.x, spawn.y);
-                enemies.add(e);
-            }
         }
 
         this.interactables = mapManager.getInteractables();
@@ -93,7 +98,7 @@ public class GameWorld {
         player.update(delta, camera);
 
         // --- LAVA DEATH LOGIC ---
-        if (player.isAlive()) {
+        if (player.isAlive() && !DebugOverlay.godMode) {
             Rectangle pBounds = player.getBounds();
             for (Rectangle lava : mapManager.getLavaRects()) {
                 if (pBounds.overlaps(lava)) {
@@ -130,6 +135,17 @@ public class GameWorld {
 
         for (Enemy e : enemies) {
             e.update(delta, player);
+
+            if (e.isAlive() && e.isBoss() && !bossFightTriggered) {
+                float bossCX = e.getBounds().x + e.getBounds().width / 2f;
+                float bossCY = e.getBounds().y + e.getBounds().height / 2f;
+                float dx = pcx - bossCX;
+                float dy = pcy - bossCY;
+
+                if (dx * dx + dy * dy <= (150f * 150f)) {
+                    bossFightTriggered = true;
+                }
+            }
         }
 
         // --- WORLD TORCHES (Map Objects) ---
@@ -162,7 +178,9 @@ public class GameWorld {
         // --- ENEMY ATTACKS ---
         for (Enemy e : enemies) {
             if (e.canDealDamage() && e.isPlayerInAttackRadius(player)) {
-                player.takeDamage(e.getDamage());
+                if (!DebugOverlay.godMode) {
+                    player.takeDamage(e.getDamage());
+                }
                 Vector2 dir = new Vector2(player.getBounds().x - e.getBounds().x, player.getBounds().y - e.getBounds().y);
                 player.applyKnockback(dir, 500f);
                 e.consumeAttackDamage();
@@ -294,6 +312,16 @@ public class GameWorld {
         // --- LEVEL EXIT LOGIC ---
         for (Rectangle exit : mapManager.getExitGateRects()) {
             if (player.getBounds().overlaps(exit)) {
+                Vector2 spawn = mapManager.getPlayerSpawn();
+                float dx = player.getPosition().x - spawn.x;
+                float dy = player.getPosition().y - spawn.y;
+                float distSq = dx * dx + dy * dy;
+
+                // Prevent immediate exit if player spawned on or too close to the door
+                if (distSq < 60f * 60f) {
+                    continue;
+                }
+
                 boolean allEnemiesDead = true;
                 for (Enemy e : enemies) {
                     if (e.isAlive()) {
@@ -309,17 +337,6 @@ public class GameWorld {
 
         for (Interactable interactable : interactables) {
             interactable.update(Gdx.graphics.getDeltaTime());
-
-            if (
-                interactable.getType() == Interactable.Type.BOSS_TRIGGER &&
-                player.isAlive() &&
-                !interactable.isInteracted() &&
-                interactable.isPlayerInRange(player)
-            ) {
-                interactable.interact(player);
-                bossFightTriggered = true;
-                continue;
-            }
 
             if (interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
                 if (interactable.getType() == Interactable.Type.CENTER_FIRE) {

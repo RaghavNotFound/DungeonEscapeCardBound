@@ -27,6 +27,7 @@ public class MapManager {
 
     // Extracted game objects
     private final Vector2 playerSpawn = new Vector2();
+    private final Vector2 bossSpawn = new Vector2(-1, -1);
     private final ArrayList<Vector2> enemySpawns = new ArrayList<>();
     private final ArrayList<Rectangle> collisionRects = new ArrayList<>();
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
@@ -131,6 +132,7 @@ public class MapManager {
 
     private void clearData() {
         playerSpawn.setZero();
+        bossSpawn.set(-1, -1);
         enemySpawns.clear();
         collisionRects.clear();
         torchRects.clear();
@@ -214,8 +216,11 @@ public class MapManager {
                     chestRects.add(new Rectangle(x, y, eWidth, eHeight));
                     interactables.add(new Interactable(Interactable.Type.CHEST, x, y, eWidth, eHeight));
                     break;
+                case "Boss":
                 case "BossSpawn":
-                    interactables.add(new Interactable(Interactable.Type.BOSS_TRIGGER, x, y, eWidth, eHeight));
+                case "boss":
+                case "BossTrigger":
+                    bossSpawn.set(x, y);
                     break;
                 case "Exit":
                 case "ExitDoor":
@@ -224,6 +229,17 @@ public class MapManager {
                 case "LavaDamage":
                     lavaRects.add(new Rectangle(x, y, eWidth, eHeight));
                     break;
+            }
+        }
+
+        if (currentMapPath.contains("tutorial.ldtk") && currentLevelIndex == 3) {
+            if (bossSpawn.x == -1 && bossSpawn.y == -1) {
+                if (!enemySpawns.isEmpty()) {
+                    Vector2 p = enemySpawns.remove(0);
+                    bossSpawn.set(p.x, p.y);
+                } else {
+                    bossSpawn.set(mapWidth / 2f, mapHeight / 2f);
+                }
             }
         }
     }
@@ -353,6 +369,7 @@ public class MapManager {
     public float getMapHeight() { return mapHeight; }
     public int getGridSize() { return gridSize; }
     public Vector2 getPlayerSpawn() { return playerSpawn; }
+    public Vector2 getBossSpawn() { return bossSpawn; }
     public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
     public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
     public ArrayList<Rectangle> getTorchRects() { return torchRects; }

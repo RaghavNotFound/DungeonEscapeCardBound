@@ -11,24 +11,23 @@ import com.badlogic.gdx.math.MathUtils;
 
 public class ExplorationScreen implements Screen {
 
-    private static final String SAFE_ROOM_MAP = "Maps/tutorial.ldtk";
     private static final String AUTO_SAVE_SLOT_NAME = "auto_save";
     private final float AUTO_SAVE_INTERVAL = 10f;
 
-    private final OrthographicCamera camera;
-    private final Viewport viewport;
+    private OrthographicCamera camera;
+    private Viewport viewport;
 
-    private final MapManager mapManager;
-    private final GameWorld world;
-    private final GameRenderer renderer;
-    private final InputHandler input;
+    private MapManager mapManager;
+    private GameWorld world;
+    private GameRenderer renderer;
+    private InputHandler input;
 
-    private final PauseOverlay pauseOverlay;
-    private final SettingsOverlay settingsOverlay;
-    private final InventoryOverlay inventoryOverlay;
-    private final GameOverOverlay gameOverOverlay;
-    private final SaveLoadOverlay saveLoadOverlay;
-    private final DebugOverlay debugOverlay;
+    private PauseOverlay pauseOverlay;
+    private SettingsOverlay settingsOverlay;
+    private InventoryOverlay inventoryOverlay;
+    private GameOverOverlay gameOverOverlay;
+    private SaveLoadOverlay saveLoadOverlay;
+    private DebugOverlay debugOverlay;
 
     public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD }
     private State state = State.GAME;
@@ -38,14 +37,25 @@ public class ExplorationScreen implements Screen {
     private boolean shakeTriggered = false;
 
     private FrameBuffer fbo;
-    private final ShaderProgram blurShader;
-    private final SpriteBatch blurBatch;
+    private ShaderProgram blurShader;
+    private SpriteBatch blurBatch;
 
+    // FIXED: Reads the save file first to figure out exactly what map and level to load!
     public ExplorationScreen(String saveFileToLoad) {
-        this(saveFileToLoad, SAFE_ROOM_MAP, 0);
+        String mapPath = "Maps/tutorial.ldtk";
+        int levelIndex = 0;
+
+        if (saveFileToLoad != null) {
+            SaveState s = SaveManager.peekSave(saveFileToLoad);
+            if (s != null) {
+                mapPath = s.currentMapPath;
+                levelIndex = s.currentLevelIndex;
+            }
+        }
+        init(saveFileToLoad, mapPath, levelIndex);
     }
 
-    public ExplorationScreen(String saveFileToLoad, String mapPath, int levelIndex) {
+    private void init(String saveFileToLoad, String mapPath, int levelIndex) {
         mapManager = new MapManager();
         mapManager.load(mapPath, levelIndex);
         float mapW = mapManager.getMapWidth();
@@ -75,7 +85,6 @@ public class ExplorationScreen implements Screen {
 
         if (saveFileToLoad != null) {
             SaveManager.loadGame(world, saveFileToLoad);
-            world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
         } else {
             world.getPlayer().setPosition(mapManager.getPlayerSpawn().x, mapManager.getPlayerSpawn().y);
         }
@@ -86,26 +95,47 @@ public class ExplorationScreen implements Screen {
         viewport.apply();
         settingsOverlay.update(delta);
 
+        Screen currentScreen = ((Game) Gdx.app.getApplicationListener()).getScreen();
+
         handleStateInput();
+        if (((Game) Gdx.app.getApplicationListener()).getScreen() != currentScreen) return;
+
         updateGameLogic(delta);
+        if (((Game) Gdx.app.getApplicationListener()).getScreen() != currentScreen) return;
+
         draw(delta);
 
+        // FIXED: Transitioning through LoadingScreen prevents the "Blue Spinner Freeze" crash!
         if (world.isLevelComplete() && state == State.GAME) {
             int nextLevelIndex = mapManager.getCurrentLevelIndex() + 1;
-            SaveManager.saveGame(world, "checkpoint");
+            String nextPath = mapManager.getCurrentMapPath();
 
-            if (mapManager.getCurrentMapPath().equals("Maps/tutorial.ldtk")) {
-                if (nextLevelIndex < 4) {
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen("checkpoint", "Maps/tutorial.ldtk", nextLevelIndex));
+            if (nextPath.equals("Maps/tutorial.ldtk")) {
+                if (nextLevelIndex >= 4) {
+                    nextPath = "Maps/safeRoom.ldtk";
+                    nextLevelIndex = 0;
+                }
+            } else if (nextPath.contains("safeRoom")) {
+                nextPath = "Maps/final_map.ldtk";
+                nextLevelIndex = 0;
+            } else if (nextPath.equals("Maps/final_map.ldtk")) {
+                if (nextLevelIndex >= 6) { // Final map has 7 levels (0-6)
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
+                        world.getPlayer().getEnemiesKilled(),
+                        world.getPlayer().getTorchCount(),
+                        world.getPlayer().getTimeSurvived()
+                    ));
                     this.dispose();
-                } else {
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null, "Maps/safeRoom.ldtk", 0));
-                    this.dispose();
+                    return;
                 }
             }
+
+            SaveManager.saveLevelTransition(world, "checkpoint", nextPath, nextLevelIndex);
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen("checkpoint"));
+            this.dispose();
+            return;
         }
 
-        // Check for Boss Trigger interaction
         if (world.isBossFightTriggered()) {
             ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE LICH KING"));
             this.dispose();
@@ -114,9 +144,7 @@ public class ExplorationScreen implements Screen {
     }
 
     private void handleStateInput() {
-        if (debugOverlay.handleInput()) {
-            return;
-        }
+        if (debugOverlay.handleInput()) return;
         debugOverlay.handleCheats(camera, world, mapManager);
 
         if (state == State.GAME) {
@@ -142,12 +170,9 @@ public class ExplorationScreen implements Screen {
                 PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
                 switch (action) {
                     case RESUME -> state = State.GAME;
-                    case SAVE -> {
-                        state = State.SAVE_LOAD;
-                        saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE);
-                    }
+                    case SAVE -> { state = State.SAVE_LOAD; saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE); }
                     case RESTART -> {
-                        ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null)); // Changed to LoadingScreen
                         this.dispose();
                     }
                     case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
@@ -177,7 +202,7 @@ public class ExplorationScreen implements Screen {
             GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
             switch (action) {
                 case RETRY -> {
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new ExplorationScreen(null));
+                    ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null)); // Changed to LoadingScreen
                     this.dispose();
                 }
                 case MAIN_MENU -> {
@@ -232,15 +257,12 @@ public class ExplorationScreen implements Screen {
             ShapeRenderer shape = renderer.getShape();
             shape.setProjectionMatrix(camera.combined);
             shape.begin(ShapeRenderer.ShapeType.Filled);
-            if (state == State.GAME_OVER) {
-                shape.setColor(0.5f, 0, 0, 0.65f);
-            } else {
-                shape.setColor(0, 0, 0, 0.5f);
-            }
+            if (state == State.GAME_OVER) shape.setColor(0.5f, 0, 0, 0.65f);
+            else shape.setColor(0, 0, 0, 0.5f);
+
             shape.rect(camera.position.x - camera.viewportWidth / 2f, camera.position.y - camera.viewportHeight / 2f, camera.viewportWidth, camera.viewportHeight);
             shape.end();
             Gdx.gl.glDisable(GL20.GL_BLEND);
-
             fbo.end();
 
             viewport.apply();
@@ -303,13 +325,13 @@ public class ExplorationScreen implements Screen {
 
     @Override
     public void dispose() {
-        renderer.dispose();
-        world.dispose();
-        mapManager.dispose();
-        fbo.dispose();
-        blurBatch.dispose();
-        blurShader.dispose();
-        inventoryOverlay.dispose();
+        if(renderer != null) renderer.dispose();
+        if(world != null) world.dispose();
+        if(mapManager != null) mapManager.dispose();
+        if(fbo != null) fbo.dispose();
+        if(blurBatch != null) blurBatch.dispose();
+        if(blurShader != null) blurShader.dispose();
+        if(inventoryOverlay != null) inventoryOverlay.dispose();
     }
 
     @Override public void show() {}

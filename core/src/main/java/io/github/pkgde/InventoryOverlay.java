@@ -11,11 +11,8 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import java.util.ArrayList;
 
-/**
- * An overlay UI for managing player inventory.
- * Features a grid-based layout, item counts, and procedural/texture-based icons.
- */
 public class InventoryOverlay {
 
     private static final int GRID_COLS = 5;
@@ -63,8 +60,9 @@ public class InventoryOverlay {
     }
 
     private void updateLayout(Viewport viewport) {
-        float totalGridWidth = viewport.getWorldWidth() * 0.6f;
-        float totalGridHeight = viewport.getWorldHeight() * 0.7f;
+        // FIXED: Reduced from 0.6 to 0.45 so the inventory actually fits inside the screen nicely
+        float totalGridWidth = viewport.getWorldWidth() * 0.45f;
+        float totalGridHeight = viewport.getWorldHeight() * 0.55f;
         float slotSize = Math.min(totalGridWidth / GRID_COLS, totalGridHeight / GRID_ROWS) * 0.9f;
         float gap = slotSize * 0.1f;
 
@@ -72,7 +70,7 @@ public class InventoryOverlay {
         float gridH = GRID_ROWS * (slotSize + gap) - gap;
 
         float startX = (viewport.getWorldWidth() - gridW) / 2f;
-        float startY = (viewport.getWorldHeight() - gridH) / 2f - 40f;
+        float startY = (viewport.getWorldHeight() - gridH) / 2f - 60f; // Pushed down slightly
 
         for (int row = 0; row < GRID_ROWS; row++) {
             for (int col = 0; col < GRID_COLS; col++) {
@@ -93,7 +91,6 @@ public class InventoryOverlay {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // 1. Draw Background Panel
         shape.begin(ShapeRenderer.ShapeType.Filled);
         shape.setColor(0, 0, 0, 0.6f);
         Rectangle firstSlot = slots[0];
@@ -105,7 +102,6 @@ public class InventoryOverlay {
         shape.rect(panelX, panelY, panelW, panelH);
         shape.end();
 
-        // 2. Draw Slots
         shape.begin(ShapeRenderer.ShapeType.Filled);
         for (Rectangle slot : slots) {
             shape.setColor(slotColor);
@@ -113,37 +109,36 @@ public class InventoryOverlay {
         }
         shape.end();
 
-        // 3. Draw Outlines
         shape.begin(ShapeRenderer.ShapeType.Line);
         for (Rectangle slot : slots) {
             shape.setColor(slotOutlineColor);
             shape.rect(slot.x, slot.y, slot.width, slot.height);
         }
 
-        // Selection Highlight
         int selectedIndex = selectedRow * GRID_COLS + selectedCol;
         Rectangle selectedSlot = slots[selectedIndex];
         shape.setColor(selectedColor);
         shape.rect(selectedSlot.x, selectedSlot.y, selectedSlot.width, selectedSlot.height);
         shape.end();
 
-        // 4. Procedural Card Icon (Slot 1)
-        if (player.getCardsCount() > 0) {
-            shape.begin(ShapeRenderer.ShapeType.Filled);
-            Rectangle slot = slots[1];
-            float iconSize = slot.height * 0.45f; // Shrunk to prevent overlap
-            float cx = slot.x + slot.width / 2f;
-            float cy = slot.y + slot.height / 2f; // Centered vertically
-
-            shape.setColor(0.8f, 0.9f, 1f, 1f); // Card base
-            shape.rect(cx - iconSize * 0.35f, cy - iconSize * 0.45f, iconSize * 0.7f, iconSize * 0.9f);
-            shape.setColor(0.9f, 0.7f, 0.2f, 1f); // Gold pattern
-            shape.rect(cx - iconSize * 0.2f, cy - iconSize * 0.3f, iconSize * 0.4f, iconSize * 0.6f);
-            shape.setColor(0.2f, 0.6f, 1f, 1f); // Center jewel
-            shape.rect(cx - iconSize * 0.1f, cy - iconSize * 0.1f, iconSize * 0.2f, iconSize * 0.2f);
-            shape.end();
+        ArrayList<String> inv = player.getInventoryOrder();
+        shape.begin(ShapeRenderer.ShapeType.Filled);
+        for (int i = 0; i < inv.size(); i++) {
+            if (i >= SLOT_COUNT) break;
+            if (inv.get(i).equals("Card")) {
+                Rectangle slot = slots[i];
+                float iconSize = slot.height * 0.45f;
+                float cx = slot.x + slot.width / 2f;
+                float cy = slot.y + slot.height / 2f;
+                shape.setColor(0.8f, 0.9f, 1f, 1f);
+                shape.rect(cx - iconSize * 0.35f, cy - iconSize * 0.45f, iconSize * 0.7f, iconSize * 0.9f);
+                shape.setColor(0.9f, 0.7f, 0.2f, 1f);
+                shape.rect(cx - iconSize * 0.2f, cy - iconSize * 0.3f, iconSize * 0.4f, iconSize * 0.6f);
+                shape.setColor(0.2f, 0.6f, 1f, 1f);
+                shape.rect(cx - iconSize * 0.1f, cy - iconSize * 0.1f, iconSize * 0.2f, iconSize * 0.2f);
+            }
         }
-
+        shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
         batch.begin();
@@ -151,39 +146,35 @@ public class InventoryOverlay {
         float oldScaleY = font.getData().scaleY;
         float shadow = Math.max(1.3f, viewport.getWorldWidth() * 0.0012f);
 
-        // 5. Title Rendering
         font.getData().setScale(viewport.getWorldWidth() / 800f * 1.5f);
         glyphLayout.setText(font, "INVENTORY");
         float titleX = (viewport.getWorldWidth() - glyphLayout.width) / 2f;
-        float titleY = slots[0].y + slots[0].height + glyphLayout.height + 20;
+        // FIXED: Pushed title up slightly so it doesn't touch the top row of inventory slots
+        float titleY = slots[0].y + slots[0].height + glyphLayout.height + 40f;
 
-        // FIXED: Using "INVENTORY" string directly instead of glyphLayout
         font.setColor(0f, 0f, 0f, 0.72f);
         font.draw(batch, "INVENTORY", titleX + shadow, titleY - shadow);
         font.setColor(Color.WHITE);
         font.draw(batch, "INVENTORY", titleX, titleY);
 
-        // 6. Draw Texture Icons & Quantities
-        int torchCount = player.getTorchCount();
-        if (torchCount > 0) {
-            Rectangle slot = slots[0];
-            float iconSize = slot.height * 0.45f; // Shrunk to prevent overlap
-            float iconX = slot.x + (slot.width - iconSize) / 2f;
-            float iconY = slot.y + (slot.height - iconSize) / 2f; // Centered vertically
-            batch.draw(torchIcon, iconX, iconY, iconSize, iconSize);
+        for (int i = 0; i < inv.size(); i++) {
+            if (i >= SLOT_COUNT) break;
+            String item = inv.get(i);
+            Rectangle slot = slots[i];
 
-            renderQuantity(batch, font, String.valueOf(torchCount), slot, viewport, shadow);
-        }
+            if (item.equals("Torch")) {
+                float iconSize = slot.height * 0.45f;
+                float iconX = slot.x + (slot.width - iconSize) / 2f;
+                float iconY = slot.y + (slot.height - iconSize) / 2f;
+                batch.draw(torchIcon, iconX, iconY, iconSize, iconSize);
+                renderQuantity(batch, font, String.valueOf(player.getTorchCount()), slot, viewport, shadow);
+            } else if (item.equals("Card")) {
+                renderQuantity(batch, font, String.valueOf(player.getCardsCount()), slot, viewport, shadow);
+            }
 
-        if (player.getCardsCount() > 0) {
-            renderQuantity(batch, font, String.valueOf(player.getCardsCount()), slots[1], viewport, shadow);
-        }
-
-        // 7. Tooltips
-        if (selectedRow == 0 && selectedCol == 0 && torchCount > 0) {
-            drawTooltip(batch, font, "Torch", slots[0], viewport, shadow);
-        } else if (selectedRow == 0 && selectedCol == 1 && player.getCardsCount() > 0) {
-            drawTooltip(batch, font, "Card", slots[1], viewport, shadow);
+            if (i == selectedIndex) {
+                drawTooltip(batch, font, item, slot, viewport, shadow);
+            }
         }
 
         font.getData().setScale(oldScaleX, oldScaleY);
@@ -195,9 +186,8 @@ public class InventoryOverlay {
         font.getData().setScale(vp.getWorldWidth() / 1280f * 1.1f);
         glyphLayout.setText(font, count);
         float textX = slot.x + slot.width - glyphLayout.width - 4f;
-        float textY = slot.y + slot.height - 4f; // Anchored to top-right
+        float textY = slot.y + slot.height - 4f;
 
-        // FIXED: Passing 'count' string instead of glyphLayout to preserve color state
         font.setColor(0f, 0f, 0f, 0.7f);
         font.draw(batch, count, textX + shadow, textY - shadow);
         font.setColor(Color.WHITE);
@@ -209,15 +199,13 @@ public class InventoryOverlay {
         glyphLayout.setText(font, text);
 
         float tooltipX = slot.x + (slot.width - glyphLayout.width) / 2f;
-        float tooltipY = slot.y + glyphLayout.height + 6f; // Anchored to bottom center
+        float tooltipY = slot.y + glyphLayout.height + 6f;
 
-        // FIXED: Passing 'text' string instead of glyphLayout to preserve color state
         font.setColor(0f, 0f, 0f, 0.72f);
         font.draw(batch, text, tooltipX + shadow, tooltipY - shadow);
         font.setColor(Color.WHITE);
         font.draw(batch, text, tooltipX, tooltipY);
     }
 
-    public void dispose() {
-    }
+    public void dispose() {}
 }

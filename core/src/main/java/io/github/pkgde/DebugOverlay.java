@@ -17,6 +17,7 @@ import java.util.ArrayList;
 public class DebugOverlay {
 
     private boolean visible = false;
+    public static boolean godMode = false;
 
     private boolean showHitboxes = true;
     private boolean showBoundaries = true;
@@ -63,6 +64,7 @@ public class DebugOverlay {
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_8)) { tpMode = !tpMode; consumed = true; }
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_9)) { spawnMode = !spawnMode; consumed = true; }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.L)) { godMode = !godMode; consumed = true; }
 
         return consumed;
     }
@@ -360,8 +362,8 @@ public class DebugOverlay {
         font.getData().setScale(0.35f * uiScale);
 
         // Added the [B] Boss cheat text to the bottom tab bar!
-        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf", "[8] TP", "[9] Spwn", "[0] Skip", "[B] Boss" };
-        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo, tpMode, spawnMode, false, false };
+        String[] tabs = { "[1] Hit", "[2] Bnd", "[3] Col", "[4] Inf", "[8] TP", "[9] Spwn", "[0] Skip", "[B] Boss", "[L] God" };
+        boolean[] states = { showHitboxes, showBoundaries, showCollisions, showInfo, tpMode, spawnMode, false, false, godMode };
 
         float tabPadding = 24f * uiScale;
 

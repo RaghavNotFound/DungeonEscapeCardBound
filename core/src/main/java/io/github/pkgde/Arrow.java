@@ -15,6 +15,9 @@ public class Arrow {
     private static final float SPEED = 120f;
     private static final float SIZE = 8f;
 
+    // CACHED: Prevents crashing the UI via constantly hitting the global asset manager
+    private static Texture arrowTex;
+
     public Arrow(float x, float y, Vector2 direction) {
         this.position = new Vector2(x, y);
         this.direction = new Vector2(direction).nor();
@@ -31,11 +34,14 @@ public class Arrow {
     }
 
     public void render(SpriteBatch batch) {
-        Texture tex = Main.assets.get("Vectors/Arrow.png", Texture.class);
+        if (arrowTex == null) {
+            arrowTex = Main.assets.get("Vectors/Arrow.png", Texture.class);
+        }
+
         float angle = direction.angleDeg();
 
         batch.draw(
-            tex,
+            arrowTex,
             position.x - SIZE / 2f,
             position.y - SIZE / 2f,
             SIZE / 2f,
@@ -47,8 +53,8 @@ public class Arrow {
             angle,
             0,
             0,
-            tex.getWidth(),
-            tex.getHeight(),
+            arrowTex.getWidth(),
+            arrowTex.getHeight(),
             false,
             false
         );
@@ -63,7 +69,6 @@ public class Arrow {
         for (Rectangle rect : obstacles) {
             if (bounds.overlaps(rect)) return true;
         }
-
         return false;
     }
 }

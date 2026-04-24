@@ -6,7 +6,7 @@ import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Input;
 import java.lang.reflect.InvocationTargetException;
 
-public final class WindowModeManager {
+public class WindowModeManager {
 
     public static final int DEFAULT_WINDOW_WIDTH = 1280;
     public static final int DEFAULT_WINDOW_HEIGHT = 720;

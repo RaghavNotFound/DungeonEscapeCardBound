@@ -33,8 +33,16 @@ public class Lwjgl3Launcher {
 
     private static void onGameReady(StartupLoadingPopup startupLoadingPopup) {
         startupLoadingPopup.close();
-        focusGameWindow(false);
-        Gdx.app.postRunnable(() -> focusGameWindow(true));
+
+
+        
+        // Wait a frame so the OS finishes drawing the window, then steal focus.
+        // This fixes the issue where the loading popup or IDE steals focus
+        // back right as the main game window becomes visible!
+        Gdx.app.postRunnable(() -> {
+            focusGameWindow(false);
+            Gdx.app.postRunnable(() -> focusGameWindow(true));
+        });
     }
 
     private static void focusGameWindow(boolean requestAttentionIfNeeded) {

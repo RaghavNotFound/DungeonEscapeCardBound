@@ -13,6 +13,7 @@ public class SaveState {
     public boolean isCenterFireLit = false;
     public String currentMapPath = "Maps/tutorial.ldtk";
     public int currentLevelIndex = 0;
+    public boolean isLevelTransition = false;
 
     public static class PlayerState {
         public float x, y, health, stamina, timeSurvived;
