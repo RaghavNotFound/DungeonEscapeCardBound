@@ -7,7 +7,7 @@ import com.badlogic.gdx.math.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
 import java.util.ArrayList;
-
+import java.util.List;
 /**
  * Represents a dungeon enemy with state-based AI, predictive tracking,
  * obstacle avoidance, and telegraphed attacks.
@@ -85,6 +85,18 @@ public class Enemy {
     // Physics
     private final Vector2 knockbackVelocity = new Vector2(0, 0);
     private static final float KNOCKBACK_FRICTION = 600f;
+
+    // A* Pathfinding
+    private List<Vector2> currentPath = new ArrayList<>();
+    private float pathUpdateTimer = 0f;
+    private AStar pathfinder;
+    private static final float PATH_UPDATE_INTERVAL = 0.8f;
+    private static final float NODE_REACHED_TOLERANCE = 6f;
+    /** Minimum distance the player must move before we recalculate the path. */
+    private static final float PATH_RECALC_PLAYER_MOVE_THRESHOLD = 32f;
+    private static final float PATH_RECALC_THRESHOLD_SQ = PATH_RECALC_PLAYER_MOVE_THRESHOLD * PATH_RECALC_PLAYER_MOVE_THRESHOLD;
+    /** Cached last target position used for A* — prevents oscillation when player is behind walls. */
+    private final Vector2 lastPathTarget = new Vector2(Float.NaN, Float.NaN);
 
     private final ShapeRenderer shape = new ShapeRenderer();
 
@@ -188,6 +200,10 @@ public class Enemy {
         float speed = BASE_SPEED * speedMultiplier;
 
         if (state == State.IDLE) {
+            // Clear A* path when not chasing
+            if (currentPath != null && !currentPath.isEmpty()) {
+                currentPath.clear();
+            }
             moveTimer -= delta;
             if (moveTimer <= 0) pickNewRandomAction();
             if (isMoving && !isAttacking && hurtTimer <= 0f) {
@@ -244,6 +260,112 @@ public class Enemy {
 
     // Integrated from File 2: Advanced Steering Override
     private void handleChaseMovement(Vector2 playerPos, float speed, float delta, float dist, Vector2 toP) {
+        // --- A* Pathfinding Logic ---
+        if (pathfinder != null) {
+            pathUpdateTimer -= delta;
+
+            // Compute hitbox centers for accurate pathfinding
+            float enemyCenterX = position.x + HITBOX_OFFSET_X + HITBOX_WIDTH / 2f;
+            float enemyCenterY = position.y + HITBOX_OFFSET_Y + HITBOX_HEIGHT / 2f;
+            float playerCenterX = playerPos.x;
+            float playerCenterY = playerPos.y;
+
+            // Decide whether to recalculate the path:
+            // - Timer has expired
+            // - AND (no existing path OR the player has moved significantly from where we last targeted)
+            boolean needsRecalc = false;
+            if (pathUpdateTimer <= 0f) {
+                if (currentPath == null || currentPath.isEmpty()) {
+                    needsRecalc = true;
+                } else {
+                    float dxTarget = playerCenterX - lastPathTarget.x;
+                    float dyTarget = playerCenterY - lastPathTarget.y;
+                    if (Float.isNaN(lastPathTarget.x) || (dxTarget * dxTarget + dyTarget * dyTarget) > PATH_RECALC_THRESHOLD_SQ) {
+                        needsRecalc = true;
+                    }
+                }
+            }
+
+            if (needsRecalc) {
+                List<Vector2> newPath = pathfinder.findPath(
+                    new Vector2(enemyCenterX, enemyCenterY),
+                    new Vector2(playerCenterX, playerCenterY)
+                );
+                if (newPath != null && !newPath.isEmpty()) {
+                    currentPath = newPath;
+                    lastPathTarget.set(playerCenterX, playerCenterY);
+                }
+                // Even if path is empty (unreachable), don't spam recalc — wait for timer
+                pathUpdateTimer = PATH_UPDATE_INTERVAL;
+            }
+
+            // If we have a valid path, follow the waypoints
+            if (currentPath != null && !currentPath.isEmpty()) {
+                // Convert the cell center waypoint to position-space
+                Vector2 cellCenter = currentPath.get(0);
+                float targetPosX = cellCenter.x - HITBOX_OFFSET_X - HITBOX_WIDTH / 2f;
+                float targetPosY = cellCenter.y - HITBOX_OFFSET_Y - HITBOX_HEIGHT / 2f;
+
+                float dxNode = targetPosX - position.x;
+                float dyNode = targetPosY - position.y;
+                float distToNode = (float) Math.sqrt(dxNode * dxNode + dyNode * dyNode);
+
+                // Advance past reached waypoints
+                while (distToNode <= NODE_REACHED_TOLERANCE && currentPath.size() > 1) {
+                    currentPath.remove(0);
+                    cellCenter = currentPath.get(0);
+                    targetPosX = cellCenter.x - HITBOX_OFFSET_X - HITBOX_WIDTH / 2f;
+                    targetPosY = cellCenter.y - HITBOX_OFFSET_Y - HITBOX_HEIGHT / 2f;
+                    dxNode = targetPosX - position.x;
+                    dyNode = targetPosY - position.y;
+                    distToNode = (float) Math.sqrt(dxNode * dxNode + dyNode * dyNode);
+                }
+
+                // If we've reached the last waypoint, clear path
+                if (distToNode <= NODE_REACHED_TOLERANCE && currentPath.size() == 1) {
+                    currentPath.clear();
+                    return;
+                }
+
+                if (!currentPath.isEmpty()) {
+                    // Move toward the current waypoint in a straight line
+                    float invDist = 1f / distToNode;
+                    float dirX = dxNode * invDist;
+                    float dirY = dyNode * invDist;
+                    forward.set(dirX, dirY);
+
+                    float moveAmount = speed * delta;
+
+                    // Don't overshoot the waypoint — clamp movement distance
+                    if (moveAmount > distToNode) {
+                        moveAmount = distToNode;
+                    }
+
+                    float mx = dirX * moveAmount;
+                    float my = dirY * moveAmount;
+
+                    // Try combined diagonal first
+                    if (tryMoveCombined(mx, my)) {
+                        return;
+                    }
+                    // Axis-slide fallback: try each axis independently
+                    if (canMoveTo(position.x + mx, position.y)) {
+                        position.x += mx;
+                        return;
+                    }
+                    if (canMoveTo(position.x, position.y + my)) {
+                        position.y += my;
+                        return;
+                    }
+                    // Totally blocked — clear path and recalculate next tick
+                    currentPath.clear();
+                    pathUpdateTimer = 0f;
+                }
+            }
+            // If A* is active but path is empty (unreachable/same cell), fall through to direct chase
+        }
+
+        // --- Fallback Direct Chasing (when no A* pathfinder or path is empty) ---
         Vector2 direction = new Vector2(playerPos).sub(position).nor();
 
         // Tick down override timer
@@ -438,6 +560,7 @@ public class Enemy {
     public Rectangle getBounds() { return bounds; }
     public void setBoundaries(ArrayList<Rectangle> b) { this.boundaries = b; }
     public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
+    public void setPathfinder(AStar pathfinder) { this.pathfinder = pathfinder; }
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) { this.worldMinX = minX; this.worldMinY = minY; this.worldMaxX = maxX; this.worldMaxY = maxY; }
     public void setPosition(float x, float y) { position.set(x, y); bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y); }
     public Vector2 getPosition() { return position; }
