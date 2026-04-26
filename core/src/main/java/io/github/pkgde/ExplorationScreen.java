@@ -110,6 +110,16 @@ public class ExplorationScreen implements Screen {
             int nextLevelIndex = mapManager.getCurrentLevelIndex() + 1;
             String nextPath = mapManager.getCurrentMapPath();
 
+            if (nextPath.contains("final_map.ldtk") && mapManager.getCurrentLevelIndex() >= 2) {
+                ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
+                    world.getPlayer().getEnemiesKilled(),
+                    world.getPlayer().getTorchCount(),
+                    world.getPlayer().getTimeSurvived()
+                ));
+                this.dispose();
+                return;
+            }
+
             if (nextPath.equals("Maps/tutorial.ldtk")) {
                 if (nextLevelIndex >= 4) {
                     nextPath = "Maps/safeRoom.ldtk";
@@ -118,16 +128,6 @@ public class ExplorationScreen implements Screen {
             } else if (nextPath.contains("safeRoom")) {
                 nextPath = "Maps/final_map.ldtk";
                 nextLevelIndex = 0;
-            } else if (nextPath.equals("Maps/final_map.ldtk")) {
-                if (nextLevelIndex >= 6) { // Final map has 7 levels (0-6)
-                    ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
-                        world.getPlayer().getEnemiesKilled(),
-                        world.getPlayer().getTorchCount(),
-                        world.getPlayer().getTimeSurvived()
-                    ));
-                    this.dispose();
-                    return;
-                }
             }
 
             SaveManager.saveLevelTransition(world, "checkpoint", nextPath, nextLevelIndex);

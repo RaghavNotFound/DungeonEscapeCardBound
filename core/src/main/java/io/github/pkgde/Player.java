@@ -80,20 +80,16 @@ public class Player {
     private float timeSurvived = 0f;
 
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
-        int walkCount = 23, runCount = 12, idleCount = 18, blinkCount = 18;
-        int hurtCount = 12, swordCount = 12, deathCount = 15;
-
-        for (int i = 0; i < walkCount; i++) manager.load("Movements/Player/walking/walking_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < runCount; i++) manager.load("Movements/Player/running/running_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < idleCount; i++) manager.load("Movements/Player/idle/idle_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < blinkCount; i++) manager.load("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < hurtCount; i++) manager.load("Movements/Player/hurt/hurt_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < swordCount; i++) manager.load("Movements/Player/kicking/kicking_" + (i + 1) + ".png", Texture.class);
-        for (int i = 0; i < deathCount; i++) manager.load("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
+        // Player sprites from Player_sprite/Adventurer/Individual Sprites/
+        String base = "Player_sprite/Adventurer/Individual Sprites/adventurer-";
+        for (int i = 0; i < 6; i++)  manager.load(base + "run-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 4; i++)  manager.load(base + "idle-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 4; i++)  manager.load(base + "idle-2-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 3; i++)  manager.load(base + "hurt-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 5; i++)  manager.load(base + "attack1-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 7; i++)  manager.load(base + "die-0" + i + ".png", Texture.class);
 
         manager.load("Vectors/Sword.png", Texture.class);
-
-        // FIXED: ADDED ARROW QUEUE TO PREVENT CRASH!
         manager.load("Vectors/Arrow.png", Texture.class);
     }
 
@@ -101,8 +97,11 @@ public class Player {
         position = new Vector2(200, 200);
         bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
 
-        int walkCount = 23, runCount = 12, idleCount = 18, blinkCount = 18;
-        int hurtCount = 12, swordCount = 12, deathCount = 15;
+        String base = "Player_sprite/Adventurer/Individual Sprites/adventurer-";
+
+        // Frame counts
+        int walkCount = 6, runCount = 6, idleCount = 4, blinkCount = 4;
+        int hurtCount = 3, swordCount = 5, deathCount = 7;
 
         walkingTextures = new Texture[walkCount];
         runTextures = new Texture[runCount];
@@ -118,45 +117,45 @@ public class Player {
         TextureRegion[] blinkFrames = new TextureRegion[blinkCount];
 
         for (int i = 0; i < walkCount; i++) {
-            walkingTextures[i] = Main.assets.get("Movements/Player/walking/walking_" + (i + 1) + ".png", Texture.class);
+            walkingTextures[i] = Main.assets.get(base + "run-0" + i + ".png", Texture.class);
             walkFrames[i] = new TextureRegion(walkingTextures[i]);
         }
         for (int i = 0; i < runCount; i++) {
-            runTextures[i] = Main.assets.get("Movements/Player/running/running_" + (i + 1) + ".png", Texture.class);
+            runTextures[i] = Main.assets.get(base + "run-0" + i + ".png", Texture.class);
             runFrames[i] = new TextureRegion(runTextures[i]);
         }
         for (int i = 0; i < idleCount; i++) {
-            idleTextures[i] = Main.assets.get("Movements/Player/idle/idle_" + (i + 1) + ".png", Texture.class);
+            idleTextures[i] = Main.assets.get(base + "idle-0" + i + ".png", Texture.class);
             idleFrames[i] = new TextureRegion(idleTextures[i]);
         }
         for (int i = 0; i < blinkCount; i++) {
-            idleBlinkingTextures[i] = Main.assets.get("Movements/Player/idleBlinking/idleBlinking_" + (i + 1) + ".png", Texture.class);
+            idleBlinkingTextures[i] = Main.assets.get(base + "idle-2-0" + i + ".png", Texture.class);
             blinkFrames[i] = new TextureRegion(idleBlinkingTextures[i]);
         }
 
         TextureRegion[] hFrames = new TextureRegion[hurtCount];
         for (int i = 0; i < hurtCount; i++) {
-            hurtTextures[i] = Main.assets.get("Movements/Player/hurt/hurt_" + (i + 1) + ".png", Texture.class);
+            hurtTextures[i] = Main.assets.get(base + "hurt-0" + i + ".png", Texture.class);
             hFrames[i] = new TextureRegion(hurtTextures[i]);
         }
         TextureRegion[] sFrames = new TextureRegion[swordCount];
         for (int i = 0; i < swordCount; i++) {
-            swordTextures[i] = Main.assets.get("Movements/Player/kicking/kicking_" + (i + 1) + ".png", Texture.class);
+            swordTextures[i] = Main.assets.get(base + "attack1-0" + i + ".png", Texture.class);
             sFrames[i] = new TextureRegion(swordTextures[i]);
         }
         TextureRegion[] dFrames = new TextureRegion[deathCount];
         for (int i = 0; i < deathCount; i++) {
-            deathTextures[i] = Main.assets.get("Movements/Player/dying/dying_" + (i + 1) + ".png", Texture.class);
+            deathTextures[i] = Main.assets.get(base + "die-0" + i + ".png", Texture.class);
             dFrames[i] = new TextureRegion(deathTextures[i]);
         }
 
-        walkAnimation = new Animation<>(0.025f, walkFrames);
-        runAnimation = new Animation<>(0.08f, runFrames);
-        idleAnimation = new Animation<>(0.08f, idleFrames);
-        idleBlinkingAnimation = new Animation<>(0.08f, blinkFrames);
-        hurtAnimation = new Animation<>(0.05f, hFrames);
-        swordAnimation = new Animation<>(0.045f, sFrames);
-        deathAnimation = new Animation<>(0.07f, dFrames);
+        walkAnimation = new Animation<>(0.09f, walkFrames);
+        runAnimation  = new Animation<>(0.065f, runFrames);
+        idleAnimation = new Animation<>(0.12f, idleFrames);
+        idleBlinkingAnimation = new Animation<>(0.12f, blinkFrames);
+        hurtAnimation = new Animation<>(0.08f, hFrames);
+        swordAnimation = new Animation<>(0.06f, sFrames);
+        deathAnimation = new Animation<>(0.08f, dFrames);
 
         swordTexture = Main.assets.get("Vectors/Sword.png", Texture.class);
         swordTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
@@ -482,16 +481,6 @@ public class Player {
             batch.draw(currentFrame, dX, position.y, dW, HEIGHT);
         }
 
-        if (swordAttackTimer > 0f) {
-            float prog = 1f - (swordAttackTimer / swordAnimation.getAnimationDuration());
-            float ox = 14f * ENTITY_SCALE, oy = 8f * ENTITY_SCALE, swW = 70f * ENTITY_SCALE, swH = 22f * ENTITY_SCALE;
-            float ax = facingRight ? position.x + WIDTH * 0.68f : position.x + WIDTH * 0.32f;
-            float ay = position.y + HEIGHT * 0.56f;
-            float start = facingRight ? -80f : 260f, end = facingRight ? 40f : 140f;
-            float angle = MathUtils.lerp(start, end, MathUtils.clamp(prog, 0f, 1f));
-
-            batch.draw(swordTexture, ax - ox, ay - oy, ox, oy, swW, swH, facingRight ? 1f : -1f, 1f, angle, 0, 0, swordTexture.getWidth(), swordTexture.getHeight(), false, false);
-        }
         for (Arrow a : arrows) a.render(batch);
     }
 

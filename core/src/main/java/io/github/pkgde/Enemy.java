@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
+import com.badlogic.gdx.utils.Array;
 import java.util.ArrayList;
 import java.util.List;
 /**
@@ -17,24 +18,20 @@ public class Enemy {
     private final Vector2 position;
     private final Rectangle bounds;
 
-    private enum Facing { FRONT, BACK, LEFT, RIGHT }
     private enum State { IDLE, CHASE }
 
-    // Animations
-    private Animation<TextureRegion> frontIdleAnim, frontWalkAnim, frontRunAnim, frontHurtAnim, frontAttackAnim;
-    private Animation<TextureRegion> backIdleAnim, backWalkAnim, backRunAnim, backHurtAnim, backAttackAnim;
-    private Animation<TextureRegion> leftIdleAnim, leftWalkAnim, leftRunAnim, leftHurtAnim, leftAttackAnim;
-    private Animation<TextureRegion> rightIdleAnim, rightWalkAnim, rightRunAnim, rightHurtAnim, rightAttackAnim;
+    // Animations — single direction (Bringer-of-Death sprite set)
+    private Animation<TextureRegion> idleAnim, walkAnim, attackAnim, hurtAnim;
     private Animation<TextureRegion> deathAnim;
 
-    private Facing facing = Facing.FRONT;
+    private boolean facingRight = false;
     private State state = State.IDLE;
     private TextureRegion currentFrame;
 
     private float stateTime, hurtStateTime, attackStateTime, deathStateTime;
 
     // Movement & AI Stats
-    private static final float BASE_SPEED = 95f;
+    private static final float BASE_SPEED = 65f;
     private float speedMultiplier = 1f;
     private static final float LEASH_RANGE = 600f;
     private static final float LEASH_RANGE_SQ = LEASH_RANGE * LEASH_RANGE;
@@ -52,8 +49,8 @@ public class Enemy {
 
     // Dimensions & Hitbox
     private final float WIDTH = 128f * ENTITY_SCALE, HEIGHT = 128f * ENTITY_SCALE;
-    private final float HITBOX_WIDTH = 30f * ENTITY_SCALE, HITBOX_HEIGHT = 40f * ENTITY_SCALE;
-    private final float HITBOX_OFFSET_X = 49f * ENTITY_SCALE, HITBOX_OFFSET_Y = 40f * ENTITY_SCALE;
+    private final float HITBOX_WIDTH = 50f * ENTITY_SCALE, HITBOX_HEIGHT = 60f * ENTITY_SCALE;
+    private final float HITBOX_OFFSET_X = 39f * ENTITY_SCALE, HITBOX_OFFSET_Y = 30f * ENTITY_SCALE;
 
     // Combat Stats
     public static final float ATTACK_RANGE = 76f * ENTITY_SCALE;
@@ -101,20 +98,20 @@ public class Enemy {
     private final ShapeRenderer shape = new ShapeRenderer();
 
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
-        String[] prefixes = {
-            "Movements/Enemy/Front/Idle/Front - Idle_", "Movements/Enemy/Front/Walking/Front - Walking_", "Movements/Enemy/Front/Running/Front - Running_", "Movements/Enemy/Front/Hurt/Front - Hurt_", "Movements/Enemy/Front/Attacking/Front - Attacking_",
-            "Movements/Enemy/Back/Idle/Back - Idle_", "Movements/Enemy/Back/Walking/Back - Walking_", "Movements/Enemy/Back/Running/Back - Running_", "Movements/Enemy/Back/Hurt/Back - Hurt_", "Movements/Enemy/Back/Attacking/Back - Attacking_",
-            "Movements/Enemy/Left/Idle/Left - Idle_", "Movements/Enemy/Left/Walking/Left - Walking_", "Movements/Enemy/Left/Running/Left - Running_", "Movements/Enemy/Left/Hurt/Left - Hurt_", "Movements/Enemy/Left/Attacking/Left - Attacking_",
-            "Movements/Enemy/Right/Idle/Right - Idle_", "Movements/Enemy/Right/Walking/Right - Walking_", "Movements/Enemy/Right/Running/Right - Running_", "Movements/Enemy/Right/Hurt/Right - Hurt_", "Movements/Enemy/Right/Attacking/Right - Attacking_",
-            "Movements/Enemy/Dying/Dying_"
-        };
-        for (String p : prefixes) {
-            for (int i = 0; ; i++) {
-                String path = p + String.format("%03d", i) + ".png";
-                if (!Gdx.files.internal(path).exists()) break;
-                manager.load(path, Texture.class);
-            }
-        }
+        // Bringer-of-Death individual sprite frames
+        for (int i = 1; i <= 8; i++)  manager.load("Enemy_Sprite/Individual Sprite/Idle/Bringer-of-Death_Idle_" + i + ".png", Texture.class);
+        for (int i = 1; i <= 8; i++)  manager.load("Enemy_Sprite/Individual Sprite/Walk/Bringer-of-Death_Walk_" + i + ".png", Texture.class);
+        for (int i = 1; i <= 10; i++) manager.load("Enemy_Sprite/Individual Sprite/Attack/Bringer-of-Death_Attack_" + i + ".png", Texture.class);
+        for (int i = 1; i <= 3; i++)  manager.load("Enemy_Sprite/Individual Sprite/Hurt/Bringer-of-Death_Hurt_" + i + ".png", Texture.class);
+        for (int i = 1; i <= 10; i++) manager.load("Enemy_Sprite/Individual Sprite/Death/Bringer-of-Death_Death_" + i + ".png", Texture.class);
+
+        // boss_sprite individual frames
+        String bBase = "boss_sprite/sprites/";
+        for (int i = 1; i <= 4; i++) manager.load(bBase + "idle" + i + ".png", Texture.class);
+        for (int i = 1; i <= 6; i++) manager.load(bBase + "walk" + i + ".png", Texture.class);
+        for (int i = 1; i <= 6; i++) manager.load(bBase + "punch" + i + ".png", Texture.class);
+        for (int i = 1; i <= 2; i++) manager.load(bBase + "hurt" + i + ".png", Texture.class);
+        for (int i = 1; i <= 2; i++) manager.load(bBase + "fall" + i + ".png", Texture.class);
     }
 
     public Enemy() {
@@ -123,45 +120,52 @@ public class Enemy {
         speedMultiplier = MathUtils.random(0.9f, 1.1f);
 
         loadAllAnimations();
-        currentFrame = frontIdleAnim.getKeyFrame(0f, true);
+        currentFrame = idleAnim.getKeyFrame(0f, true);
         pickNewRandomAction();
     }
 
     private void loadAllAnimations() {
-        frontIdleAnim   = load("Movements/Enemy/Front/Idle/Front - Idle_", 0.09f);
-        frontWalkAnim   = load("Movements/Enemy/Front/Walking/Front - Walking_", 0.08f);
-        frontRunAnim    = load("Movements/Enemy/Front/Running/Front - Running_", 0.07f);
-        frontHurtAnim   = load("Movements/Enemy/Front/Hurt/Front - Hurt_", 0.05f);
-        frontAttackAnim = load("Movements/Enemy/Front/Attacking/Front - Attacking_", 0.05f);
-        backIdleAnim    = load("Movements/Enemy/Back/Idle/Back - Idle_", 0.09f);
-        backWalkAnim    = load("Movements/Enemy/Back/Walking/Back - Walking_", 0.08f);
-        backRunAnim     = load("Movements/Enemy/Back/Running/Back - Running_", 0.07f);
-        backHurtAnim    = load("Movements/Enemy/Back/Hurt/Back - Hurt_", 0.05f);
-        backAttackAnim  = load("Movements/Enemy/Back/Attacking/Back - Attacking_", 0.05f);
-        leftIdleAnim    = load("Movements/Enemy/Left/Idle/Left - Idle_", 0.09f);
-        leftWalkAnim    = load("Movements/Enemy/Left/Walking/Left - Walking_", 0.08f);
-        leftRunAnim     = load("Movements/Enemy/Left/Running/Left - Running_", 0.07f);
-        leftHurtAnim    = load("Movements/Enemy/Left/Hurt/Left - Hurt_", 0.05f);
-        leftAttackAnim  = load("Movements/Enemy/Left/Attacking/Left - Attacking_", 0.05f);
-        rightIdleAnim   = load("Movements/Enemy/Right/Idle/Right - Idle_", 0.09f);
-        rightWalkAnim   = load("Movements/Enemy/Right/Walking/Right - Walking_", 0.08f);
-        rightRunAnim    = load("Movements/Enemy/Right/Running/Right - Running_", 0.07f);
-        rightHurtAnim   = load("Movements/Enemy/Right/Hurt/Right - Hurt_", 0.05f);
-        rightAttackAnim = load("Movements/Enemy/Right/Attacking/Right - Attacking_", 0.05f);
-        deathAnim       = load("Movements/Enemy/Dying/Dying_", 0.08f);
+        if (isBoss) {
+            // New Boss character from assets/boss_sprite/
+            String bBase = "boss_sprite/sprites/";
+            Array<TextureRegion> bIdle = new Array<>();
+            for (int i = 1; i <= 4; i++) bIdle.add(new TextureRegion(Main.assets.get(bBase + "idle" + i + ".png", Texture.class)));
+            idleAnim = new Animation<>(0.15f, bIdle, Animation.PlayMode.LOOP);
+
+            Array<TextureRegion> bWalk = new Array<>();
+            for (int i = 1; i <= 6; i++) bWalk.add(new TextureRegion(Main.assets.get(bBase + "walk" + i + ".png", Texture.class)));
+            walkAnim = new Animation<>(0.12f, bWalk, Animation.PlayMode.LOOP);
+
+            Array<TextureRegion> bAttack = new Array<>();
+            for (int i = 1; i <= 6; i++) bAttack.add(new TextureRegion(Main.assets.get(bBase + "punch" + i + ".png", Texture.class)));
+            attackAnim = new Animation<>(0.08f, bAttack, Animation.PlayMode.NORMAL);
+
+            Array<TextureRegion> bHurt = new Array<>();
+            for (int i = 1; i <= 2; i++) bHurt.add(new TextureRegion(Main.assets.get(bBase + "hurt" + i + ".png", Texture.class)));
+            hurtAnim = new Animation<>(0.10f, bHurt, Animation.PlayMode.NORMAL);
+
+            Array<TextureRegion> bDeath = new Array<>();
+            for (int i = 1; i <= 2; i++) bDeath.add(new TextureRegion(Main.assets.get(bBase + "fall" + i + ".png", Texture.class)));
+            deathAnim = new Animation<>(0.20f, bDeath, Animation.PlayMode.NORMAL);
+        } else {
+            // Regular enemies use Bringer-of-Death
+            idleAnim   = loadNamed("Enemy_Sprite/Individual Sprite/Idle/Bringer-of-Death_Idle_",   8,  0.10f);
+            walkAnim   = loadNamed("Enemy_Sprite/Individual Sprite/Walk/Bringer-of-Death_Walk_",   8,  0.09f);
+            attackAnim = loadNamed("Enemy_Sprite/Individual Sprite/Attack/Bringer-of-Death_Attack_", 10, 0.08f);
+            hurtAnim   = loadNamed("Enemy_Sprite/Individual Sprite/Hurt/Bringer-of-Death_Hurt_",     3,  0.07f);
+            deathAnim  = loadNamed("Enemy_Sprite/Individual Sprite/Death/Bringer-of-Death_Death_",   10, 0.12f);
+        }
     }
 
-    // Base logic: Uses Main.assets to manage memory
-    private Animation<TextureRegion> load(String pathPrefix, float frameDuration) {
-        ArrayList<TextureRegion> frames = new ArrayList<>();
-        for (int i = 0; ; i++) {
-            String path = pathPrefix + String.format("%03d", i) + ".png";
-            if (!Main.assets.isLoaded(path)) break;
+    /** Load a numbered animation from the AssetManager (path_N.png, 1-based). */
+    private Animation<TextureRegion> loadNamed(String pathPrefix, int count, float frameDuration) {
+        TextureRegion[] frames = new TextureRegion[count];
+        for (int i = 0; i < count; i++) {
+            String path = pathPrefix + (i + 1) + ".png";
             Texture tex = Main.assets.get(path, Texture.class);
-            frames.add(new TextureRegion(tex));
+            frames[i] = new TextureRegion(tex);
         }
-        if (frames.isEmpty()) throw new IllegalStateException("Missing enemy animation frames: " + pathPrefix);
-        return new Animation<>(frameDuration, frames.toArray(new TextureRegion[0]));
+        return new Animation<>(frameDuration, frames);
     }
 
     public void update(float delta, Player player) {
@@ -517,36 +521,31 @@ public class Enemy {
     // =====================================
 
     private void updateFacing() {
-        if (Math.abs(forward.x) > Math.abs(forward.y)) facing = forward.x >= 0f ? Facing.RIGHT : Facing.LEFT;
-        else facing = forward.y >= 0f ? Facing.BACK : Facing.FRONT;
+        facingRight = forward.x >= 0f;
     }
 
     private void updateAnimation(boolean moved) {
-        if (hurtTimer > 0f) currentFrame = getHurtAnimation().getKeyFrame(hurtStateTime, false);
-        else if (attackTimer > 0f) currentFrame = getAttackAnimation().getKeyFrame(attackStateTime, false);
-        else currentFrame = pickAnimation(state, moved).getKeyFrame(stateTime, true);
+        if (hurtTimer > 0f)   currentFrame = hurtAnim.getKeyFrame(hurtStateTime, false);
+        else if (attackTimer > 0f) currentFrame = attackAnim.getKeyFrame(attackStateTime, false);
+        else if (!isAlive())       currentFrame = deathAnim.getKeyFrame(deathStateTime, false);
+        else if (moved)            currentFrame = walkAnim.getKeyFrame(stateTime, true);
+        else                       currentFrame = idleAnim.getKeyFrame(stateTime, true);
     }
 
-    private Animation<TextureRegion> pickAnimation(State s, boolean m) {
-        if (!m) return switch (facing) { case BACK -> backIdleAnim; case LEFT -> leftIdleAnim; case RIGHT -> rightIdleAnim; default -> frontIdleAnim; };
-        if (s == State.CHASE) return switch (facing) { case BACK -> backRunAnim; case LEFT -> leftRunAnim; case RIGHT -> rightRunAnim; default -> frontRunAnim; };
-        return switch (facing) { case BACK -> backWalkAnim; case LEFT -> leftWalkAnim; case RIGHT -> rightWalkAnim; default -> frontWalkAnim; };
-    }
-
-    private Animation<TextureRegion> getHurtAnimation() { return switch (facing) { case BACK -> backHurtAnim; case LEFT -> leftHurtAnim; case RIGHT -> rightHurtAnim; default -> frontHurtAnim; }; }
-    private Animation<TextureRegion> getAttackAnimation() { return switch (facing) { case BACK -> backAttackAnim; case LEFT -> leftAttackAnim; case RIGHT -> rightAttackAnim; default -> frontAttackAnim; }; }
+    private Animation<TextureRegion> getAttackAnimation() { return attackAnim; }
 
     public void render(SpriteBatch batch) {
         if (disposed) return;
         if (hurtTimer > 0f) batch.setColor(1f, 0.5f, 0.5f, 1f);
-        // Boss has red tint
         if (isBoss) batch.setColor(1f, 0.5f, 0.5f, 1f);
 
-        // Make boss bigger maybe? (Optional)
         float w = isBoss ? WIDTH * 1.5f : WIDTH;
         float h = isBoss ? HEIGHT * 1.5f : HEIGHT;
 
-        batch.draw(currentFrame, position.x, position.y, w, h);
+        // Flip sprite horizontally based on facing direction
+        float dW = facingRight ? w : -w;
+        float dX = facingRight ? position.x : position.x + w;
+        batch.draw(currentFrame, dX, position.y, dW, h);
         batch.setColor(1f, 1f, 1f, 1f);
     }
 
@@ -581,8 +580,9 @@ public class Enemy {
     public boolean isBoss() { return isBoss; }
     public void setBoss(boolean boss) {
         this.isBoss = boss;
+        loadAllAnimations(); // Refresh animations to use boss-specific sprites if applicable
         if (boss) {
-            this.health = Float.MAX_VALUE;
+            this.health = Float.MAX_VALUE; // World boss is immortal, fight happens on BossFightScreen
         }
     }
 }

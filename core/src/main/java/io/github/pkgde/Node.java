@@ -11,6 +11,7 @@ public class Node {
     public float hCost;
     public Node parent;
     public boolean walkable;
+    public float penalty = 0f;
 
     public Node(int gridX, int gridY) {
         this.gridX = gridX;

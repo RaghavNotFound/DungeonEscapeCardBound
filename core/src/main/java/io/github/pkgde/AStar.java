@@ -48,6 +48,26 @@ public class AStar {
                 }
             }
         }
+
+        // --- WALL PENALTY PRE-CALCULATION ---
+        // Nodes near walls get a movement penalty to keep enemies in the open
+        for (int x = 0; x < cols; x++) {
+            for (int y = 0; y < rows; y++) {
+                if (!grid[x][y].walkable) continue;
+                
+                // Check 1-node radius around this node
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && !grid[nx][ny].walkable) {
+                            grid[x][y].penalty += 35f; // Significant penalty for wall proximity
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -114,7 +134,7 @@ public class AStar {
             for (Node neighbor : getNeighbors(current)) {
                 if (!neighbor.walkable || closedSet.contains(neighbor)) continue;
 
-                float newG = current.gCost + getDistance(current, neighbor);
+                float newG = current.gCost + getDistance(current, neighbor) + neighbor.penalty;
                 if (newG < neighbor.gCost) {
                     neighbor.gCost = newG;
                     neighbor.hCost = getDistance(neighbor, targetNode);

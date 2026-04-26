@@ -25,9 +25,11 @@ public class InventoryOverlay {
     private final Texture torchIcon;
     private final GlyphLayout glyphLayout = new GlyphLayout();
 
-    private final Color slotColor = new Color(0.1f, 0.1f, 0.1f, 0.7f);
-    private final Color slotOutlineColor = new Color(0.8f, 0.8f, 0.8f, 0.5f);
+    private final Color bgColor = new Color(0.02f, 0.04f, 0.06f, 0.88f);
+    private final Color slotColor = new Color(0.08f, 0.12f, 0.16f, 0.9f);
+    private final Color slotOutlineColor = new Color(0.2f, 0.3f, 0.4f, 1f);
     private final Color selectedColor = new Color(0.25f, 0.85f, 1f, 1f);
+    private final Color titleColor = new Color(0.25f, 0.85f, 1f, 1f);
 
     private final Rectangle[] slots = new Rectangle[SLOT_COUNT];
 
@@ -60,17 +62,14 @@ public class InventoryOverlay {
     }
 
     private void updateLayout(Viewport viewport) {
-        // FIXED: Reduced from 0.6 to 0.45 so the inventory actually fits inside the screen nicely
-        float totalGridWidth = viewport.getWorldWidth() * 0.45f;
-        float totalGridHeight = viewport.getWorldHeight() * 0.55f;
-        float slotSize = Math.min(totalGridWidth / GRID_COLS, totalGridHeight / GRID_ROWS) * 0.9f;
-        float gap = slotSize * 0.1f;
+        float slotSize = Math.min(viewport.getWorldWidth() * 0.08f, viewport.getWorldHeight() * 0.12f);
+        float gap = slotSize * 0.15f;
 
         float gridW = GRID_COLS * (slotSize + gap) - gap;
         float gridH = GRID_ROWS * (slotSize + gap) - gap;
 
         float startX = (viewport.getWorldWidth() - gridW) / 2f;
-        float startY = (viewport.getWorldHeight() - gridH) / 2f - 60f; // Pushed down slightly
+        float startY = (viewport.getWorldHeight() - gridH) / 2f - 20f;
 
         for (int row = 0; row < GRID_ROWS; row++) {
             for (int col = 0; col < GRID_COLS; col++) {
@@ -91,36 +90,48 @@ public class InventoryOverlay {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-        shape.begin(ShapeRenderer.ShapeType.Filled);
-        shape.setColor(0, 0, 0, 0.6f);
+        // Calculate panel dimensions
         Rectangle firstSlot = slots[0];
-        Rectangle lastSlot = slots[SLOT_COUNT - 1];
-        float panelX = firstSlot.x - 20;
-        float panelY = lastSlot.y - 20;
-        float panelW = (slots[GRID_COLS - 1].x + slots[GRID_COLS - 1].width) - firstSlot.x + 40;
-        float panelH = (firstSlot.y + firstSlot.height) - lastSlot.y + 80;
-        shape.rect(panelX, panelY, panelW, panelH);
-        shape.end();
+        float panelW = (slots[GRID_COLS - 1].x + slots[GRID_COLS - 1].width) - firstSlot.x + 80;
+        float panelH = (firstSlot.y + firstSlot.height) - slots[SLOT_COUNT-1].y + 180;
+        float panelX = (viewport.getWorldWidth() - panelW) / 2f;
+        float panelY = (viewport.getWorldHeight() - panelH) / 2f;
 
+        // 1. Draw Background Panel
         shape.begin(ShapeRenderer.ShapeType.Filled);
+        shape.setColor(bgColor);
+        shape.rect(panelX, panelY, panelW, panelH);
+        
+        // Header highlight
+        shape.setColor(0.1f, 0.2f, 0.3f, 0.5f);
+        shape.rect(panelX, panelY + panelH - 70, panelW, 70);
+
+        // 2. Draw Slots
         for (Rectangle slot : slots) {
             shape.setColor(slotColor);
             shape.rect(slot.x, slot.y, slot.width, slot.height);
         }
         shape.end();
 
+        // 3. Draw Borders
         shape.begin(ShapeRenderer.ShapeType.Line);
+        shape.setColor(0.4f, 0.5f, 0.6f, 0.3f);
+        shape.rect(panelX, panelY, panelW, panelH); // Outer panel border
+        
         for (Rectangle slot : slots) {
             shape.setColor(slotOutlineColor);
             shape.rect(slot.x, slot.y, slot.width, slot.height);
         }
 
+        // Selection glow
         int selectedIndex = selectedRow * GRID_COLS + selectedCol;
-        Rectangle selectedSlot = slots[selectedIndex];
+        Rectangle sel = slots[selectedIndex];
         shape.setColor(selectedColor);
-        shape.rect(selectedSlot.x, selectedSlot.y, selectedSlot.width, selectedSlot.height);
+        shape.rect(sel.x - 2, sel.y - 2, sel.width + 4, sel.height + 4);
+        shape.rect(sel.x - 1, sel.y - 1, sel.width + 2, sel.height + 2);
         shape.end();
 
+        // 4. Draw Items (Simple shapes)
         ArrayList<String> inv = player.getInventoryOrder();
         shape.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < inv.size(); i++) {
@@ -134,46 +145,43 @@ public class InventoryOverlay {
                 shape.rect(cx - iconSize * 0.35f, cy - iconSize * 0.45f, iconSize * 0.7f, iconSize * 0.9f);
                 shape.setColor(0.9f, 0.7f, 0.2f, 1f);
                 shape.rect(cx - iconSize * 0.2f, cy - iconSize * 0.3f, iconSize * 0.4f, iconSize * 0.6f);
-                shape.setColor(0.2f, 0.6f, 1f, 1f);
-                shape.rect(cx - iconSize * 0.1f, cy - iconSize * 0.1f, iconSize * 0.2f, iconSize * 0.2f);
             }
         }
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        // 5. Draw Text and Textures
         batch.begin();
         float oldScaleX = font.getData().scaleX;
         float oldScaleY = font.getData().scaleY;
-        float shadow = Math.max(1.3f, viewport.getWorldWidth() * 0.0012f);
 
-        font.getData().setScale(viewport.getWorldWidth() / 800f * 1.5f);
+        // Title
+        font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.8f);
+        font.setColor(titleColor);
         glyphLayout.setText(font, "INVENTORY");
-        float titleX = (viewport.getWorldWidth() - glyphLayout.width) / 2f;
-        // FIXED: Pushed title up slightly so it doesn't touch the top row of inventory slots
-        float titleY = slots[0].y + slots[0].height + glyphLayout.height + 40f;
+        font.draw(batch, "INVENTORY", (viewport.getWorldWidth() - glyphLayout.width) / 2f, panelY + panelH - 25);
 
-        font.setColor(0f, 0f, 0f, 0.72f);
-        font.draw(batch, "INVENTORY", titleX + shadow, titleY - shadow);
-        font.setColor(Color.WHITE);
-        font.draw(batch, "INVENTORY", titleX, titleY);
+        // Description Area at Bottom
+        font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.1f);
+        String selectedItem = (selectedIndex < inv.size()) ? inv.get(selectedIndex) : "Empty Slot";
+        font.setColor(Color.LIGHT_GRAY);
+        glyphLayout.setText(font, selectedItem);
+        font.draw(batch, selectedItem, (viewport.getWorldWidth() - glyphLayout.width) / 2f, panelY + 45);
 
+        // Render Torch Icon and quantities
         for (int i = 0; i < inv.size(); i++) {
             if (i >= SLOT_COUNT) break;
             String item = inv.get(i);
             Rectangle slot = slots[i];
 
             if (item.equals("Torch")) {
-                float iconSize = slot.height * 0.45f;
+                float iconSize = slot.height * 0.5f;
                 float iconX = slot.x + (slot.width - iconSize) / 2f;
                 float iconY = slot.y + (slot.height - iconSize) / 2f;
                 batch.draw(torchIcon, iconX, iconY, iconSize, iconSize);
-                renderQuantity(batch, font, String.valueOf(player.getTorchCount()), slot, viewport, shadow);
+                renderQuantity(batch, font, String.valueOf(player.getTorchCount()), slot);
             } else if (item.equals("Card")) {
-                renderQuantity(batch, font, String.valueOf(player.getCardsCount()), slot, viewport, shadow);
-            }
-
-            if (i == selectedIndex) {
-                drawTooltip(batch, font, item, slot, viewport, shadow);
+                renderQuantity(batch, font, String.valueOf(player.getCardsCount()), slot);
             }
         }
 
@@ -182,29 +190,13 @@ public class InventoryOverlay {
         batch.end();
     }
 
-    private void renderQuantity(SpriteBatch batch, BitmapFont font, String count, Rectangle slot, Viewport vp, float shadow) {
-        font.getData().setScale(vp.getWorldWidth() / 1280f * 1.1f);
-        glyphLayout.setText(font, count);
-        float textX = slot.x + slot.width - glyphLayout.width - 4f;
-        float textY = slot.y + slot.height - 4f;
-
-        font.setColor(0f, 0f, 0f, 0.7f);
-        font.draw(batch, count, textX + shadow, textY - shadow);
+    private void renderQuantity(SpriteBatch batch, BitmapFont font, String count, Rectangle slot) {
+        float oldScaleX = font.getData().scaleX;
+        float oldScaleY = font.getData().scaleY;
+        font.getData().setScale(oldScaleX * 0.8f);
         font.setColor(Color.WHITE);
-        font.draw(batch, count, textX, textY);
-    }
-
-    private void drawTooltip(SpriteBatch batch, BitmapFont font, String text, Rectangle slot, Viewport viewport, float shadow) {
-        font.getData().setScale(viewport.getWorldWidth() / 1280f * 1.0f);
-        glyphLayout.setText(font, text);
-
-        float tooltipX = slot.x + (slot.width - glyphLayout.width) / 2f;
-        float tooltipY = slot.y + glyphLayout.height + 6f;
-
-        font.setColor(0f, 0f, 0f, 0.72f);
-        font.draw(batch, text, tooltipX + shadow, tooltipY - shadow);
-        font.setColor(Color.WHITE);
-        font.draw(batch, text, tooltipX, tooltipY);
+        font.draw(batch, count, slot.x + slot.width - 20, slot.y + 20);
+        font.getData().setScale(oldScaleX, oldScaleY);
     }
 
     public void dispose() {}

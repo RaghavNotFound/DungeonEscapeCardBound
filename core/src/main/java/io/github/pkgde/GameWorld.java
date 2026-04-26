@@ -59,20 +59,11 @@ public class GameWorld {
         player.setBoundaries(boundaries);
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
 
-        // Spawn player properly!
         player.getPosition().set(mapManager.getPlayerSpawn());
+        System.out.println("[GameWorld] Loading Level: " + mapManager.getCurrentLevelIndex() + " Path: " + mapManager.getCurrentMapPath());
 
         Vector2 bossSpawn = mapManager.getBossSpawn();
-        if (bossSpawn.x != -1 && bossSpawn.y != -1) {
-            Enemy boss = new Enemy();
-            boss.setBoundaries(boundaries);
-            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
-            boss.setPathfinder(pathfinder);
-            boss.setPosition(bossSpawn.x, bossSpawn.y);
-            boss.setBoss(true);
-            boss.forceChase(Float.MAX_VALUE);
-            enemies.add(boss);
-        }
+        boolean forceBoss = mapManager.getCurrentMapPath().contains("final_map.ldtk") && mapManager.getCurrentLevelIndex() >= 2;
 
         // Spawn enemies
         for (Vector2 spawn : mapManager.getEnemySpawns()) {
@@ -91,6 +82,28 @@ public class GameWorld {
         }
 
         this.interactables = mapManager.getInteractables();
+
+        // --- FINAL BOSS SPAWN (Forced) ---
+        // Trigger in Room 3 (index 2) or later of the final map
+        boolean isFinalMap = mapManager.getCurrentMapPath().toLowerCase().contains("final_map");
+        boolean isEndGameRoom = mapManager.getCurrentLevelIndex() >= 2;
+        
+        if (forceBoss || (isFinalMap && isEndGameRoom)) {
+            float spawnX = bossSpawn.x, spawnY = bossSpawn.y;
+            if (spawnX <= 0) {
+                spawnX = mapManager.getMapWidth() / 2f;
+                spawnY = mapManager.getMapHeight() / 2f;
+            }
+            Enemy boss = new Enemy();
+            boss.setBoundaries(boundaries);
+            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+            boss.setPathfinder(pathfinder);
+            boss.setPosition(spawnX, spawnY);
+            boss.setBoss(true);
+            boss.forceChase(Float.MAX_VALUE);
+            enemies.add(boss);
+            System.out.println("[GameWorld] BOSS FORCED at " + spawnX + ", " + spawnY + " | Path: " + mapManager.getCurrentMapPath());
+        }
     }
 
     public void update(float delta, OrthographicCamera camera, com.badlogic.gdx.graphics.glutils.ShapeRenderer shape) {
@@ -142,7 +155,7 @@ public class GameWorld {
                 float dx = pcx - bossCX;
                 float dy = pcy - bossCY;
 
-                if (dx * dx + dy * dy <= (150f * 150f)) {
+                if (dx * dx + dy * dy <= (22f * 22f)) {
                     bossFightTriggered = true;
                 }
             }
@@ -169,7 +182,7 @@ public class GameWorld {
                     }
 
                     Vector2 dir = new Vector2(e.getBounds().x - player.getBounds().x, e.getBounds().y - player.getBounds().y);
-                    e.applyKnockback(dir, 400f);
+                    e.applyKnockback(dir, 200f); // Reduced from 400f
                 }
             }
             player.consumeSwordDamage();
@@ -182,7 +195,7 @@ public class GameWorld {
                     player.takeDamage(e.getDamage());
                 }
                 Vector2 dir = new Vector2(player.getBounds().x - e.getBounds().x, player.getBounds().y - e.getBounds().y);
-                player.applyKnockback(dir, 500f);
+                player.applyKnockback(dir, 250f); // Reduced from 500f
                 e.consumeAttackDamage();
             }
         }

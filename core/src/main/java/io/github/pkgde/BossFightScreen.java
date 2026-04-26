@@ -27,13 +27,19 @@ public class BossFightScreen implements Screen {
     private Texture background;
 
     private final GameOverOverlay gameOverOverlay;
+    private PauseOverlay pauseOverlay;
+    private SettingsOverlay settingsOverlay;
+
+    public enum State { GAME, PAUSE, SETTINGS }
+    private State state = State.GAME;
 
     // Animations
     private Animation<TextureRegion> playerIdle, playerHurt;
-    private Animation<TextureRegion> bossIdle, bossHurt;
+    private Animation<TextureRegion> bossIdle, bossHurt, bossAttack;
     private float stateTime = 0f;
     private float playerHurtTimer = 0f;
     private float bossHurtTimer = 0f;
+    private float bossAttackTimer = 0f;
 
     // Stats
     private float playerMaxHealth;
@@ -103,6 +109,8 @@ public class BossFightScreen implements Screen {
         font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         gameOverOverlay = new GameOverOverlay();
+        pauseOverlay = new PauseOverlay();
+        settingsOverlay = new SettingsOverlay();
 
         loadAnimations();
         loadCards();
@@ -119,7 +127,7 @@ public class BossFightScreen implements Screen {
         for(int i=0; i<4; i++) drawPile.add(new Card("Strike", "Player_Cards/strike.png", 1, 15, CardType.ATTACK));
         for(int i=0; i<3; i++) drawPile.add(new Card("Defend", "Player_Cards/defend.png", 1, 10, CardType.DEFEND));
         drawPile.add(new Card("Heavy Strike", "Player_Cards/strike+.png", 2, 35, CardType.ATTACK));
-        drawPile.add(new Card("Heal", "Player_Cards/heal.png", 2, 20, CardType.HEAL));
+        drawPile.add(new Card("Heal", "Player_Cards/heal.png", 1, 20, CardType.HEAL));
         Collections.shuffle(drawPile);
 
         // Boss Deck Build
@@ -155,11 +163,15 @@ public class BossFightScreen implements Screen {
     public void render(float delta) {
         Screen currentScreen = ((Game) Gdx.app.getApplicationListener()).getScreen();
 
-        stateTime += delta;
-        handleTurnLogic(delta);
-        handleInput();
+        settingsOverlay.update(delta);
+        handleStateInput();
 
         if (((Game) Gdx.app.getApplicationListener()).getScreen() != currentScreen) return;
+
+        if (state == State.GAME) {
+            stateTime += delta;
+            handleTurnLogic(delta);
+        }
 
         Gdx.gl.glClearColor(0.05f, 0.05f, 0.08f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -194,7 +206,13 @@ public class BossFightScreen implements Screen {
         TextureRegion pFrame = (playerHurtTimer > 0) ? playerHurt.getKeyFrame(playerHurt.getAnimationDuration() - playerHurtTimer, false) : playerIdle.getKeyFrame(stateTime, true);
         batch.draw(pFrame, 180, 180, 380, 380);
 
-        TextureRegion bFrame = (bossHurtTimer > 0) ? bossHurt.getKeyFrame(bossHurt.getAnimationDuration() - bossHurtTimer, false) : bossIdle.getKeyFrame(stateTime, true);
+        TextureRegion bFrame;
+        if (bossHurtTimer > 0) bFrame = bossHurt.getKeyFrame(bossHurt.getAnimationDuration() - bossHurtTimer, false);
+        else if (bossAttackTimer > 0) bFrame = bossAttack.getKeyFrame(bossAttack.getAnimationDuration() - bossAttackTimer, false);
+        else bFrame = bossIdle.getKeyFrame(stateTime, true);
+
+        // Flip boss to face left
+        if (!bFrame.isFlipX()) bFrame.flip(true, false);
         batch.draw(bFrame, 720, 180, 380, 380);
 
         // Draw Cards in Hand
@@ -258,6 +276,20 @@ public class BossFightScreen implements Screen {
         batch.end();
 
         if (turnState == TurnState.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        if (state == State.PAUSE || (state == State.SETTINGS && settingsOverlay.getTransitionProgress() < 1f)) {
+            shape.begin(ShapeRenderer.ShapeType.Filled);
+            shape.setColor(0, 0, 0, 0.7f);
+            shape.rect(0, 0, GameWorld.WORLD_WIDTH, GameWorld.WORLD_HEIGHT);
+            shape.end();
+
+            float alpha = 1f;
+            if (state == State.SETTINGS) alpha = 1f - settingsOverlay.getTransitionProgress();
+            pauseOverlay.render(shape, batch, font, viewport, alpha);
+        }
+        settingsOverlay.render(shape, batch, font, viewport);
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void drawHealthBars(ShapeRenderer shape) {
@@ -302,6 +334,7 @@ public class BossFightScreen implements Screen {
     private void handleTurnLogic(float delta) {
         if (playerHurtTimer > 0) playerHurtTimer -= delta;
         if (bossHurtTimer > 0) bossHurtTimer -= delta;
+        if (bossAttackTimer > 0) bossAttackTimer -= delta;
 
         if (bossHealth <= 0 && turnState != TurnState.VICTORY && turnState != TurnState.GAME_OVER) {
             combatLog = "You defeated " + bossName + "!";
@@ -347,6 +380,7 @@ public class BossFightScreen implements Screen {
             playerBlock = 0;
             playerHealth -= damage;
             playerHurtTimer = playerHurt.getAnimationDuration();
+            bossAttackTimer = bossAttack.getAnimationDuration();
             combatLog = bossName + " used " + activeBossCard.name + " for " + damage + " dmg!";
         }
 
@@ -354,10 +388,48 @@ public class BossFightScreen implements Screen {
         if (playerHealth > 0) startPlayerTurn();
     }
 
-    private void handleInput() {
+    private void handleStateInput() {
+        if (state == State.GAME) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) && turnState != TurnState.GAME_OVER && turnState != TurnState.VICTORY) {
+                state = State.PAUSE;
+            } else {
+                handleGameInput();
+            }
+        } else if (state == State.PAUSE) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                state = State.GAME;
+            } else {
+                PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
+                switch (action) {
+                    case RESUME -> state = State.GAME;
+                    case SAVE -> {
+                        combatLog = "Cannot save during boss fight!";
+                    }
+                    case RESTART -> {
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null));
+                        this.dispose();
+                    }
+                    case SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
+                    case EXIT -> {
+                        ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
+                        this.dispose();
+                    }
+                }
+            }
+        } else if (state == State.SETTINGS) {
+            if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(viewport);
+            if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) state = State.PAUSE;
+        }
+    }
+
+    private void handleGameInput() {
         if (turnState == TurnState.GAME_OVER) {
-            if (gameOverOverlay.handleInput(viewport) == GameOverOverlay.Action.RETRY) {
+            GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
+            if (action == GameOverOverlay.Action.RETRY) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null));
+                this.dispose();
+            } else if (action == GameOverOverlay.Action.MAIN_MENU) {
+                ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                 this.dispose();
             }
             return;
@@ -412,29 +484,29 @@ public class BossFightScreen implements Screen {
     }
 
     private void loadAnimations() {
+        // Player animations from Player_sprite/Adventurer/Individual Sprites/
+        String pBase = "Player_sprite/Adventurer/Individual Sprites/adventurer-";
         Array<TextureRegion> pIdle = new Array<>();
-        for(int i=1; i<=18; i++) pIdle.add(new TextureRegion(Main.assets.get("Movements/Player/idle/idle_" + i + ".png", Texture.class)));
-        playerIdle = new Animation<>(0.08f, pIdle, Animation.PlayMode.LOOP);
+        for (int i = 0; i < 4; i++) pIdle.add(new TextureRegion(Main.assets.get(pBase + "idle-0" + i + ".png", Texture.class)));
+        playerIdle = new Animation<>(0.12f, pIdle, Animation.PlayMode.LOOP);
 
         Array<TextureRegion> pHurt = new Array<>();
-        for(int i=1; i<=12; i++) pHurt.add(new TextureRegion(Main.assets.get("Movements/Player/hurt/hurt_" + i + ".png", Texture.class)));
-        playerHurt = new Animation<>(0.05f, pHurt, Animation.PlayMode.NORMAL);
+        for (int i = 0; i < 3; i++) pHurt.add(new TextureRegion(Main.assets.get(pBase + "hurt-0" + i + ".png", Texture.class)));
+        playerHurt = new Animation<>(0.08f, pHurt, Animation.PlayMode.NORMAL);
 
+        // Boss animations from boss_sprite/
+        String bBase = "boss_sprite/sprites/";
         Array<TextureRegion> bIdle = new Array<>();
-        for(int i=0; ; i++) {
-            String p = "Movements/Enemy/Left/Idle/Left - Idle_" + String.format("%03d", i) + ".png";
-            if (!Main.assets.isLoaded(p)) break;
-            bIdle.add(new TextureRegion(Main.assets.get(p, Texture.class)));
-        }
-        bossIdle = new Animation<>(0.09f, bIdle, Animation.PlayMode.LOOP);
+        for (int i = 1; i <= 4; i++) bIdle.add(new TextureRegion(Main.assets.get(bBase + "idle" + i + ".png", Texture.class)));
+        bossIdle = new Animation<>(0.15f, bIdle, Animation.PlayMode.LOOP);
 
         Array<TextureRegion> bHurt = new Array<>();
-        for(int i=0; ; i++) {
-            String p = "Movements/Enemy/Left/Hurt/Left - Hurt_" + String.format("%03d", i) + ".png";
-            if (!Main.assets.isLoaded(p)) break;
-            bHurt.add(new TextureRegion(Main.assets.get(p, Texture.class)));
-        }
-        bossHurt = new Animation<>(0.05f, bHurt, Animation.PlayMode.NORMAL);
+        for (int i = 1; i <= 2; i++) bHurt.add(new TextureRegion(Main.assets.get(bBase + "hurt" + i + ".png", Texture.class)));
+        bossHurt = new Animation<>(0.10f, bHurt, Animation.PlayMode.NORMAL);
+
+        Array<TextureRegion> bAttack = new Array<>();
+        for (int i = 1; i <= 6; i++) bAttack.add(new TextureRegion(Main.assets.get(bBase + "punch" + i + ".png", Texture.class)));
+        bossAttack = new Animation<>(0.08f, bAttack, Animation.PlayMode.NORMAL);
     }
 
     @Override public void resize(int w, int h) { viewport.update(w, h, true); }

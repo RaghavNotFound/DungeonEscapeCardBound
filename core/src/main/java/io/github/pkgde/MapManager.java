@@ -312,15 +312,17 @@ public class MapManager {
             String assetPath = dir + filename;
 
             try {
+                System.out.println("[MapManager] Attempting to load tileset: " + assetPath);
                 if (Gdx.files.internal(assetPath).exists()) {
                     Texture tex = new Texture(Gdx.files.internal(assetPath));
                     tex.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
                     tilesetTextures.put(uid, tex);
+                    System.out.println("[MapManager] SUCCESS: Loaded tileset " + assetPath + " (uid=" + uid + ")");
                 } else {
-                    System.out.println("[MapManager] Tileset not found: " + assetPath + " (uid=" + uid + ")");
+                    System.out.println("[MapManager] ERROR: Tileset not found at " + assetPath + " (uid=" + uid + ")");
                 }
             } catch (Exception e) {
-                System.out.println("[MapManager] Failed to load tileset: " + assetPath + " — " + e.getMessage());
+                System.out.println("[MapManager] ERROR loading tileset " + assetPath + ": " + e.getMessage());
             }
         }
     }
