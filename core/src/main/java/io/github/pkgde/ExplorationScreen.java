@@ -137,7 +137,7 @@ public class ExplorationScreen implements Screen {
         }
 
         if (world.isBossFightTriggered()) {
-            ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE LICH KING"));
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE DEMONIC MONK"));
             this.dispose();
             return;
         }

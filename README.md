@@ -2,11 +2,11 @@
 
 A tactical 2D roguelike deck-builder built with [libGDX](https://libgdx.com/). 
 
-Navigate a pixel-art dungeon filled with treacherous lava and deadly enemies. Once you reach the end of the dungeon, engage the boss in a "Slay the Spire" style turn-based card battle!
+Navigate a pixel-art dungeon filled with treacherous lava and deadly enemies. Once you reach the end of the dungeon, engage the boss (The Lich King) in a "Slay the Spire" style turn-based card battle!
 
 ## Features
 - **Exploration & Combat:** Navigate through an LDtk-generated dungeon, dodging lava, collecting loot, and fighting off basic enemies using real-time sword and bow combat.
-- **Card-Based Boss Fights:** When you reach the boss, combat transitions into a turn-based deck-building system. Draw cards, manage energy and block, and survive the Boss's devastating Ultimate attacks.
+- **Card-Based Boss Fights:** When you reach the boss (The Lich King), combat transitions into a turn-based deck-building system. Draw cards, manage energy and block, and survive the Boss's devastating Ultimate attacks.
 - **Dynamic Lighting:** A custom frame-buffer lighting engine ensures torches and campfires realistically illuminate your surroundings in the dark dungeon.
 - **Full Save/Load System:** Save your progress mid-run, including player position, health, inventory, and cleared rooms.
 - **Developer Debug Tools:** Press `F3` to open a robust debug overlay featuring God Mode, hitbox rendering, and instant teleportation.
@@ -36,15 +36,18 @@ core/src/main/java/io/github/pkgde/
 ├── SaveState.java            # Data Transfer Object (DTO) for game saves
 ├── WindowModeManager.java    # Fullscreen / Borderless Window toggle logic
 ├── BlurShader.java           # Custom GLSL shader used to blur the background during pause menus
-└── Overlays/
-    ├── HomeScreen.java       # Main menu launch screen
-    ├── PauseOverlay.java     # Mid-game pause UI
-    ├── SettingsOverlay.java  # Audio/Visual configuration UI
-    ├── SaveLoadOverlay.java  # Menu UI to load, overwrite, and delete runs
-    ├── InventoryOverlay.java # Player's collected items and active cards view
-    ├── DebugOverlay.java     # F3 Developer tooling (God Mode, Teleport, Hitboxes)
-    ├── GameOverOverlay.java  # Player death screen
-    └── VictoryScreen.java    # Game completion screen with run statistics
+├── GameTimeManager.java      # Keeps track of the total time in the game
+├── LoadingScreen.java        # Loading Screen shown between parts of the game
+├── InputHandler.java         # Handler for standard user inputs
+├── KeyBindings.java          # Utility storing the user mapped inputs
+├── HomeScreen.java           # Main menu launch screen
+├── PauseOverlay.java         # Mid-game pause UI
+├── SettingsOverlay.java      # Audio/Visual configuration UI
+├── SaveLoadOverlay.java      # Menu UI to load, overwrite, and delete runs
+├── InventoryOverlay.java     # Player's collected items and active cards view
+├── DebugOverlay.java         # F3 Developer tooling (God Mode, Teleport, Hitboxes)
+├── GameOverOverlay.java      # Player death screen
+└── VictoryScreen.java        # Game completion screen with run statistics
 ```
 
 ## Running the Game (Desktop)
