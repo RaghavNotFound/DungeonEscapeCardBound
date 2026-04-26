@@ -2,6 +2,7 @@ package io.github.pkgde;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.*;
@@ -46,6 +47,19 @@ public class Player {
     private float targetLavaRotation = 0f;
     private Vector2 lastVelocity = new Vector2();
     private Vector2 lavaVelocity = new Vector2();
+
+    // --- JUMP MECHANIC ---
+    private static final float JUMP_DURATION = 0.45f;      // total airtime in seconds
+    private static final float JUMP_MAX_HEIGHT = 18f;       // peak visual height (pixels)
+    private static final float JUMP_STAMINA_COST = 40f;
+    private static final float JUMP_COOLDOWN = 0.3f;
+    private static final float JUMP_FIXED_DISTANCE = 18f;   // total horizontal distance in pixels
+    private boolean isJumping = false;
+    private float jumpTimer = 0f;
+    private float jumpCooldownTimer = 0f;
+    private float jumpHeight = 0f;  // current visual offset (parabolic arc)
+    private Vector2 jumpDirection = new Vector2(); // locked movement direction at jump start
+    private float jumpDistanceTravelled = 0f;      // how far we've moved during this jump
 
     private static final float DASH_DURATION = 0.22f, DASH_SPEED_MULT = 3.8f;
     private static final float DASH_STAMINA_COST = 30f, DASH_COOLDOWN = 0.6f;
@@ -267,6 +281,7 @@ public class Player {
         if (hurtTimer > 0f) { hurtTimer -= delta; hurtStateTime += delta; }
         if (swordCooldownTimer > 0f) swordCooldownTimer -= delta;
         if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
+        if (jumpCooldownTimer > 0f) jumpCooldownTimer -= delta;
         if (shootTimer > 0) shootTimer -= delta;
 
         if (dashTimer > 0f) {
@@ -275,7 +290,37 @@ public class Player {
             else damageInvulnTimer = Math.max(damageInvulnTimer, 0.1f);
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && stamina >= DASH_STAMINA_COST && !isDashing && dashCooldownTimer <= 0f && hurtTimer <= 0f) {
+        // --- JUMP MECHANIC ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && !isJumping && jumpCooldownTimer <= 0f
+            && stamina >= JUMP_STAMINA_COST && hurtTimer <= 0f && !isDashing) {
+            isJumping = true;
+            jumpTimer = 0f;
+            jumpDistanceTravelled = 0f;
+            stamina -= JUMP_STAMINA_COST;
+            jumpCooldownTimer = JUMP_COOLDOWN;
+            float dx = 0, dy = 0;
+            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) dy = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) dy = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) dx = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx = 1;
+            if (dx == 0 && dy == 0) dx = facingRight ? 1 : -1;
+            jumpDirection.set(dx, dy).nor();
+        }
+
+        if (isJumping) {
+            jumpTimer += delta;
+            float t = jumpTimer / JUMP_DURATION;
+            if (t >= 1f) {
+                isJumping = false;
+                jumpTimer = 0f;
+                jumpHeight = 0f;
+            } else {
+                jumpHeight = 4f * JUMP_MAX_HEIGHT * t * (1f - t);
+            }
+        }
+
+        // --- DASH: Q triggers a dash ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Q) && stamina >= DASH_STAMINA_COST && !isDashing && dashCooldownTimer <= 0f && hurtTimer <= 0f && !isJumping) {
             stamina -= DASH_STAMINA_COST;
             dashTimer = DASH_DURATION;
             dashCooldownTimer = DASH_COOLDOWN;
@@ -361,6 +406,8 @@ public class Player {
 
     public boolean isAlive() { return health > 0f; }
     public boolean isDeathAnimationFinished() { return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime); }
+    public boolean isAirborne() { return isJumping && jumpHeight > JUMP_MAX_HEIGHT * 0.15f; }
+    public float getJumpHeight() { return jumpHeight; }
 
     public boolean canDealSwordDamage() {
         if (swordAttackTimer <= 0f || swordDamageConsumed) return false;
@@ -404,7 +451,17 @@ public class Player {
             }
         }
 
-        if (isDashing) {
+        if (isJumping) {
+            float jumpSpeed = JUMP_FIXED_DISTANCE / JUMP_DURATION;
+            float step = jumpSpeed * delta;
+            float remaining = JUMP_FIXED_DISTANCE - jumpDistanceTravelled;
+            if (step > remaining) step = remaining;
+            newX += jumpDirection.x * step;
+            newY += jumpDirection.y * step;
+            jumpDistanceTravelled += step;
+            if (jumpDirection.x != 0) facingRight = jumpDirection.x > 0;
+            isRunning = false;
+        } else if (isDashing) {
             newX += dashDirection.x * 100f * DASH_SPEED_MULT * delta;
             newY += dashDirection.y * 100f * DASH_SPEED_MULT * delta;
             facingRight = (dashDirection.x != 0) ? (dashDirection.x > 0) : facingRight;
@@ -466,19 +523,26 @@ public class Player {
         float dW = facingRight ? WIDTH : -WIDTH;
         float dX = facingRight ? position.x : position.x + WIDTH;
 
+        if (isJumping && jumpHeight > 0.5f) {
+            float shadowScale = 1f - (jumpHeight / JUMP_MAX_HEIGHT) * 0.4f;
+            float shadowW = HITBOX_WIDTH * shadowScale, shadowH = 3f;
+            float shadowX = position.x + HITBOX_OFFSET_X + (HITBOX_WIDTH - shadowW) * 0.5f;
+            float shadowY = position.y + HITBOX_OFFSET_Y - 1f;
+            Color prev = batch.getColor().cpy();
+            batch.setColor(0f, 0f, 0f, 0.35f * shadowScale);
+            batch.draw(currentFrame, shadowX, shadowY, shadowW, shadowH);
+            batch.setColor(prev);
+        }
+
         if (sinkingInLava) {
             float renderedHeight = Math.max(0, HEIGHT - sinkOffset);
             TextureRegion cropped = new TextureRegion(currentFrame);
             float cropRatio = renderedHeight / HEIGHT;
-
             cropped.setRegionHeight((int)(cropped.getRegionHeight() * cropRatio));
-
-            float originX = facingRight ? WIDTH / 2f : -WIDTH / 2f;
-            float originY = renderedHeight / 2f;
-
+            float originX = facingRight ? WIDTH / 2f : -WIDTH / 2f, originY = renderedHeight / 2f;
             batch.draw(cropped, dX, position.y + sinkOffset, originX, originY, dW, renderedHeight, 1f, 1f, lavaRotation);
         } else {
-            batch.draw(currentFrame, dX, position.y, dW, HEIGHT);
+            batch.draw(currentFrame, dX, position.y + jumpHeight, dW, HEIGHT);
         }
 
         for (Arrow a : arrows) a.render(batch);
