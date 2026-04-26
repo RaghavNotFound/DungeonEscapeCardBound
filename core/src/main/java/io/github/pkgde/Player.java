@@ -2,6 +2,7 @@ package io.github.pkgde;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.*;
@@ -27,6 +28,11 @@ public class Player {
     private ArrayList<Polygon> collisionPolygons;
     private float worldMinX = 0f, worldMinY = 0f, worldMaxX = Float.MAX_VALUE, worldMaxY = Float.MAX_VALUE;
 
+    // Reusable temp objects — avoids per-frame GC pressure
+    private final Rectangle tmpCollisionRect = new Rectangle();
+    private final Polygon tmpCollisionPoly = new Polygon(new float[8]);
+    private final Vector2 tmpKnockback = new Vector2();
+
     public static final float ENTITY_SCALE = 0.16f;
 
     private final float WIDTH = 128f * ENTITY_SCALE;
@@ -46,6 +52,25 @@ public class Player {
     private float targetLavaRotation = 0f;
     private Vector2 lastVelocity = new Vector2();
     private Vector2 lavaVelocity = new Vector2();
+
+    // --- LAVA TICK DAMAGE ---
+    private static final float LAVA_DAMAGE_PER_TICK = 8f;   // HP removed each tick
+    private static final float LAVA_TICK_INTERVAL = 0.25f;   // seconds between ticks
+    private float lavaDamageTimer = 0f;                       // accumulator for tick timing
+    private boolean inLava = false;                           // whether player is currently in lava
+
+    // --- JUMP MECHANIC ---
+    private static final float JUMP_DURATION = 0.45f;      // total airtime in seconds
+    private static final float JUMP_MAX_HEIGHT = 18f;       // peak visual height (pixels)
+    private static final float JUMP_STAMINA_COST = 40f;
+    private static final float JUMP_COOLDOWN = 0.3f;
+    private static final float JUMP_FIXED_DISTANCE = 18f;   // total horizontal distance in pixels
+    private boolean isJumping = false;
+    private float jumpTimer = 0f;
+    private float jumpCooldownTimer = 0f;
+    private float jumpHeight = 0f;  // current visual offset (parabolic arc)
+    private Vector2 jumpDirection = new Vector2(); // locked movement direction at jump start
+    private float jumpDistanceTravelled = 0f;      // how far we've moved during this jump
 
     private static final float DASH_DURATION = 0.22f, DASH_SPEED_MULT = 3.8f;
     private static final float DASH_STAMINA_COST = 30f, DASH_COOLDOWN = 0.6f;
@@ -239,6 +264,38 @@ public class Player {
         lavaRotation = 0f;
     }
 
+    /**
+     * Apply tick damage while standing in lava.
+     * Called every frame from GameWorld while the player overlaps lava.
+     * When health hits 0, automatically triggers the lava sinking death.
+     */
+    public void applyLavaDamage(float delta) {
+        if (!isAlive()) return;
+        lavaDamageTimer += delta;
+        while (lavaDamageTimer >= LAVA_TICK_INTERVAL) {
+            lavaDamageTimer -= LAVA_TICK_INTERVAL;
+            health = Math.max(0f, health - LAVA_DAMAGE_PER_TICK);
+            // Brief hurt flash on each tick (but don't override an existing longer hurt)
+            if (hurtTimer <= 0f) {
+                hurtTimer = 0.15f;
+                hurtStateTime = 0f;
+            }
+            if (!isAlive()) {
+                triggerLavaDeath();
+                return;
+            }
+        }
+    }
+
+    /** Reset lava tick timer when the player leaves lava. */
+    public void resetLavaDamage() {
+        lavaDamageTimer = 0f;
+        inLava = false;
+    }
+
+    public void setInLava(boolean inLava) { this.inLava = inLava; }
+    public boolean isInLava() { return inLava; }
+
     public void update(float delta, OrthographicCamera camera) {
         timeSurvived += delta;
 
@@ -268,6 +325,7 @@ public class Player {
         if (hurtTimer > 0f) { hurtTimer -= delta; hurtStateTime += delta; }
         if (swordCooldownTimer > 0f) swordCooldownTimer -= delta;
         if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
+        if (jumpCooldownTimer > 0f) jumpCooldownTimer -= delta;
         if (shootTimer > 0) shootTimer -= delta;
 
         if (dashTimer > 0f) {
@@ -276,7 +334,39 @@ public class Player {
             else damageInvulnTimer = Math.max(damageInvulnTimer, 0.1f);
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && stamina >= DASH_STAMINA_COST && !isDashing && dashCooldownTimer <= 0f && hurtTimer <= 0f) {
+        // --- JUMP: SPACE triggers a jump arc ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && !isJumping && jumpCooldownTimer <= 0f
+            && stamina >= JUMP_STAMINA_COST && hurtTimer <= 0f && !isDashing) {
+            isJumping = true;
+            jumpTimer = 0f;
+            jumpDistanceTravelled = 0f;
+            stamina -= JUMP_STAMINA_COST;
+            jumpCooldownTimer = JUMP_COOLDOWN;
+            // Lock the movement direction at the moment of jump
+            float dx = 0, dy = 0;
+            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) dy = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) dy = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) dx = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx = 1;
+            if (dx == 0 && dy == 0) dx = facingRight ? 1 : -1; // default to facing direction
+            jumpDirection.set(dx, dy).nor();
+        }
+
+        // Update jump arc (parabola: h = 4*H*t*(1-t) where t goes 0→1)
+        if (isJumping) {
+            jumpTimer += delta;
+            float t = jumpTimer / JUMP_DURATION;
+            if (t >= 1f) {
+                isJumping = false;
+                jumpTimer = 0f;
+                jumpHeight = 0f;
+            } else {
+                jumpHeight = 4f * JUMP_MAX_HEIGHT * t * (1f - t);
+            }
+        }
+
+        // --- DASH: Q triggers a dash ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Q) && stamina >= DASH_STAMINA_COST && !isDashing && dashCooldownTimer <= 0f && hurtTimer <= 0f && !isJumping) {
             stamina -= DASH_STAMINA_COST;
             dashTimer = DASH_DURATION;
             dashCooldownTimer = DASH_COOLDOWN;
@@ -357,11 +447,13 @@ public class Player {
 
     public void applyKnockback(Vector2 forceDir, float forceAmt) {
         if (!isAlive()) return;
-        knockbackVelocity.add(new Vector2(forceDir).nor().scl(forceAmt));
+        knockbackVelocity.add(tmpKnockback.set(forceDir).nor().scl(forceAmt));
     }
 
     public boolean isAlive() { return health > 0f; }
     public boolean isDeathAnimationFinished() { return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime); }
+    public boolean isAirborne() { return isJumping && jumpHeight > JUMP_MAX_HEIGHT * 0.15f; }
+    public float getJumpHeight() { return jumpHeight; }
 
     public boolean canDealSwordDamage() {
         if (swordAttackTimer <= 0f || swordDamageConsumed) return false;
@@ -405,7 +497,19 @@ public class Player {
             }
         }
 
-        if (isDashing) {
+        if (isJumping) {
+            // During a jump, use the locked direction at a fixed speed so total
+            // displacement across the full jump equals JUMP_FIXED_DISTANCE pixels.
+            float jumpSpeed = JUMP_FIXED_DISTANCE / JUMP_DURATION;
+            float step = jumpSpeed * delta;
+            float remaining = JUMP_FIXED_DISTANCE - jumpDistanceTravelled;
+            if (step > remaining) step = remaining;
+            newX += jumpDirection.x * step;
+            newY += jumpDirection.y * step;
+            jumpDistanceTravelled += step;
+            if (jumpDirection.x != 0) facingRight = jumpDirection.x > 0;
+            isRunning = false;
+        } else if (isDashing) {
             newX += dashDirection.x * 100f * DASH_SPEED_MULT * delta;
             newY += dashDirection.y * 100f * DASH_SPEED_MULT * delta;
             facingRight = (dashDirection.x != 0) ? (dashDirection.x > 0) : facingRight;
@@ -429,11 +533,14 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
+        // Always check wall collisions (even while jumping — only lava is skippable)
         float hx = newX + HITBOX_OFFSET_X;
-        if (!collides(new Rectangle(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
+        tmpCollisionRect.set(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        if (!collides(tmpCollisionRect)) position.x = newX;
 
         hx = position.x + HITBOX_OFFSET_X;
-        if (!collides(new Rectangle(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
+        tmpCollisionRect.set(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        if (!collides(tmpCollisionRect)) position.y = newY;
 
         return !MathUtils.isEqual(oldX, position.x, 0.001f) || !MathUtils.isEqual(oldY, position.y, 0.001f);
     }
@@ -441,13 +548,13 @@ public class Player {
     private boolean collides(Rectangle next) {
         if (boundaries != null) for (Rectangle r : boundaries) if (next.overlaps(r)) return true;
         if (collisionPolygons != null) {
-            Polygon nextPoly = new Polygon(new float[]{
-                next.x, next.y,
-                next.x + next.width, next.y,
-                next.x + next.width, next.y + next.height,
-                next.x, next.y + next.height
-            });
-            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(nextPoly, poly)) return true;
+            float[] v = tmpCollisionPoly.getVertices();
+            v[0] = next.x;                    v[1] = next.y;
+            v[2] = next.x + next.width;        v[3] = next.y;
+            v[4] = next.x + next.width;        v[5] = next.y + next.height;
+            v[6] = next.x;                     v[7] = next.y + next.height;
+            tmpCollisionPoly.setVertices(v);
+            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(tmpCollisionPoly, poly)) return true;
         }
         return false;
     }
@@ -467,6 +574,22 @@ public class Player {
         float dW = facingRight ? WIDTH : -WIDTH;
         float dX = facingRight ? position.x : position.x + WIDTH;
 
+        // --- Draw jump shadow on the ground ---
+        if (isJumping && jumpHeight > 0.5f) {
+            float shadowScale = 1f - (jumpHeight / JUMP_MAX_HEIGHT) * 0.4f; // shadow shrinks at peak
+            float shadowW = HITBOX_WIDTH * shadowScale;
+            float shadowH = 3f;
+            float shadowX = position.x + HITBOX_OFFSET_X + (HITBOX_WIDTH - shadowW) * 0.5f;
+            float shadowY = position.y + HITBOX_OFFSET_Y - 1f;
+            // We draw the shadow using the batch's color tint (semi-transparent black oval)
+            Color prev = batch.getColor().cpy();
+            float shadowAlpha = 0.35f * shadowScale;
+            batch.setColor(0f, 0f, 0f, shadowAlpha);
+            // Use the current frame as a hacky 1px slice for the shadow shape
+            batch.draw(currentFrame, shadowX, shadowY, shadowW, shadowH);
+            batch.setColor(prev);
+        }
+
         if (sinkingInLava) {
             float renderedHeight = Math.max(0, HEIGHT - sinkOffset);
             TextureRegion cropped = new TextureRegion(currentFrame);
@@ -479,7 +602,8 @@ public class Player {
 
             batch.draw(cropped, dX, position.y + sinkOffset, originX, originY, dW, renderedHeight, 1f, 1f, lavaRotation);
         } else {
-            batch.draw(currentFrame, dX, position.y, dW, HEIGHT);
+            // Offset sprite upward by jumpHeight when airborne
+            batch.draw(currentFrame, dX, position.y + jumpHeight, dW, HEIGHT);
         }
 
         if (swordAttackTimer > 0f) {

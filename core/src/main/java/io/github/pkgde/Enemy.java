@@ -4,7 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.*;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -98,7 +98,12 @@ public class Enemy {
     /** Cached last target position used for A* — prevents oscillation when player is behind walls. */
     private final Vector2 lastPathTarget = new Vector2(Float.NaN, Float.NaN);
 
-    private final ShapeRenderer shape = new ShapeRenderer();
+    // Reusable temp objects — avoids per-frame GC pressure
+    private final Vector2 tmpToPlayer = new Vector2();
+    private final Vector2 tmpDir = new Vector2();
+    private final Vector2 tmpAlt = new Vector2();
+    private final Rectangle tmpRect = new Rectangle();
+    private final Polygon tmpPoly = new Polygon(new float[8]);
 
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
         String[] prefixes = {
@@ -191,7 +196,7 @@ public class Enemy {
         }
 
         Vector2 playerPos = player.getPosition();
-        Vector2 toPlayer = new Vector2(playerPos).sub(position);
+        Vector2 toPlayer = tmpToPlayer.set(playerPos).sub(position);
         float distance = toPlayer.len();
 
         updateAIState(distance, toPlayer, delta);
@@ -245,7 +250,7 @@ public class Enemy {
         boolean inRange = (state == State.CHASE) ? distance <= alertRange : distance <= baseRange;
         boolean inCone = false;
         if (inRange) {
-            float dot = forward.dot(new Vector2(toPlayer).nor());
+            float dot = forward.dot(tmpDir.set(toPlayer).nor());
             inCone = dot >= MathUtils.cosDeg(fovAngle / 2f);
         }
 
@@ -366,7 +371,7 @@ public class Enemy {
         }
 
         // --- Fallback Direct Chasing (when no A* pathfinder or path is empty) ---
-        Vector2 direction = new Vector2(playerPos).sub(position).nor();
+        Vector2 direction = tmpDir.set(playerPos).sub(position).nor();
 
         // Tick down override timer
         if (overrideTimer > 0f) overrideTimer -= delta;
@@ -398,11 +403,11 @@ public class Enemy {
 
         // 2. Direct path blocked — find avoidance angle and COMMIT
         for (float angle : AVOIDANCE_ANGLES) {
-            Vector2 altDir = new Vector2(direction).rotateDeg(angle);
-            float ax = altDir.x * speed * delta, ay = altDir.y * speed * delta;
+            tmpAlt.set(direction).rotateDeg(angle);
+            float ax = tmpAlt.x * speed * delta, ay = tmpAlt.y * speed * delta;
             if (tryMoveCombined(ax, ay)) {
-                forward.set(altDir);
-                overrideDir.set(altDir);
+                forward.set(tmpAlt);
+                overrideDir.set(tmpAlt);
                 overrideTimer = OVERRIDE_DURATION;
                 return;
             }
@@ -415,16 +420,16 @@ public class Enemy {
             position.y += my;
         } else {
             // 4. Completely stuck — try perpendicular
-            Vector2 perp = new Vector2(-direction.y, direction.x);
-            float pmx = perp.x * speed * delta, pmy = perp.y * speed * delta;
+            tmpAlt.set(-direction.y, direction.x);
+            float pmx = tmpAlt.x * speed * delta, pmy = tmpAlt.y * speed * delta;
             if (tryMoveCombined(pmx, pmy)) {
-                forward.set(perp);
-                overrideDir.set(perp);
+                forward.set(tmpAlt);
+                overrideDir.set(tmpAlt);
                 overrideTimer = OVERRIDE_DURATION;
             } else if (tryMoveCombined(-pmx, -pmy)) {
-                perp.scl(-1f);
-                forward.set(perp);
-                overrideDir.set(perp);
+                tmpAlt.scl(-1f);
+                forward.set(tmpAlt);
+                overrideDir.set(tmpAlt);
                 overrideTimer = OVERRIDE_DURATION;
             }
         }
@@ -468,7 +473,7 @@ public class Enemy {
     public void applyKnockback(Vector2 forceDir, float forceAmt) {
         if (!isAlive() || disposed) return;
         if (isBoss) return; // Boss doesn't get knocked back
-        knockbackVelocity.add(new Vector2(forceDir).nor().scl(forceAmt));
+        knockbackVelocity.add(tmpAlt.set(forceDir).nor().scl(forceAmt));
     }
 
     public boolean canDealDamage() {
@@ -499,18 +504,18 @@ public class Enemy {
     }
 
     private boolean canMoveTo(float x, float y) {
-        Rectangle next = new Rectangle(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        tmpRect.set(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
-            for (Rectangle wall : boundaries) if (next.overlaps(wall)) return false;
+            for (Rectangle wall : boundaries) if (tmpRect.overlaps(wall)) return false;
         }
         if (collisionPolygons != null) {
-            Polygon p = new Polygon(new float[]{
-                next.x, next.y,
-                next.x + next.width, next.y,
-                next.x + next.width, next.y + next.height,
-                next.x, next.y + next.height
-            });
-            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(p, poly)) return false;
+            float[] v = tmpPoly.getVertices();
+            v[0] = tmpRect.x;                       v[1] = tmpRect.y;
+            v[2] = tmpRect.x + tmpRect.width;        v[3] = tmpRect.y;
+            v[4] = tmpRect.x + tmpRect.width;        v[5] = tmpRect.y + tmpRect.height;
+            v[6] = tmpRect.x;                        v[7] = tmpRect.y + tmpRect.height;
+            tmpPoly.setVertices(v);
+            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(tmpPoly, poly)) return false;
         }
         return true;
     }
@@ -576,7 +581,7 @@ public class Enemy {
     public boolean isDeathAnimationFinished() { return !isAlive() && deathStateTime >= deathAnim.getAnimationDuration(); }
     public float getAttackTimer() { return attackTimer; }
     public float getAttackAnimDuration() { return getAttackAnimation().getAnimationDuration(); }
-    public void dispose() { if (!disposed) { shape.dispose(); disposed = true; } }
+    public void dispose() { disposed = true; }
 
     public boolean isBoss() { return isBoss; }
     public void setBoss(boolean boss) {

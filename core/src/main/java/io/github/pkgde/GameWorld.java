@@ -44,6 +44,9 @@ public class GameWorld {
     // Shared A* pathfinder for all enemies
     private AStar pathfinder;
 
+    // Reusable temp object — avoids per-hit allocations
+    private final Vector2 tmpDir = new Vector2();
+
     public GameWorld(MapManager mapManager) {
         this.mapManager = mapManager;
         this.lightingManager = new LightingManager();
@@ -97,9 +100,10 @@ public class GameWorld {
         lightingManager.update(delta);
         player.update(delta, camera);
 
-        // --- LAVA DEATH LOGIC ---
-        if (player.isAlive() && !DebugOverlay.godMode) {
+        // --- LAVA TICK DAMAGE --- (skip while player is airborne from a jump)
+        if (player.isAlive() && !DebugOverlay.godMode && !player.isAirborne()) {
             Rectangle pBounds = player.getBounds();
+            boolean touchingLava = false;
             for (Rectangle lava : mapManager.getLavaRects()) {
                 if (pBounds.overlaps(lava)) {
                     // Calculate horizontal overlap
@@ -107,19 +111,23 @@ public class GameWorld {
                     float overlapXEnd = Math.min(pBounds.x + pBounds.width, lava.x + lava.width);
                     float overlapWidth = overlapXEnd - overlapXStart;
 
-                    // Calculate vertical overlap (from the bottom of player to lava's top)
+                    // Calculate vertical overlap
                     float overlapYStart = Math.max(pBounds.y, lava.y);
                     float overlapYEnd = Math.min(pBounds.y + pBounds.height, lava.y + lava.height);
                     float overlapHeight = overlapYEnd - overlapYStart;
 
-                    // Trigger death if:
-                    // 1) Horizontal overlap is more than half the player's width
-                    // 2) Player's bottom is touching the lava
+                    // Apply tick damage when significantly overlapping lava
                     if (overlapWidth > pBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, pBounds.y, 1f)) {
-                        player.triggerLavaDeath();
+                        touchingLava = true;
+                        player.setInLava(true);
+                        player.applyLavaDamage(delta);
                         break;
                     }
                 }
+            }
+            // Reset tick timer when player leaves lava
+            if (!touchingLava && player.isInLava()) {
+                player.resetLavaDamage();
             }
         }
 
@@ -168,8 +176,8 @@ public class GameWorld {
                         handleEnemyDeath(e);
                     }
 
-                    Vector2 dir = new Vector2(e.getBounds().x - player.getBounds().x, e.getBounds().y - player.getBounds().y);
-                    e.applyKnockback(dir, 400f);
+                    tmpDir.set(e.getBounds().x - player.getBounds().x, e.getBounds().y - player.getBounds().y);
+                    e.applyKnockback(tmpDir, 400f);
                 }
             }
             player.consumeSwordDamage();
@@ -181,8 +189,8 @@ public class GameWorld {
                 if (!DebugOverlay.godMode) {
                     player.takeDamage(e.getDamage());
                 }
-                Vector2 dir = new Vector2(player.getBounds().x - e.getBounds().x, player.getBounds().y - e.getBounds().y);
-                player.applyKnockback(dir, 500f);
+                tmpDir.set(player.getBounds().x - e.getBounds().x, player.getBounds().y - e.getBounds().y);
+                player.applyKnockback(tmpDir, 500f);
                 e.consumeAttackDamage();
             }
         }
