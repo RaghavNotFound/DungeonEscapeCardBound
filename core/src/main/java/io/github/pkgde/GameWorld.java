@@ -60,10 +60,15 @@ public class GameWorld {
         player.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
 
         player.getPosition().set(mapManager.getPlayerSpawn());
+
+        // Nudge player out of collision if spawned inside a wall
+        nudgeOutOfCollision(player.getPosition(), boundaries, mapManager.getMapWidth(), mapManager.getMapHeight());
+
         System.out.println("[GameWorld] Loading Level: " + mapManager.getCurrentLevelIndex() + " Path: " + mapManager.getCurrentMapPath());
 
         Vector2 bossSpawn = mapManager.getBossSpawn();
-        boolean forceBoss = mapManager.getCurrentMapPath().equals("Maps/map.ldtk") && mapManager.getCurrentLevelIndex() == 4;
+        boolean forceBoss = mapManager.getCurrentMapPath().equals("Maps/final_map.ldtk")
+            && (mapManager.getCurrentLevelIndex() == 4 || mapManager.getCurrentLevelIndex() >= 6);
 
         // Spawn enemies
         for (Vector2 spawn : mapManager.getEnemySpawns()) {
@@ -85,14 +90,15 @@ public class GameWorld {
 
         // --- BOSS SPAWN (Forced) ---
         // Trigger in map.ldtk level 4 where BossSpawn entity is placed
-        boolean isFinalMap = mapManager.getCurrentMapPath().equals("Maps/map.ldtk");
-        boolean isEndGameRoom = mapManager.getCurrentLevelIndex() == 4;
+        boolean isFinalMap = mapManager.getCurrentMapPath().equals("Maps/final_map.ldtk");
+        boolean isEndGameRoom = mapManager.getCurrentLevelIndex() == 4 || mapManager.getCurrentLevelIndex() >= 6;
         
         if (forceBoss || (isFinalMap && isEndGameRoom)) {
             float spawnX = bossSpawn.x, spawnY = bossSpawn.y;
             if (spawnX <= 0) {
-                spawnX = mapManager.getMapWidth() / 2f;
-                spawnY = mapManager.getMapHeight() / 2f;
+                // No BossSpawn entity — spawn near player like debug menu does
+                spawnX = player.getPosition().x + 80f;
+                spawnY = player.getPosition().y;
             }
             Enemy boss = new Enemy();
             boss.setBoundaries(boundaries);
@@ -113,25 +119,14 @@ public class GameWorld {
         // --- LAVA DEATH LOGIC ---
         if (player.isAlive() && !DebugOverlay.godMode) {
             Rectangle pBounds = player.getBounds();
+            // Create a small rectangle representing only the bottom line (legs) of the player
+            Rectangle footLine = new Rectangle(pBounds.x, pBounds.y, pBounds.width, 2f);
             for (Rectangle lava : mapManager.getLavaRects()) {
-                if (pBounds.overlaps(lava)) {
-                    // Calculate horizontal overlap
-                    float overlapXStart = Math.max(pBounds.x, lava.x);
-                    float overlapXEnd = Math.min(pBounds.x + pBounds.width, lava.x + lava.width);
-                    float overlapWidth = overlapXEnd - overlapXStart;
-
-                    // Calculate vertical overlap (from the bottom of player to lava's top)
-                    float overlapYStart = Math.max(pBounds.y, lava.y);
-                    float overlapYEnd = Math.min(pBounds.y + pBounds.height, lava.y + lava.height);
-                    float overlapHeight = overlapYEnd - overlapYStart;
-
-                    // Trigger death if:
-                    // 1) Horizontal overlap is more than half the player's width
-                    // 2) Player's bottom is touching the lava
-                    if (overlapWidth > pBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, pBounds.y, 1f)) {
+                if (footLine.overlaps(lava)) {
+                    if (!player.isJumping()) {
                         player.triggerLavaDeath();
-                        break;
                     }
+                    break;
                 }
             }
         }
@@ -142,22 +137,12 @@ public class GameWorld {
                 Rectangle eBounds = e.getBounds();
                 for (Rectangle lava : mapManager.getLavaRects()) {
                     if (eBounds.overlaps(lava)) {
-                        float overlapXStart = Math.max(eBounds.x, lava.x);
-                        float overlapXEnd = Math.min(eBounds.x + eBounds.width, lava.x + lava.width);
-                        float overlapWidth = overlapXEnd - overlapXStart;
-
-                        float overlapYStart = Math.max(eBounds.y, lava.y);
-                        float overlapYEnd = Math.min(eBounds.y + eBounds.height, lava.y + lava.height);
-                        float overlapHeight = overlapYEnd - overlapYStart;
-
-                        if (overlapWidth > eBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, eBounds.y, 1f)) {
-                            boolean wasAlive = e.isAlive();
-                            e.takeDamage(e.getHealth()); // Instant death
-                            if (wasAlive && !e.isAlive()) {
-                                handleEnemyDeath(e);
-                            }
-                            break;
+                        boolean wasAlive = e.isAlive();
+                        e.takeDamage(e.getHealth()); // Instant death
+                        if (wasAlive && !e.isAlive()) {
+                            handleEnemyDeath(e);
                         }
+                        break;
                     }
                 }
             }
@@ -172,6 +157,15 @@ public class GameWorld {
 
         // Update the lighting FBO here, before main rendering starts
         lightingManager.updateLightFbo(camera, shape);
+
+        // --- REMOVE DEAD ENEMIES after death animation finishes ---
+        for (int i = enemies.size() - 1; i >= 0; i--) {
+            Enemy e = enemies.get(i);
+            if (!e.isAlive() && e.isDeathAnimationFinished()) {
+                enemies.remove(i);
+                e.dispose();
+            }
+        }
 
         for (Enemy e : enemies) {
             e.update(delta, player);
@@ -289,8 +283,10 @@ public class GameWorld {
         float cx = e.getBounds().x + e.getBounds().width / 2f;
         float cy = e.getBounds().y + e.getBounds().height / 2f;
 
-        // Enemies always drop a card, plus random chance loot
-        lootDrops.add(new LootDrop(LootDrop.Type.CARD, cx, cy));
+        // Enemies have a 35% chance to drop a card, plus random chance loot
+        if (MathUtils.random() < 0.35f) {
+            lootDrops.add(new LootDrop(LootDrop.Type.CARD, cx, cy));
+        }
         spawnLoot(cx, cy);
     }
 
@@ -375,10 +371,11 @@ public class GameWorld {
             }
         }
 
+        boolean interactedThisFrame = false;
         for (Interactable interactable : interactables) {
             interactable.update(Gdx.graphics.getDeltaTime());
 
-            if (interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
+            if (!interactedThisFrame && interactable.isPlayerInRange(player) && Gdx.input.isKeyJustPressed(Input.Keys.G)) {
                 if (interactable.getType() == Interactable.Type.CENTER_FIRE) {
                     if (!lightingManager.isLit()) {
                         if (player.hasTorch()) {
@@ -386,6 +383,18 @@ public class GameWorld {
                             interactable.interact(player); // Hides the "Press [G]" prompt
                             Rectangle b = interactable.getBounds();
                             lightingManager.triggerLighting(b.x + b.width / 2f, b.y + b.height / 2f);
+
+                            // Spawn a boss near the player (same as debug menu [B] spawn)
+                            Enemy boss = new Enemy();
+                            boss.setBoundaries(boundaries);
+                            boss.setWorldBounds(0f, 0f, mapManager.getMapWidth(), mapManager.getMapHeight());
+                            boss.setPathfinder(pathfinder);
+                            boss.setPosition(player.getPosition().x + 80f, player.getPosition().y);
+                            boss.setBoss(true);
+                            boss.forceChase(Float.MAX_VALUE);
+                            enemies.add(boss);
+                            System.out.println("[GameWorld] Boss spawned from Center Fire!");
+                            interactedThisFrame = true;
                         } else {
                             System.out.println("You need a torch to light the center fire!");
                         }
@@ -396,15 +405,14 @@ public class GameWorld {
                     float cy = b.y + b.height / 2f;
 
                     if (interactable.getType() == Interactable.Type.CHEST) {
-                        lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, cx - 15f, cy + 20f));
-                        if (MathUtils.random() < 0.5f) lootDrops.add(new LootDrop(LootDrop.Type.TORCH, cx + 15f, cy + 20f));
-                        if (MathUtils.random() < 0.3f) lootDrops.add(new LootDrop(LootDrop.Type.STAMINA, cx, cy + 35f));
+                        lootDrops.add(new LootDrop(LootDrop.Type.TORCH, cx, cy + 20f));
                     } else if (interactable.getType() == Interactable.Type.BARREL) {
                         float roll = MathUtils.random();
                         if (roll < 0.4f) lootDrops.add(new LootDrop(LootDrop.Type.HEALTH, cx, cy + 15f));
                         else if (roll < 0.7f) lootDrops.add(new LootDrop(LootDrop.Type.STAMINA, cx, cy + 15f));
                         else lootDrops.add(new LootDrop(LootDrop.Type.ARROW, cx, cy + 15f));
                     }
+                    interactedThisFrame = true;
                 }
             }
         }
@@ -431,6 +439,46 @@ public class GameWorld {
         return false;
     }
 
+    /**
+     * Nudges a position out of collision rects by trying offsets in 8 directions.
+     * Used to fix spawning inside walls.
+     */
+    private void nudgeOutOfCollision(Vector2 pos, ArrayList<Rectangle> collisions, float mapW, float mapH) {
+        float testW = 55f * Player.ENTITY_SCALE;  // player foot hitbox width
+        float testH = 28f * Player.ENTITY_SCALE;  // player foot hitbox height
+        float offX = (128f - 55f) / 2f * Player.ENTITY_SCALE;
+        float offY = 19f * Player.ENTITY_SCALE;
+
+        Rectangle test = new Rectangle(pos.x + offX, pos.y + offY, testW, testH);
+
+        // Check if currently colliding
+        boolean colliding = false;
+        for (Rectangle r : collisions) {
+            if (test.overlaps(r)) { colliding = true; break; }
+        }
+        if (!colliding) return;
+
+        // Try nudging in 8 directions at increasing distances
+        float[][] dirs = {{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
+        for (float dist = 8f; dist <= 128f; dist += 8f) {
+            for (float[] d : dirs) {
+                float nx = pos.x + d[0] * dist;
+                float ny = pos.y + d[1] * dist;
+                if (nx < 0 || ny < 0 || nx > mapW || ny > mapH) continue;
+                test.set(nx + offX, ny + offY, testW, testH);
+                boolean ok = true;
+                for (Rectangle r : collisions) {
+                    if (test.overlaps(r)) { ok = false; break; }
+                }
+                if (ok) {
+                    System.out.println("[GameWorld] Nudged player spawn from (" + pos.x + "," + pos.y + ") to (" + nx + "," + ny + ")");
+                    pos.set(nx, ny);
+                    return;
+                }
+            }
+        }
+    }
+
     // ===== GETTERS & SETTERS =====
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
@@ -441,6 +489,7 @@ public class GameWorld {
     public ArrayList<Rectangle> getBoundaries() { return boundaries; }
     public boolean isLevelComplete() { return levelComplete; } // Getter for levelComplete
     public boolean isBossFightTriggered() { return bossFightTriggered; }
+    public void setBossFightTriggered(boolean val) { this.bossFightTriggered = val; }
 
     public void dispose() {
         player.dispose();

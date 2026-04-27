@@ -24,6 +24,8 @@ public class BossFightScreen implements Screen {
 
     private final Player player;
     private final String bossName;
+    private final boolean hasExit;
+    private final Screen previousScreen;
     private Texture background;
 
     private final GameOverOverlay gameOverOverlay;
@@ -92,9 +94,11 @@ public class BossFightScreen implements Screen {
     private String combatLog = "Boss Fight Started!";
     private final Vector3 touch = new Vector3();
 
-    public BossFightScreen(Player player, String bossName) {
+    public BossFightScreen(Player player, String bossName, boolean hasExit, Screen previousScreen) {
         this.player = player;
         this.bossName = bossName;
+        this.hasExit = hasExit;
+        this.previousScreen = previousScreen;
         this.playerMaxHealth = player.getMaxHealth();
         this.playerHealth = player.getHealth();
 
@@ -379,6 +383,7 @@ public class BossFightScreen implements Screen {
             damage -= playerBlock;
             playerBlock = 0;
             playerHealth -= damage;
+            if (playerHealth < 0) playerHealth = 0;
             playerHurtTimer = playerHurt.getAnimationDuration();
             bossAttackTimer = bossAttack.getAnimationDuration();
             combatLog = bossName + " used " + activeBossCard.name + " for " + damage + " dmg!";
@@ -436,7 +441,16 @@ public class BossFightScreen implements Screen {
         }
 
         if (turnState == TurnState.VICTORY && Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
-            ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen("checkpoint"));
+            if (hasExit) {
+                ((Main) Gdx.app.getApplicationListener()).setScreen(previousScreen);
+            } else {
+                ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
+                    player.getEnemiesKilled(),
+                    player.getTorchCount(),
+                    player.getTimeSurvived()
+                ));
+                if (previousScreen != null) previousScreen.dispose();
+            }
             this.dispose();
             return;
         }
@@ -472,6 +486,7 @@ public class BossFightScreen implements Screen {
     private void playPlayerCard(Card c) {
         if (c.type == CardType.ATTACK) {
             bossHealth -= c.value;
+            if (bossHealth < 0) bossHealth = 0;
             bossHurtTimer = bossHurt.getAnimationDuration();
             combatLog = "Played " + c.name + "! Dealt " + c.value + " dmg.";
         } else if (c.type == CardType.DEFEND) {

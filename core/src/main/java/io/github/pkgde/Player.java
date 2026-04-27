@@ -37,6 +37,13 @@ public class Player {
     private final float HITBOX_OFFSET_X = (128f - 55f) / 2f * ENTITY_SCALE;
     private final float HITBOX_OFFSET_Y = 19f * ENTITY_SCALE;
 
+    // Foot-only collision hitbox for wall/obstacle collisions (bottom portion of
+    // sprite)
+    private final float FOOT_HITBOX_WIDTH = 55f * ENTITY_SCALE;
+    private final float FOOT_HITBOX_HEIGHT = 28f * ENTITY_SCALE;
+    private final float FOOT_HITBOX_OFFSET_X = (128f - 55f) / 2f * ENTITY_SCALE;
+    private final float FOOT_HITBOX_OFFSET_Y = 19f * ENTITY_SCALE;
+
     private boolean isRunning;
     private boolean facingRight = true;
     private Vector2 knockbackVelocity = new Vector2();
@@ -49,17 +56,21 @@ public class Player {
     private Vector2 lavaVelocity = new Vector2();
 
     // --- JUMP MECHANIC ---
-    private static final float JUMP_DURATION = 0.45f;      // total airtime in seconds
-    private static final float JUMP_MAX_HEIGHT = 18f;       // peak visual height (pixels)
+    private static final float JUMP_DURATION = 0.65f; // total airtime in seconds
+    private static final float JUMP_MAX_HEIGHT = 26f; // peak visual height (pixels)
     private static final float JUMP_STAMINA_COST = 40f;
     private static final float JUMP_COOLDOWN = 0.3f;
-    private static final float JUMP_FIXED_DISTANCE = 18f;   // total horizontal distance in pixels
     private boolean isJumping = false;
     private float jumpTimer = 0f;
     private float jumpCooldownTimer = 0f;
-    private float jumpHeight = 0f;  // current visual offset (parabolic arc)
+    private float jumpHeight = 0f; // current visual offset (parabolic arc)
     private Vector2 jumpDirection = new Vector2(); // locked movement direction at jump start
-    private float jumpDistanceTravelled = 0f;      // how far we've moved during this jump
+    private float jumpDistanceTravelled = 0f; // how far we've moved during this jump
+
+    private boolean isJumpPending = false;
+    private float jumpPendingTimer = 0f;
+    private static final float JUMP_PENDING_DELAY = 0.12f;
+    private float currentJumpDistance = 0f;
 
     private static final float DASH_DURATION = 0.22f, DASH_SPEED_MULT = 3.8f;
     private static final float DASH_STAMINA_COST = 30f, DASH_COOLDOWN = 0.6f;
@@ -96,12 +107,18 @@ public class Player {
     public static void queueAssets(com.badlogic.gdx.assets.AssetManager manager) {
         // Player sprites from Player_sprite/Adventurer/Individual Sprites/
         String base = "Player_sprite/Adventurer/Individual Sprites/adventurer-";
-        for (int i = 0; i < 6; i++)  manager.load(base + "run-0" + i + ".png", Texture.class);
-        for (int i = 0; i < 4; i++)  manager.load(base + "idle-0" + i + ".png", Texture.class);
-        for (int i = 0; i < 4; i++)  manager.load(base + "idle-2-0" + i + ".png", Texture.class);
-        for (int i = 0; i < 3; i++)  manager.load(base + "hurt-0" + i + ".png", Texture.class);
-        for (int i = 0; i < 5; i++)  manager.load(base + "attack1-0" + i + ".png", Texture.class);
-        for (int i = 0; i < 7; i++)  manager.load(base + "die-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 6; i++)
+            manager.load(base + "run-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 4; i++)
+            manager.load(base + "idle-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 4; i++)
+            manager.load(base + "idle-2-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 3; i++)
+            manager.load(base + "hurt-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 5; i++)
+            manager.load(base + "attack1-0" + i + ".png", Texture.class);
+        for (int i = 0; i < 7; i++)
+            manager.load(base + "die-0" + i + ".png", Texture.class);
 
         manager.load("Vectors/Sword.png", Texture.class);
         manager.load("Vectors/Arrow.png", Texture.class);
@@ -164,7 +181,7 @@ public class Player {
         }
 
         walkAnimation = new Animation<>(0.09f, walkFrames);
-        runAnimation  = new Animation<>(0.065f, runFrames);
+        runAnimation = new Animation<>(0.065f, runFrames);
         idleAnimation = new Animation<>(0.12f, idleFrames);
         idleBlinkingAnimation = new Animation<>(0.12f, blinkFrames);
         hurtAnimation = new Animation<>(0.08f, hFrames);
@@ -176,69 +193,162 @@ public class Player {
         currentFrame = idleFrames[0];
     }
 
-    public float getStamina() { return stamina; }
-    public float getMaxStamina() { return maxStamina; }
-    public float getShootCooldownPercent() { return MathUtils.clamp(1f - (shootTimer / SHOOT_COOLDOWN), 0f, 1f); }
-    public float getHealth() { return health; }
-    public float getAnimatedHealth() { return animatedHealth; }
-    public float getMaxHealth() { return MAX_HEALTH; }
-    public float getHealthRatio() { return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f); }
-    public float getAnimatedHealthRatio() { return MathUtils.clamp(animatedHealth / MAX_HEALTH, 0f, 1f); }
-    public void addHealth(float amount) { health = Math.min(health + amount, MAX_HEALTH); }
-    public float getSwordDamage() { return SWORD_DAMAGE; }
-    public Vector2 getPosition() { return position; }
-    public Rectangle getBounds() { return bounds; }
-    public ArrayList<Arrow> getArrows() { return arrows; }
-    public int getTorchCount() { return torchCount; }
-    public boolean hasTorch() { return torchCount > 0; }
-    public int getCardsCount() { return cardsCount; }
-    public int getEnemiesKilled() { return enemiesKilled; }
-    public float getTimeSurvived() { return timeSurvived; }
-    public ArrayList<String> getInventoryOrder() { return inventoryOrder; }
+    public float getStamina() {
+        return stamina;
+    }
+
+    public float getMaxStamina() {
+        return maxStamina;
+    }
+
+    public float getShootCooldownPercent() {
+        return MathUtils.clamp(1f - (shootTimer / SHOOT_COOLDOWN), 0f, 1f);
+    }
+
+    public float getHealth() {
+        return health;
+    }
+
+    public float getAnimatedHealth() {
+        return animatedHealth;
+    }
+
+    public float getMaxHealth() {
+        return MAX_HEALTH;
+    }
+
+    public float getHealthRatio() {
+        return MathUtils.clamp(health / MAX_HEALTH, 0f, 1f);
+    }
+
+    public float getAnimatedHealthRatio() {
+        return MathUtils.clamp(animatedHealth / MAX_HEALTH, 0f, 1f);
+    }
+
+    public void addHealth(float amount) {
+        health = Math.min(health + amount, MAX_HEALTH);
+    }
+
+    public float getSwordDamage() {
+        return SWORD_DAMAGE;
+    }
+
+    public Vector2 getPosition() {
+        return position;
+    }
+
+    public Rectangle getBounds() {
+        return bounds;
+    }
+
+    public ArrayList<Arrow> getArrows() {
+        return arrows;
+    }
+
+    public int getTorchCount() {
+        return torchCount;
+    }
+
+    public boolean hasTorch() {
+        return torchCount > 0;
+    }
+
+    public int getCardsCount() {
+        return cardsCount;
+    }
+
+    public int getEnemiesKilled() {
+        return enemiesKilled;
+    }
+
+    public float getTimeSurvived() {
+        return timeSurvived;
+    }
+
+    public ArrayList<String> getInventoryOrder() {
+        return inventoryOrder;
+    }
 
     public void addTorch() {
         torchCount++;
-        if (!inventoryOrder.contains("Torch")) inventoryOrder.add("Torch");
+        if (!inventoryOrder.contains("Torch"))
+            inventoryOrder.add("Torch");
     }
+
     public void addCard() {
         cardsCount++;
-        if (!inventoryOrder.contains("Card")) inventoryOrder.add("Card");
+        if (!inventoryOrder.contains("Card"))
+            inventoryOrder.add("Card");
     }
+
     public void removeTorch() {
         if (torchCount > 0) {
             torchCount--;
-            if (torchCount == 0) inventoryOrder.remove("Torch");
+            if (torchCount == 0)
+                inventoryOrder.remove("Torch");
         }
     }
 
-    public void addStamina(float amount) { stamina = Math.min(stamina + amount, maxStamina); }
-    public void incrementEnemiesKilled() { enemiesKilled++; }
-
-    public void setBoundaries(ArrayList<Rectangle> b) { this.boundaries = b; }
-    public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
-    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
-        this.worldMinX = minX; this.worldMinY = minY;
-        this.worldMaxX = maxX; this.worldMaxY = maxY;
+    public void addStamina(float amount) {
+        stamina = Math.min(stamina + amount, maxStamina);
     }
 
-    public void setPosition(float x, float y) { position.set(x, y); updateBoundsPosition(); }
-    public void setHealth(float h) { health = h; animatedHealth = h; }
-    public void setStamina(float s) { stamina = s; }
+    public void incrementEnemiesKilled() {
+        enemiesKilled++;
+    }
+
+    public void setBoundaries(ArrayList<Rectangle> b) {
+        this.boundaries = b;
+    }
+
+    public void setCollisionPolygons(ArrayList<Polygon> p) {
+        this.collisionPolygons = p;
+    }
+
+    public void setWorldBounds(float minX, float minY, float maxX, float maxY) {
+        this.worldMinX = minX;
+        this.worldMinY = minY;
+        this.worldMaxX = maxX;
+        this.worldMaxY = maxY;
+    }
+
+    public void setPosition(float x, float y) {
+        position.set(x, y);
+        updateBoundsPosition();
+    }
+
+    public void setHealth(float h) {
+        health = h;
+        animatedHealth = h;
+    }
+
+    public void setStamina(float s) {
+        stamina = s;
+    }
 
     public void setTorchCount(int t) {
         torchCount = t;
-        if (t > 0 && !inventoryOrder.contains("Torch")) inventoryOrder.add("Torch");
+        if (t > 0 && !inventoryOrder.contains("Torch"))
+            inventoryOrder.add("Torch");
     }
+
     public void setCardsCount(int c) {
         cardsCount = c;
-        if (c > 0 && !inventoryOrder.contains("Card")) inventoryOrder.add("Card");
+        if (c > 0 && !inventoryOrder.contains("Card"))
+            inventoryOrder.add("Card");
     }
 
-    public void setEnemiesKilled(int k) { enemiesKilled = k; }
-    public void setTimeSurvived(float t) { timeSurvived = t; }
+    public void setEnemiesKilled(int k) {
+        enemiesKilled = k;
+    }
+
+    public void setTimeSurvived(float t) {
+        timeSurvived = t;
+    }
 
     public void triggerLavaDeath() {
-        if (!isAlive()) return;
+        if (!isAlive())
+            return;
         health = 0;
         sinkingInLava = true;
         deathStateTime = 0f;
@@ -277,34 +387,68 @@ public class Player {
             return;
         }
 
-        if (damageInvulnTimer > 0f) damageInvulnTimer -= delta;
-        if (hurtTimer > 0f) { hurtTimer -= delta; hurtStateTime += delta; }
-        if (swordCooldownTimer > 0f) swordCooldownTimer -= delta;
-        if (dashCooldownTimer > 0f) dashCooldownTimer -= delta;
-        if (jumpCooldownTimer > 0f) jumpCooldownTimer -= delta;
-        if (shootTimer > 0) shootTimer -= delta;
+        if (damageInvulnTimer > 0f)
+            damageInvulnTimer -= delta;
+        if (hurtTimer > 0f) {
+            hurtTimer -= delta;
+            hurtStateTime += delta;
+        }
+        if (swordCooldownTimer > 0f)
+            swordCooldownTimer -= delta;
+        if (dashCooldownTimer > 0f)
+            dashCooldownTimer -= delta;
+        if (jumpCooldownTimer > 0f)
+            jumpCooldownTimer -= delta;
+        if (shootTimer > 0)
+            shootTimer -= delta;
 
         if (dashTimer > 0f) {
             dashTimer -= delta;
-            if (dashTimer <= 0f) isDashing = false;
-            else damageInvulnTimer = Math.max(damageInvulnTimer, 0.1f);
+            if (dashTimer <= 0f)
+                isDashing = false;
+            else
+                damageInvulnTimer = Math.max(damageInvulnTimer, 0.1f);
         }
 
         // --- JUMP MECHANIC ---
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && !isJumping && jumpCooldownTimer <= 0f
-            && stamina >= JUMP_STAMINA_COST && hurtTimer <= 0f && !isDashing) {
-            isJumping = true;
-            jumpTimer = 0f;
-            jumpDistanceTravelled = 0f;
-            stamina -= JUMP_STAMINA_COST;
-            jumpCooldownTimer = JUMP_COOLDOWN;
-            float dx = 0, dy = 0;
-            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) dy = 1;
-            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) dy = -1;
-            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) dx = -1;
-            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx = 1;
-            if (dx == 0 && dy == 0) dx = facingRight ? 1 : -1;
-            jumpDirection.set(dx, dy).nor();
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) && !isJumping && !isJumpPending && jumpCooldownTimer <= 0f
+                && stamina >= JUMP_STAMINA_COST && hurtTimer <= 0f && !isDashing) {
+            isJumpPending = true;
+            jumpPendingTimer = JUMP_PENDING_DELAY;
+        }
+
+        if (isJumpPending) {
+            jumpPendingTimer -= delta;
+            if (jumpPendingTimer <= 0f) {
+                isJumpPending = false;
+                isJumping = true;
+                jumpTimer = 0f;
+                jumpDistanceTravelled = 0f;
+                stamina -= JUMP_STAMINA_COST;
+                jumpCooldownTimer = JUMP_COOLDOWN;
+
+                float dx = 0, dy = 0;
+                if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP))
+                    dy = 1;
+                if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN))
+                    dy = -1;
+                if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT))
+                    dx = -1;
+                if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT))
+                    dx = 1;
+
+                boolean shiftPressed = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) && !runLocked;
+                float distX = shiftPressed ? 80f : 40f; // More for left/right
+                float distY = shiftPressed ? 40f : 20f; // Less for front/back
+
+                if (dx == 0 && dy == 0) {
+                    jumpDirection.set(0, 0);
+                } else {
+                    jumpDirection.set(dx, dy).nor();
+                    jumpDirection.x *= distX;
+                    jumpDirection.y *= distY;
+                }
+            }
         }
 
         if (isJumping) {
@@ -320,26 +464,35 @@ public class Player {
         }
 
         // --- DASH: Q triggers a dash ---
-        if (Gdx.input.isKeyJustPressed(Input.Keys.Q) && stamina >= DASH_STAMINA_COST && !isDashing && dashCooldownTimer <= 0f && hurtTimer <= 0f && !isJumping) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.Q) && stamina >= DASH_STAMINA_COST && !isDashing
+                && dashCooldownTimer <= 0f && hurtTimer <= 0f && !isJumping) {
             stamina -= DASH_STAMINA_COST;
             dashTimer = DASH_DURATION;
             dashCooldownTimer = DASH_COOLDOWN;
             isDashing = true;
             float dx = 0, dy = 0;
-            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP)) dy = 1;
-            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN)) dy = -1;
-            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT)) dx = -1;
-            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT)) dx = 1;
-            if (dx == 0 && dy == 0) dx = facingRight ? 1 : -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP))
+                dy = 1;
+            if (Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN))
+                dy = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT))
+                dx = -1;
+            if (Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT))
+                dx = 1;
+            if (dx == 0 && dy == 0)
+                dx = facingRight ? 1 : -1;
             dashDirection.set(dx, dy).nor();
         }
 
         if (swordAttackTimer > 0f) {
             swordAttackTimer -= delta;
             swordAttackStateTime += delta;
-            if (swordAttackTimer <= 0f) swordDamageConsumed = false;
+            if (swordAttackTimer <= 0f)
+                swordDamageConsumed = false;
         }
-        if (isAlive() && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.F)) && swordCooldownTimer <= 0f && swordAttackTimer <= 0f) {
+        if (isAlive()
+                && (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.F))
+                && swordCooldownTimer <= 0f && swordAttackTimer <= 0f) {
             swordAttackTimer = swordAnimation.getAnimationDuration();
             swordAttackStateTime = 0f;
             swordCooldownTimer = SWORD_COOLDOWN;
@@ -360,7 +513,8 @@ public class Player {
             currentFrame = swordAnimation.getKeyFrame(swordAttackStateTime, false);
         } else if (moved) {
             idleLoopTime = 0f;
-            currentFrame = isRunning ? runAnimation.getKeyFrame(stateTime, true) : walkAnimation.getKeyFrame(stateTime, true);
+            currentFrame = isRunning ? runAnimation.getKeyFrame(stateTime, true)
+                    : walkAnimation.getKeyFrame(stateTime, true);
         } else {
             idleLoopTime += delta;
             currentFrame = getIdleLoopFrame(idleLoopTime);
@@ -368,9 +522,12 @@ public class Player {
 
         boolean runningNow = isRunning && moved && stamina > 0;
         if (!isDashing) {
-            if (runningNow) stamina -= STAMINA_DRAIN_RATE * delta;
-            else if (moved) stamina += STAMINA_WALK_REGEN_RATE * delta;
-            else stamina += STAMINA_IDLE_REGEN_RATE * delta;
+            if (runningNow)
+                stamina -= STAMINA_DRAIN_RATE * delta;
+            else if (moved)
+                stamina += STAMINA_WALK_REGEN_RATE * delta;
+            else
+                stamina += STAMINA_IDLE_REGEN_RATE * delta;
         }
         stamina = MathUtils.clamp(stamina, 0, maxStamina);
         updateRunLockState();
@@ -391,31 +548,55 @@ public class Player {
     }
 
     public void takeDamage(float damage) {
-        if (damage <= 0f || !isAlive() || damageInvulnTimer > 0f) return;
+        if (damage <= 0f || !isAlive() || damageInvulnTimer > 0f)
+            return;
         health = Math.max(0f, health - damage);
-        if (!isAlive()) { hurtTimer = 0f; deathStateTime = 0f; return; }
+        if (!isAlive()) {
+            hurtTimer = 0f;
+            deathStateTime = 0f;
+            return;
+        }
         damageInvulnTimer = DAMAGE_INVULNERABILITY;
         hurtTimer = HURT_ANIM_TIME;
         hurtStateTime = 0f;
     }
 
     public void applyKnockback(Vector2 forceDir, float forceAmt) {
-        if (!isAlive()) return;
+        if (!isAlive())
+            return;
         knockbackVelocity.add(new Vector2(forceDir).nor().scl(forceAmt));
     }
 
-    public boolean isAlive() { return health > 0f; }
-    public boolean isDeathAnimationFinished() { return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime); }
-    public boolean isAirborne() { return isJumping && jumpHeight > JUMP_MAX_HEIGHT * 0.15f; }
-    public float getJumpHeight() { return jumpHeight; }
+    public boolean isAlive() {
+        return health > 0f;
+    }
+
+    public boolean isDeathAnimationFinished() {
+        return !isAlive() && deathAnimation.isAnimationFinished(deathStateTime);
+    }
+
+    public boolean isAirborne() {
+        return isJumping && jumpHeight > JUMP_MAX_HEIGHT * 0.15f;
+    }
+
+    public boolean isJumping() {
+        return isJumping || isJumpPending;
+    }
+
+    public float getJumpHeight() {
+        return jumpHeight;
+    }
 
     public boolean canDealSwordDamage() {
-        if (swordAttackTimer <= 0f || swordDamageConsumed) return false;
+        if (swordAttackTimer <= 0f || swordDamageConsumed)
+            return false;
         float progress = 1f - (swordAttackTimer / swordAnimation.getAnimationDuration());
         return progress >= 0.28f && progress <= 0.62f;
     }
 
-    public void consumeSwordDamage() { swordDamageConsumed = true; }
+    public void consumeSwordDamage() {
+        swordDamageConsumed = true;
+    }
 
     public Rectangle getSwordHitbox() {
         float hitW = 78f * ENTITY_SCALE, hitH = 60f * ENTITY_SCALE;
@@ -426,15 +607,18 @@ public class Player {
     }
 
     private void updateRunLockState() {
-        if (stamina <= 0f) runLocked = true;
-        else if (runLocked && stamina >= maxStamina * RUN_UNLOCK_THRESHOLD_RATIO) runLocked = false;
+        if (stamina <= 0f)
+            runLocked = true;
+        else if (runLocked && stamina >= maxStamina * RUN_UNLOCK_THRESHOLD_RATIO)
+            runLocked = false;
     }
 
     private TextureRegion getIdleLoopFrame(float time) {
         float iDur = idleAnimation.getAnimationDuration();
         float bDur = idleBlinkingAnimation.getAnimationDuration();
         float cycleTime = time % (iDur + bDur);
-        return (cycleTime < iDur) ? idleAnimation.getKeyFrame(cycleTime, false) : idleBlinkingAnimation.getKeyFrame(cycleTime - iDur, false);
+        return (cycleTime < iDur) ? idleAnimation.getKeyFrame(cycleTime, false)
+                : idleBlinkingAnimation.getKeyFrame(cycleTime - iDur, false);
     }
 
     private boolean handleMovement(float delta) {
@@ -443,7 +627,8 @@ public class Player {
 
         if (knockbackVelocity.len2() > 0) {
             float speed = knockbackVelocity.len() - KNOCKBACK_FRICTION * delta;
-            if (speed <= 0) knockbackVelocity.setZero();
+            if (speed <= 0)
+                knockbackVelocity.setZero();
             else {
                 knockbackVelocity.setLength(speed);
                 newX += knockbackVelocity.x * delta;
@@ -452,14 +637,14 @@ public class Player {
         }
 
         if (isJumping) {
-            float jumpSpeed = JUMP_FIXED_DISTANCE / JUMP_DURATION;
-            float step = jumpSpeed * delta;
-            float remaining = JUMP_FIXED_DISTANCE - jumpDistanceTravelled;
-            if (step > remaining) step = remaining;
-            newX += jumpDirection.x * step;
-            newY += jumpDirection.y * step;
-            jumpDistanceTravelled += step;
-            if (jumpDirection.x != 0) facingRight = jumpDirection.x > 0;
+            float stepX = (jumpDirection.x / JUMP_DURATION) * delta;
+            float stepY = (jumpDirection.y / JUMP_DURATION) * delta;
+            
+            newX += stepX;
+            newY += stepY;
+            
+            if (jumpDirection.x != 0)
+                facingRight = jumpDirection.x > 0;
             isRunning = false;
         } else if (isDashing) {
             newX += dashDirection.x * 100f * DASH_SPEED_MULT * delta;
@@ -474,10 +659,18 @@ public class Player {
             isRunning = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) && !runLocked;
             float speed = isRunning ? 150f : 100f;
 
-            if (up) newY += speed * delta;
-            if (down) newY -= speed * delta;
-            if (left) { newX -= speed * delta; facingRight = false; }
-            if (right) { newX += speed * delta; facingRight = true; }
+            if (up)
+                newY += speed * delta;
+            if (down)
+                newY -= speed * delta;
+            if (left) {
+                newX -= speed * delta;
+                facingRight = false;
+            }
+            if (right) {
+                newX += speed * delta;
+                facingRight = true;
+            }
         } else {
             isRunning = false;
         }
@@ -485,25 +678,34 @@ public class Player {
         newX = MathUtils.clamp(newX, worldMinX, worldMaxX - WIDTH);
         newY = MathUtils.clamp(newY, worldMinY, worldMaxY - HEIGHT);
 
-        float hx = newX + HITBOX_OFFSET_X;
-        if (!collides(new Rectangle(hx, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.x = newX;
+        // Use foot-only hitbox for wall/obstacle collisions so the player's head
+        // doesn't block movement
+        float hx = newX + FOOT_HITBOX_OFFSET_X;
+        if (!collides(new Rectangle(hx, position.y + FOOT_HITBOX_OFFSET_Y, FOOT_HITBOX_WIDTH, FOOT_HITBOX_HEIGHT)))
+            position.x = newX;
 
-        hx = position.x + HITBOX_OFFSET_X;
-        if (!collides(new Rectangle(hx, newY + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT))) position.y = newY;
+        hx = position.x + FOOT_HITBOX_OFFSET_X;
+        if (!collides(new Rectangle(hx, newY + FOOT_HITBOX_OFFSET_Y, FOOT_HITBOX_WIDTH, FOOT_HITBOX_HEIGHT)))
+            position.y = newY;
 
         return !MathUtils.isEqual(oldX, position.x, 0.001f) || !MathUtils.isEqual(oldY, position.y, 0.001f);
     }
 
     private boolean collides(Rectangle next) {
-        if (boundaries != null) for (Rectangle r : boundaries) if (next.overlaps(r)) return true;
+        if (boundaries != null)
+            for (Rectangle r : boundaries)
+                if (next.overlaps(r))
+                    return true;
         if (collisionPolygons != null) {
-            Polygon nextPoly = new Polygon(new float[]{
-                next.x, next.y,
-                next.x + next.width, next.y,
-                next.x + next.width, next.y + next.height,
-                next.x, next.y + next.height
+            Polygon nextPoly = new Polygon(new float[] {
+                    next.x, next.y,
+                    next.x + next.width, next.y,
+                    next.x + next.width, next.y + next.height,
+                    next.x, next.y + next.height
             });
-            for (Polygon poly : collisionPolygons) if (Intersector.overlapConvexPolygons(nextPoly, poly)) return true;
+            for (Polygon poly : collisionPolygons)
+                if (Intersector.overlapConvexPolygons(nextPoly, poly))
+                    return true;
         }
         return false;
     }
@@ -538,15 +740,18 @@ public class Player {
             float renderedHeight = Math.max(0, HEIGHT - sinkOffset);
             TextureRegion cropped = new TextureRegion(currentFrame);
             float cropRatio = renderedHeight / HEIGHT;
-            cropped.setRegionHeight((int)(cropped.getRegionHeight() * cropRatio));
+            cropped.setRegionHeight((int) (cropped.getRegionHeight() * cropRatio));
             float originX = facingRight ? WIDTH / 2f : -WIDTH / 2f, originY = renderedHeight / 2f;
-            batch.draw(cropped, dX, position.y + sinkOffset, originX, originY, dW, renderedHeight, 1f, 1f, lavaRotation);
+            batch.draw(cropped, dX, position.y + sinkOffset, originX, originY, dW, renderedHeight, 1f, 1f,
+                    lavaRotation);
         } else {
             batch.draw(currentFrame, dX, position.y + jumpHeight, dW, HEIGHT);
         }
 
-        for (Arrow a : arrows) a.render(batch);
+        for (Arrow a : arrows)
+            a.render(batch);
     }
 
-    public void dispose() { }
+    public void dispose() {
+    }
 }

@@ -58,11 +58,11 @@ public class MapManager {
      * Represents one tile instance within a layer.
      */
     private static class TileInstance {
-        float dstX, dstY;       // destination position in world (Y-flipped)
-        float srcX, srcY;       // source position in tileset texture
-        float width, height;    // tile size (gridSize)
-        int flipFlags;          // 0=none, 1=flipX, 2=flipY, 3=both
-        int tilesetUid;         // which tileset this tile uses
+        float dstX, dstY; // destination position in world (Y-flipped)
+        float srcX, srcY; // source position in tileset texture
+        float width, height; // tile size (gridSize)
+        int flipFlags; // 0=none, 1=flipX, 2=flipY, 3=both
+        int tilesetUid; // which tileset this tile uses
     }
 
     public void load(String path) {
@@ -103,8 +103,23 @@ public class MapManager {
 
             switch (type) {
                 case "IntGrid":
-                    if ("Collision".equals(identifier)) {
-                        loadIntGridCollision(layer);
+                    switch (identifier) {
+                        case "Collision":
+                        case "TempCollision":
+                            loadIntGridCollision(layer);
+                            break;
+                        case "LavaDamage":
+                            loadIntGridToRects(layer, lavaRects);
+                            break;
+                        case "Torch":
+                            loadIntGridToRects(layer, torchRects);
+                            break;
+                        case "Chest":
+                            loadIntGridToInteractables(layer, Interactable.Type.CHEST);
+                            break;
+                        case "Centerfire":
+                            loadIntGridToInteractables(layer, Interactable.Type.CENTER_FIRE);
+                            break;
                     }
                     break;
                 case "Entities":
@@ -115,8 +130,6 @@ public class MapManager {
                     break;
             }
         }
-
-
 
         // Generate fallback interactables if none found
         if (interactables.isEmpty()) {
@@ -171,11 +184,49 @@ public class MapManager {
         }
     }
 
+    /** Generic IntGrid loader that adds cells as Rectangles to the given list. */
+    private void loadIntGridToRects(JsonValue layer, ArrayList<Rectangle> targetList) {
+        int layerGridSize = layer.getInt("__gridSize", gridSize);
+        int cWid = layer.getInt("__cWid");
+        JsonValue csv = layer.get("intGridCsv");
+
+        for (int idx = 0; idx < csv.size; idx++) {
+            if (csv.getInt(idx) != 0) {
+                int col = idx % cWid;
+                int row = idx / cWid;
+                float x = col * layerGridSize;
+                float y = mapHeight - (row + 1) * layerGridSize;
+                targetList.add(new Rectangle(x, y, layerGridSize, layerGridSize));
+            }
+        }
+    }
+
+    /** IntGrid loader that creates Interactables (for Chest, Centerfire, etc). */
+    private void loadIntGridToInteractables(JsonValue layer, Interactable.Type type) {
+        int layerGridSize = layer.getInt("__gridSize", gridSize);
+        int cWid = layer.getInt("__cWid");
+        JsonValue csv = layer.get("intGridCsv");
+
+        for (int idx = 0; idx < csv.size; idx++) {
+            if (csv.getInt(idx) != 0) {
+                int col = idx % cWid;
+                int row = idx / cWid;
+                float x = col * layerGridSize;
+                float y = mapHeight - (row + 1) * layerGridSize;
+                interactables.add(new Interactable(type, x, y, layerGridSize, layerGridSize));
+                if (type == Interactable.Type.CHEST) {
+                    chestRects.add(new Rectangle(x, y, layerGridSize, layerGridSize));
+                }
+            }
+        }
+    }
+
     // ===== ENTITIES =====
 
     private void loadEntities(JsonValue layer) {
         JsonValue entities = layer.get("entityInstances");
-        if (entities == null) return;
+        if (entities == null)
+            return;
 
         for (JsonValue entity : entities) {
             String id = entity.getString("__identifier");
@@ -197,7 +248,8 @@ public class MapManager {
             float x = leftLdtk;
             float y = mapHeight - topLdtk - eHeight;
 
-            System.out.println("[MapManager] Entity: " + id + " ldtk=(" + ldtkX + "," + ldtkY + ") -> libgdx=(" + x + "," + y + ") size=" + eWidth + "x" + eHeight);
+            System.out.println("[MapManager] Entity: " + id + " ldtk=(" + ldtkX + "," + ldtkY + ") -> libgdx=(" + x
+                    + "," + y + ") size=" + eWidth + "x" + eHeight);
 
             switch (id) {
                 case "PlayerSpawn":
@@ -273,7 +325,8 @@ public class MapManager {
 
         // Override tileset if specified
         int overrideUid = layer.getInt("overrideTilesetUid", -1);
-        if (overrideUid != -1) tilesetUid = overrideUid;
+        if (overrideUid != -1)
+            tilesetUid = overrideUid;
 
         JsonValue gridTiles = layer.get("gridTiles");
         if (gridTiles != null) {
@@ -304,12 +357,14 @@ public class MapManager {
     // ===== TILESET LOADING =====
 
     private void loadTilesetTextures(String mapPath) {
-        if (tilesetDefs == null) return;
+        if (tilesetDefs == null)
+            return;
 
         // Determine the directory the LDtk file is in
         String dir = "";
         int lastSlash = mapPath.lastIndexOf('/');
-        if (lastSlash >= 0) dir = mapPath.substring(0, lastSlash + 1);
+        if (lastSlash >= 0)
+            dir = mapPath.substring(0, lastSlash + 1);
 
         for (JsonValue ts : tilesetDefs) {
             int uid = ts.getInt("uid");
@@ -317,7 +372,8 @@ public class MapManager {
             String embedAtlas = ts.getString("embedAtlas", null);
 
             // Skip embedded atlases (internal LDtk icons) and null paths
-            if (embedAtlas != null || relPath == null) continue;
+            if (embedAtlas != null || relPath == null)
+                continue;
 
             // The relPath in the LDtk file is relative to the .ldtk file location.
             // But it may contain absolute-like paths. We try loading:
@@ -325,7 +381,8 @@ public class MapManager {
             // 2. The relative path as-is (fallback)
             String filename = relPath;
             int lastSep = Math.max(relPath.lastIndexOf('/'), relPath.lastIndexOf('\\'));
-            if (lastSep >= 0) filename = relPath.substring(lastSep + 1);
+            if (lastSep >= 0)
+                filename = relPath.substring(lastSep + 1);
 
             String assetPath = dir + filename;
 
@@ -354,14 +411,15 @@ public class MapManager {
         for (TileLayerData tld : tileLayers) {
             for (TileInstance tile : tld.tiles) {
                 Texture tex = tilesetTextures.get(tile.tilesetUid);
-                if (tex == null) continue;
+                if (tex == null)
+                    continue;
 
                 boolean flipX = (tile.flipFlags & 1) != 0;
                 boolean flipY = (tile.flipFlags & 2) != 0;
 
                 TextureRegion region = new TextureRegion(tex,
-                    (int) tile.srcX, (int) tile.srcY,
-                    (int) tile.width, (int) tile.height);
+                        (int) tile.srcX, (int) tile.srcY,
+                        (int) tile.width, (int) tile.height);
                 region.flip(flipX, flipY);
 
                 batch.draw(region, tile.dstX, tile.dstY, tile.width, tile.height);
@@ -373,30 +431,62 @@ public class MapManager {
 
     // ===== FALLBACK GENERATORS =====
 
-
-
-
-
     private void generateFallbackInteractables() {
-        interactables.add(new Interactable(Interactable.Type.SIGN, mapWidth * 0.5f, mapHeight * 0.8f, 8f, 10f, "Explore the dungeon!"));
+        interactables.add(new Interactable(Interactable.Type.SIGN, mapWidth * 0.5f, mapHeight * 0.8f, 8f, 10f,
+                "Explore the dungeon!"));
         interactables.add(new Interactable(Interactable.Type.BARREL, mapWidth * 0.2f, mapHeight * 0.3f, 8f, 10f));
         interactables.add(new Interactable(Interactable.Type.BARREL, mapWidth * 0.8f, mapHeight * 0.7f, 8f, 10f));
     }
 
     // --- Getters for Extracted Data ---
 
-    public float getMapWidth() { return mapWidth; }
-    public float getMapHeight() { return mapHeight; }
-    public int getGridSize() { return gridSize; }
-    public Vector2 getPlayerSpawn() { return playerSpawn; }
-    public Vector2 getBossSpawn() { return bossSpawn; }
-    public ArrayList<Vector2> getEnemySpawns() { return enemySpawns; }
-    public ArrayList<Rectangle> getCollisionRects() { return collisionRects; }
-    public ArrayList<Rectangle> getTorchRects() { return torchRects; }
-    public ArrayList<Rectangle> getChestRects() { return chestRects; }
-    public ArrayList<Rectangle> getExitGateRects() { return exitGateRects; }
-    public ArrayList<Rectangle> getLavaRects() { return lavaRects; }
-    public ArrayList<Interactable> getInteractables() { return interactables; }
+    public float getMapWidth() {
+        return mapWidth;
+    }
+
+    public float getMapHeight() {
+        return mapHeight;
+    }
+
+    public int getGridSize() {
+        return gridSize;
+    }
+
+    public Vector2 getPlayerSpawn() {
+        return playerSpawn;
+    }
+
+    public Vector2 getBossSpawn() {
+        return bossSpawn;
+    }
+
+    public ArrayList<Vector2> getEnemySpawns() {
+        return enemySpawns;
+    }
+
+    public ArrayList<Rectangle> getCollisionRects() {
+        return collisionRects;
+    }
+
+    public ArrayList<Rectangle> getTorchRects() {
+        return torchRects;
+    }
+
+    public ArrayList<Rectangle> getChestRects() {
+        return chestRects;
+    }
+
+    public ArrayList<Rectangle> getExitGateRects() {
+        return exitGateRects;
+    }
+
+    public ArrayList<Rectangle> getLavaRects() {
+        return lavaRects;
+    }
+
+    public ArrayList<Interactable> getInteractables() {
+        return interactables;
+    }
 
     public void dispose() {
         for (Texture tex : tilesetTextures.values()) {

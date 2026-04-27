@@ -169,6 +169,9 @@ public class Enemy {
     }
 
     public void update(float delta, Player player) {
+        // Clamp delta to prevent teleporting on frame spikes (cap at 50ms = 20fps minimum)
+        delta = Math.min(delta, 0.05f);
+
         // Health animation logic
         if (animatedHealth > health) {
             animatedHealth -= 40f * delta;
@@ -251,6 +254,18 @@ public class Enemy {
         if (inRange) {
             float dot = forward.dot(new Vector2(toPlayer).nor());
             inCone = dot >= MathUtils.cosDeg(fovAngle / 2f);
+            
+            // Line of Sight check
+            if (inCone && boundaries != null) {
+                Vector2 p1 = new Vector2(position.x + WIDTH / 2f, position.y + HEIGHT / 2f);
+                Vector2 p2 = new Vector2(position.x + toPlayer.x + WIDTH / 2f, position.y + toPlayer.y + HEIGHT / 2f);
+                for (Rectangle wall : boundaries) {
+                    if (Intersector.intersectSegmentRectangle(p1, p2, wall)) {
+                        inCone = false;
+                        break;
+                    }
+                }
+            }
         }
 
         if (forcedAggroTimer > 0f) {
@@ -543,8 +558,11 @@ public class Enemy {
         float h = isBoss ? HEIGHT * 1.5f : HEIGHT;
 
         // Flip sprite horizontally based on facing direction
-        float dW = facingRight ? w : -w;
-        float dX = facingRight ? position.x : position.x + w;
+        // Enemy sprites (Bringer-of-Death) face LEFT by default, so invert the flip
+        // Boss sprites might face RIGHT by default.
+        boolean flipX = isBoss ? !facingRight : facingRight;
+        float dW = flipX ? -w : w;
+        float dX = flipX ? position.x + w : position.x;
         batch.draw(currentFrame, dX, position.y, dW, h);
         batch.setColor(1f, 1f, 1f, 1f);
     }

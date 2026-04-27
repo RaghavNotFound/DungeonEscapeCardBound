@@ -118,7 +118,7 @@ public class ExplorationScreen implements Screen {
             String nextPath = mapManager.getCurrentMapPath();
 
             // Victory: completed the last level of map.ldtk (index 6)
-            if (nextPath.equals("Maps/map.ldtk") && mapManager.getCurrentLevelIndex() >= 6) {
+            if (nextPath.equals("Maps/final_map.ldtk") && mapManager.getCurrentLevelIndex() >= 6) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
                     world.getPlayer().getEnemiesKilled(),
                     world.getPlayer().getTorchCount(),
@@ -130,7 +130,7 @@ public class ExplorationScreen implements Screen {
 
             // Transition from tutorial to map after all 6 tutorial levels (indices 0-5)
             if (nextPath.equals("Maps/tutorial.ldtk") && nextLevelIndex >= 6) {
-                nextPath = "Maps/map.ldtk";
+                nextPath = "Maps/final_map.ldtk";
                 nextLevelIndex = 0;
             }
 
@@ -141,8 +141,11 @@ public class ExplorationScreen implements Screen {
         }
 
         if (world.isBossFightTriggered()) {
-            ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE DEMONIC MONK"));
-            this.dispose();
+            world.setBossFightTriggered(false);
+            world.getEnemies().removeIf(io.github.pkgde.Enemy::isBoss);
+            boolean hasExit = !mapManager.getExitGateRects().isEmpty();
+            ((Main) Gdx.app.getApplicationListener()).setScreen(new BossFightScreen(world.getPlayer(), "THE DEMONIC MONK", hasExit, this));
+            // We do NOT dispose ExplorationScreen here so we can return to it if hasExit is true
             return;
         }
     }

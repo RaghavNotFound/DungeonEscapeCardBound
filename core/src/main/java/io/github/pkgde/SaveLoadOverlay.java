@@ -297,10 +297,6 @@ public class SaveLoadOverlay {
 
             font.getData().setScale(fontScale * 0.8f);
 
-            font.setColor(Color.BLACK);
-            glyphLayout.setText(font, "ENTER NEW NAME (Press ENTER to Save, ESC to Cancel)");
-            font.draw(batch, glyphLayout, inputX + 2f, inputY + inputH + (h * 0.03f) - 2f);
-
             font.setColor(Color.LIGHT_GRAY);
             glyphLayout.setText(font, "ENTER NEW NAME (Press ENTER to Save, ESC to Cancel)");
             font.draw(batch, glyphLayout, inputX, inputY + inputH + (h * 0.03f));
@@ -308,10 +304,6 @@ public class SaveLoadOverlay {
             font.getData().setScale(fontScale * 1.2f);
             boolean cursorVisible = (System.currentTimeMillis() / 500) % 2 == 0;
             String text = renameText + (cursorVisible ? "|" : "");
-
-            font.setColor(Color.BLACK);
-            glyphLayout.setText(font, text);
-            font.draw(batch, glyphLayout, inputX + (w * 0.02f) + 2f, inputY + inputH / 2f + glyphLayout.height / 2f - 2f);
 
             font.setColor(Color.WHITE);
             glyphLayout.setText(font, text);
@@ -323,11 +315,9 @@ public class SaveLoadOverlay {
                 String saveText = saves.get(i);
                 float rectY = startY - i * (boxH + gap);
 
-                font.setColor(0f, 0f, 0f, 0.72f);
                 glyphLayout.setText(font, saveText);
                 float textX = centerX + (boxW - glyphLayout.width) / 2f;
                 float textY = rectY + boxH / 2f + glyphLayout.height / 2f;
-                font.draw(batch, glyphLayout, textX + 2f, textY - 2f);
 
                 if (selected == i) {
                     font.setColor(Color.BLACK);
@@ -346,11 +336,9 @@ public class SaveLoadOverlay {
                 String optText = subOptions.get(i);
                 float rectY = subStartY - i * (subBoxH + subGap);
 
-                font.setColor(0f, 0f, 0f, 0.72f);
                 glyphLayout.setText(font, optText);
                 float textX = subCenterX + (subBoxW - glyphLayout.width) / 2f;
                 float textY = rectY + subBoxH / 2f + glyphLayout.height / 2f;
-                font.draw(batch, glyphLayout, textX + 2f, textY - 2f);
 
                 if (subSelected == i) {
                     font.setColor(Color.BLACK);
