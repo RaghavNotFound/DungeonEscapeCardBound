@@ -5,7 +5,8 @@ A tactical 2D roguelike deck-builder built with [libGDX](https://libgdx.com/).
 Navigate a pixel-art dungeon filled with treacherous lava and deadly enemies. Once you reach the end of the dungeon, engage the boss (The Lich King) in a "Slay the Spire" style turn-based card battle!
 
 ## Features
-- **Exploration & Combat:** Navigate through an LDtk-generated dungeon, dodging lava, collecting loot, and fighting off basic enemies using real-time sword and bow combat.
+- **Exploration & Combat:** Navigate through an LDtk-generated dungeon, collect loot, and fight off basic enemies using real-time sword and bow combat. Enemies have a chance to drop unique cards upon defeat.
+- **Advanced Platforming:** Master directional jumping and dashing to traverse the dungeon. Players can execute precision jumps to clear dangerous lava pools (granting mid-air immunity), with shift-modified jumps for extended horizontal distance.
 - **Card-Based Boss Fights:** When you reach the boss (The Lich King), combat transitions into a turn-based deck-building system. Draw cards, manage energy and block, and survive the Boss's devastating Ultimate attacks.
 - **Dynamic Lighting:** A custom frame-buffer lighting engine ensures torches and campfires realistically illuminate your surroundings in the dark dungeon.
 - **Full Save/Load System:** Save your progress mid-run, including player position, health, inventory, and cleared rooms.
