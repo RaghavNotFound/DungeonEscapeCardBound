@@ -151,19 +151,6 @@ Enemy navigation uses a custom A\* implementation (`AStar.java`, `Node.java`) wi
  
 ---
  
-## Team
- 
-| Member | Role | Key Deliverables |
-|---|---|---|
-| **Raghav Singhal** (Leader) | Core Engine & Architecture | `Main.java`, `GameWorld.java`, `GameRenderer.java`, game loop design |
-| **Anmol Thapliyal** | UI/UX & Boss Encounter | `BossFightScreen.java`, card deck logic, `PauseOverlay`, `SettingsOverlay` |
-| **Lakshay Manchanda** | DAA Algorithms & Enemy AI | `Enemy.java` FSM, `AStar.java`, `Node.java` with wall-penalty extension |
-| **Abhimanyu Chauhan** | Level Design & Map Integration | LDtk dungeon layouts, `MapManager.java`, Interactables, stage transitions |
-| **Vanshaj Goyal** | Research, Assets & Theory | FBO lighting research, JSON strategy, sprite sheet & card art integration |
-| **Yatish Sharma** | Application Flow & QA | `LoadingScreen`, `HomeScreen`, `VictoryScreen`, bug triage & input fixes |
- 
----
- 
 ## Known Issues & Roadmap
  
 ### Known Issues
