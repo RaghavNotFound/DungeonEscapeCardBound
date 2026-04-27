@@ -50,7 +50,27 @@ public class Enemy {
     // Dimensions & Hitbox
     private final float WIDTH = 128f * ENTITY_SCALE, HEIGHT = 128f * ENTITY_SCALE;
     private final float HITBOX_WIDTH = 50f * ENTITY_SCALE, HITBOX_HEIGHT = 60f * ENTITY_SCALE;
-    private final float HITBOX_OFFSET_X = 39f * ENTITY_SCALE, HITBOX_OFFSET_Y = 30f * ENTITY_SCALE;
+    
+    // Bringer-of-Death sprite has the character on the far right side of the canvas (to leave room for scythe swing)
+    private static final float BOD_OFFSET_DEFAULT = 72f * ENTITY_SCALE;
+    private static final float BOD_OFFSET_FLIPPED = 6f * ENTITY_SCALE;
+    
+    // Boss sprite offset
+    private static final float BOSS_OFFSET_DEFAULT = 39f * ENTITY_SCALE;
+    private static final float BOSS_OFFSET_FLIPPED = (128f - 39f - 50f) * ENTITY_SCALE;
+
+    private final float HITBOX_OFFSET_Y = 30f * ENTITY_SCALE;
+
+    /** Returns the correct hitbox X offset based on the current sprite flip direction. */
+    private float getHitboxOffsetX() {
+        if (isBoss) {
+            // Boss sprites face right by default
+            return facingRight ? BOSS_OFFSET_DEFAULT : BOSS_OFFSET_FLIPPED;
+        } else {
+            // Bringer of death sprite faces left by default
+            return facingRight ? BOD_OFFSET_FLIPPED : BOD_OFFSET_DEFAULT;
+        }
+    }
 
     // Combat Stats
     public static final float ATTACK_RANGE = 76f * ENTITY_SCALE;
@@ -116,7 +136,7 @@ public class Enemy {
 
     public Enemy() {
         position = new Vector2(400, 300);
-        bounds = new Rectangle(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        bounds = new Rectangle(position.x + getHitboxOffsetX(), position.y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         speedMultiplier = MathUtils.random(0.9f, 1.1f);
 
         loadAllAnimations();
@@ -233,12 +253,19 @@ public class Enemy {
             }
         }
 
-        position.x = MathUtils.clamp(position.x, worldMinX, worldMaxX - WIDTH);
-        position.y = MathUtils.clamp(position.y, worldMinY, worldMaxY - HEIGHT);
+        // Clamp based on hitbox, not canvas bounds, so the actual character stays within the world
+        float currentHitboxOffsetX = getHitboxOffsetX();
+        float minPosX = worldMinX - currentHitboxOffsetX;
+        float maxPosX = worldMaxX - currentHitboxOffsetX - HITBOX_WIDTH;
+        position.x = MathUtils.clamp(position.x, minPosX, maxPosX);
+
+        float minPosY = worldMinY - HITBOX_OFFSET_Y;
+        float maxPosY = worldMaxY - HITBOX_OFFSET_Y - HITBOX_HEIGHT;
+        position.y = MathUtils.clamp(position.y, minPosY, maxPosY);
 
         boolean moved = !MathUtils.isEqual(prevX, position.x, 0.0001f) || !MathUtils.isEqual(prevY, position.y, 0.0001f);
         updateFacing();
-        bounds.setPosition(position.x + HITBOX_OFFSET_X, position.y + HITBOX_OFFSET_Y);
+        bounds.setPosition(position.x + getHitboxOffsetX(), position.y + HITBOX_OFFSET_Y);
 
         updateAnimation(moved);
     }
@@ -284,7 +311,7 @@ public class Enemy {
             pathUpdateTimer -= delta;
 
             // Compute hitbox centers for accurate pathfinding
-            float enemyCenterX = position.x + HITBOX_OFFSET_X + HITBOX_WIDTH / 2f;
+            float enemyCenterX = position.x + getHitboxOffsetX() + HITBOX_WIDTH / 2f;
             float enemyCenterY = position.y + HITBOX_OFFSET_Y + HITBOX_HEIGHT / 2f;
             float playerCenterX = playerPos.x;
             float playerCenterY = playerPos.y;
@@ -322,7 +349,7 @@ public class Enemy {
             if (currentPath != null && !currentPath.isEmpty()) {
                 // Convert the cell center waypoint to position-space
                 Vector2 cellCenter = currentPath.get(0);
-                float targetPosX = cellCenter.x - HITBOX_OFFSET_X - HITBOX_WIDTH / 2f;
+                float targetPosX = cellCenter.x - getHitboxOffsetX() - HITBOX_WIDTH / 2f;
                 float targetPosY = cellCenter.y - HITBOX_OFFSET_Y - HITBOX_HEIGHT / 2f;
 
                 float dxNode = targetPosX - position.x;
@@ -333,7 +360,7 @@ public class Enemy {
                 while (distToNode <= NODE_REACHED_TOLERANCE && currentPath.size() > 1) {
                     currentPath.remove(0);
                     cellCenter = currentPath.get(0);
-                    targetPosX = cellCenter.x - HITBOX_OFFSET_X - HITBOX_WIDTH / 2f;
+                    targetPosX = cellCenter.x - getHitboxOffsetX() - HITBOX_WIDTH / 2f;
                     targetPosY = cellCenter.y - HITBOX_OFFSET_Y - HITBOX_HEIGHT / 2f;
                     dxNode = targetPosX - position.x;
                     dyNode = targetPosY - position.y;
@@ -518,7 +545,7 @@ public class Enemy {
     }
 
     private boolean canMoveTo(float x, float y) {
-        Rectangle next = new Rectangle(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
+        Rectangle next = new Rectangle(x + getHitboxOffsetX(), y + HITBOX_OFFSET_Y, HITBOX_WIDTH, HITBOX_HEIGHT);
         if (boundaries != null) {
             for (Rectangle wall : boundaries) if (next.overlaps(wall)) return false;
         }
@@ -536,7 +563,16 @@ public class Enemy {
     // =====================================
 
     private void updateFacing() {
+        boolean oldFacingRight = facingRight;
+        float oldOffset = getHitboxOffsetX();
+        
         facingRight = forward.x >= 0f;
+        
+        if (oldFacingRight != facingRight) {
+            float newOffset = getHitboxOffsetX();
+            // Shift position.x so the hitbox (and visual character) stays in the exact same world position when flipped
+            position.x += (oldOffset - newOffset);
+        }
     }
 
     private void updateAnimation(boolean moved) {
@@ -579,7 +615,7 @@ public class Enemy {
     public void setCollisionPolygons(ArrayList<Polygon> p) { this.collisionPolygons = p; }
     public void setPathfinder(AStar pathfinder) { this.pathfinder = pathfinder; }
     public void setWorldBounds(float minX, float minY, float maxX, float maxY) { this.worldMinX = minX; this.worldMinY = minY; this.worldMaxX = maxX; this.worldMaxY = maxY; }
-    public void setPosition(float x, float y) { position.set(x, y); bounds.setPosition(x + HITBOX_OFFSET_X, y + HITBOX_OFFSET_Y); }
+    public void setPosition(float x, float y) { position.set(x, y); bounds.setPosition(x + getHitboxOffsetX(), y + HITBOX_OFFSET_Y); }
     public Vector2 getPosition() { return position; }
     public float getHealth() { return health; }
     public void setHealth(float h) { health = h; animatedHealth = h; }
