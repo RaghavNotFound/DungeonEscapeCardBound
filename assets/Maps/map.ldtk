@@ -568,7 +568,7 @@
 			"fieldDefs": []
 		},
 		{
-			"identifier": "Unnamed",
+			"identifier": "ExitDoor",
 			"uid": 37,
 			"tags": ["exitDoor"],
 			"exportToToc": false,
@@ -1062,7 +1062,7 @@
 			"__cHei": 4,
 			"identifier": "Torch_Animated",
 			"uid": 57,
-			"relPath": "campfire-Sheet.png",
+			"relPath": "../../../../../Users/abhimanyuchauhan/Downloads/Torch Animated.png",
 			"embedAtlas": null,
 			"pxWid": 256,
 			"pxHei": 128,
@@ -1074,10 +1074,7 @@
 			"enumTags": [],
 			"customData": [],
 			"savedSelections": [],
-			"cachedPixelData": {
-				"opaqueTiles": "00000000000000000000000000000000",
-				"averageColors": "1ca72b642c972c752c971c862d972c75275414332754143327541433275414332c961c742c861c752c861b742c971c8527541433275414332754143327541433"
-			}
+			"cachedPixelData": null
 		},
 		{
 			"__cWid": 32,
@@ -1404,7 +1401,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [7,1],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -2011,7 +2008,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [7,1],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -2030,7 +2027,7 @@
 							"__worldY": 196
 						},
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [6,1],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -2049,7 +2046,7 @@
 							"__worldY": 195
 						},
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [8,1],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -2429,6 +2426,22 @@
 							"fieldInstances": [],
 							"__worldX": -2156,
 							"__worldY": 233
+						},
+						{
+							"__identifier": "PlayerSpawn",
+							"__grid": [8,2],
+							"__pivot": [0.5,0],
+							"__tags": ["playerSpawn"],
+							"__tile": null,
+							"__smartColor": "#D1C7C4",
+							"iid": "708a9850-21a0-11f1-8d10-7b4e7fa0cd07",
+							"width": 16,
+							"height": 16,
+							"defUid": 36,
+							"px": [136,32],
+							"fieldInstances": [],
+							"__worldX": -2139,
+							"__worldY": 206
 						}
 					]
 				},
@@ -2638,7 +2651,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [1,4],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -3247,7 +3260,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [14,4],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -3839,7 +3852,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [8,0],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -3858,7 +3871,7 @@
 							"__worldY": 210
 						},
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [7,0],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -4498,7 +4511,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [8,8],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],
@@ -5361,7 +5374,7 @@
 					"gridTiles": [],
 					"entityInstances": [
 						{
-							"__identifier": "Unnamed",
+							"__identifier": "ExitDoor",
 							"__grid": [6,0],
 							"__pivot": [0.5,1],
 							"__tags": ["exitDoor"],

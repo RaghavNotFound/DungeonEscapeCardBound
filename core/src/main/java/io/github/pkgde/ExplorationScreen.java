@@ -48,8 +48,15 @@ public class ExplorationScreen implements Screen {
         if (saveFileToLoad != null) {
             SaveState s = SaveManager.peekSave(saveFileToLoad);
             if (s != null) {
-                mapPath = s.currentMapPath;
-                levelIndex = s.currentLevelIndex;
+                if (Gdx.files.internal(s.currentMapPath).exists()) {
+                    mapPath = s.currentMapPath;
+                    levelIndex = s.currentLevelIndex;
+                } else {
+                    System.err.println("Warning: Saved map '" + s.currentMapPath + "' not found. Falling back to default.");
+                    mapPath = "Maps/tutorial.ldtk";
+                    levelIndex = 0;
+                    saveFileToLoad = null; // Prevent loading invalid entity states
+                }
             }
         }
         init(saveFileToLoad, mapPath, levelIndex);
@@ -110,7 +117,8 @@ public class ExplorationScreen implements Screen {
             int nextLevelIndex = mapManager.getCurrentLevelIndex() + 1;
             String nextPath = mapManager.getCurrentMapPath();
 
-            if (nextPath.contains("final_map.ldtk") && mapManager.getCurrentLevelIndex() >= 2) {
+            // Victory: completed the last level of map.ldtk (index 6)
+            if (nextPath.equals("Maps/map.ldtk") && mapManager.getCurrentLevelIndex() >= 6) {
                 ((Main) Gdx.app.getApplicationListener()).setScreen(new VictoryScreen(
                     world.getPlayer().getEnemiesKilled(),
                     world.getPlayer().getTorchCount(),
@@ -120,13 +128,9 @@ public class ExplorationScreen implements Screen {
                 return;
             }
 
-            if (nextPath.equals("Maps/tutorial.ldtk")) {
-                if (nextLevelIndex >= 4) {
-                    nextPath = "Maps/safeRoom.ldtk";
-                    nextLevelIndex = 0;
-                }
-            } else if (nextPath.contains("safeRoom")) {
-                nextPath = "Maps/final_map.ldtk";
+            // Transition from tutorial to map after all 6 tutorial levels (indices 0-5)
+            if (nextPath.equals("Maps/tutorial.ldtk") && nextLevelIndex >= 6) {
+                nextPath = "Maps/map.ldtk";
                 nextLevelIndex = 0;
             }
 
@@ -314,6 +318,7 @@ public class ExplorationScreen implements Screen {
     @Override
     public void resize(int w, int h) {
         viewport.update(w, h, true);
+        if (w == 0 || h == 0) return; // Prevent crash when minimized
         if (fbo != null) fbo.dispose();
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
         fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);

@@ -116,10 +116,7 @@ public class MapManager {
             }
         }
 
-        // Add torch only if it's the safeRoom level
-        if (currentMapPath.contains("safeRoom.ldtk") && torchRects.isEmpty()) {
-            torchRects.add(new Rectangle(mapWidth * 0.5f, mapHeight * 0.5f, 8f, 8f));
-        }
+
 
         // Generate fallback interactables if none found
         if (interactables.isEmpty()) {
@@ -228,6 +225,27 @@ public class MapManager {
                     break;
                 case "LavaDamage":
                     lavaRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+                case "Torch":
+                    torchRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+                case "Centerfire":
+                    interactables.add(new Interactable(Interactable.Type.CENTER_FIRE, x, y, eWidth, eHeight));
+                    break;
+                case "BossRest":
+                    // Pre-boss rest area marker — sets boss spawn position
+                    bossSpawn.set(x, y);
+                    break;
+                case "TrapChest":
+                    chestRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    interactables.add(new Interactable(Interactable.Type.CHEST, x, y, eWidth, eHeight));
+                    break;
+                case "Key":
+                    // Key pickup — treat as a torch collectible for now
+                    torchRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    break;
+                case "Steps":
+                    // Visual/decorative — no game logic needed
                     break;
             }
         }

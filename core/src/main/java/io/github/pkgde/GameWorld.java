@@ -63,7 +63,7 @@ public class GameWorld {
         System.out.println("[GameWorld] Loading Level: " + mapManager.getCurrentLevelIndex() + " Path: " + mapManager.getCurrentMapPath());
 
         Vector2 bossSpawn = mapManager.getBossSpawn();
-        boolean forceBoss = mapManager.getCurrentMapPath().contains("final_map.ldtk") && mapManager.getCurrentLevelIndex() >= 2;
+        boolean forceBoss = mapManager.getCurrentMapPath().equals("Maps/map.ldtk") && mapManager.getCurrentLevelIndex() == 4;
 
         // Spawn enemies
         for (Vector2 spawn : mapManager.getEnemySpawns()) {
@@ -83,10 +83,10 @@ public class GameWorld {
 
         this.interactables = mapManager.getInteractables();
 
-        // --- FINAL BOSS SPAWN (Forced) ---
-        // Trigger in Room 3 (index 2) or later of the final map
-        boolean isFinalMap = mapManager.getCurrentMapPath().toLowerCase().contains("final_map");
-        boolean isEndGameRoom = mapManager.getCurrentLevelIndex() >= 2;
+        // --- BOSS SPAWN (Forced) ---
+        // Trigger in map.ldtk level 4 where BossSpawn entity is placed
+        boolean isFinalMap = mapManager.getCurrentMapPath().equals("Maps/map.ldtk");
+        boolean isEndGameRoom = mapManager.getCurrentLevelIndex() == 4;
         
         if (forceBoss || (isFinalMap && isEndGameRoom)) {
             float spawnX = bossSpawn.x, spawnY = bossSpawn.y;
@@ -131,6 +131,33 @@ public class GameWorld {
                     if (overlapWidth > pBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, pBounds.y, 1f)) {
                         player.triggerLavaDeath();
                         break;
+                    }
+                }
+            }
+        }
+
+        // --- ENEMY LAVA DEATH LOGIC ---
+        for (Enemy e : enemies) {
+            if (e.isAlive() && !e.isBoss()) {
+                Rectangle eBounds = e.getBounds();
+                for (Rectangle lava : mapManager.getLavaRects()) {
+                    if (eBounds.overlaps(lava)) {
+                        float overlapXStart = Math.max(eBounds.x, lava.x);
+                        float overlapXEnd = Math.min(eBounds.x + eBounds.width, lava.x + lava.width);
+                        float overlapWidth = overlapXEnd - overlapXStart;
+
+                        float overlapYStart = Math.max(eBounds.y, lava.y);
+                        float overlapYEnd = Math.min(eBounds.y + eBounds.height, lava.y + lava.height);
+                        float overlapHeight = overlapYEnd - overlapYStart;
+
+                        if (overlapWidth > eBounds.width * 0.5f && overlapHeight > 0 && MathUtils.isEqual(overlapYStart, eBounds.y, 1f)) {
+                            boolean wasAlive = e.isAlive();
+                            e.takeDamage(e.getHealth()); // Instant death
+                            if (wasAlive && !e.isAlive()) {
+                                handleEnemyDeath(e);
+                            }
+                            break;
+                        }
                     }
                 }
             }
