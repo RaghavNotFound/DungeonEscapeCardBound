@@ -36,6 +36,6 @@
 ## Integration points and current gaps
 - `PauseOverlay`, `InputHandler`, and `KeyBindings` are currently not wired into active screen flow.
 - `MapManager` is only disposed if `GameWorld.dispose()` calls it (currently it does not), so map renderer/map lifetime should be reviewed when editing lifecycle.
-- Desktop launcher (`lwjgl3/Lwjgl3Launcher.java`) applies maximized decorated windowed mode, not true fullscreen.
+- Desktop launcher (`lwjgl3/Lwjgl3Launcher.java`) applies maximized decorated windowed mode, not complete fullscreen.
 - Android launcher is minimal (`AndroidLauncher` with immersive mode); any platform-specific input/file fixes should be isolated to launcher modules, not `core`.
 
