@@ -11,6 +11,7 @@ import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class BossFightScreen implements Screen {
     private Texture background;
 
     private final GameOverOverlay gameOverOverlay;
+    private final DialogueOverlay dialogueOverlay;
     private PauseOverlay pauseOverlay;
     private SettingsOverlay settingsOverlay;
 
@@ -86,8 +88,8 @@ public class BossFightScreen implements Screen {
     private List<Card> bossDeck = new ArrayList<>();
     private Card activeBossCard = null;
 
-    private enum TurnState { PLAYER_TURN, BOSS_THINKING, BOSS_FLASHING_CARD, VICTORY, GAME_OVER, ANSWERING_QUESTION }
-    private TurnState turnState = TurnState.PLAYER_TURN;
+    private enum TurnState { DIALOGUE, PLAYER_TURN, BOSS_THINKING, BOSS_FLASHING_CARD, VICTORY, GAME_OVER, ANSWERING_QUESTION }
+    private TurnState turnState = TurnState.DIALOGUE;
 
     private Stage quizStage;
     private io.github.pkgde.quiz.QuizUIStyles quizUIStyles;
@@ -122,6 +124,7 @@ public class BossFightScreen implements Screen {
         gameOverOverlay = new GameOverOverlay();
         pauseOverlay = new PauseOverlay();
         settingsOverlay = new SettingsOverlay();
+        dialogueOverlay = new DialogueOverlay();
 
         quizStage = new Stage(viewport, batch);
         quizUIStyles = new io.github.pkgde.quiz.QuizUIStyles(font);
@@ -137,7 +140,7 @@ public class BossFightScreen implements Screen {
 
         loadAnimations();
         loadCards();
-        startPlayerTurn();
+        buildIntroDialogue();
 
         try {
             background = new Texture(Gdx.files.internal("BossScreen/BossScreen.png"));
@@ -179,7 +182,7 @@ public class BossFightScreen implements Screen {
                 hand.add(drawPile.remove(0));
             }
         }
-        combatLog = "Your turn! Draw cards.";
+        combatLog = "Your turn! Play your cards.";
     }
 
     @Override
@@ -193,7 +196,11 @@ public class BossFightScreen implements Screen {
 
         if (state == State.GAME) {
             stateTime += delta;
-            handleTurnLogic(delta);
+            if (turnState == TurnState.DIALOGUE) {
+                dialogueOverlay.update(delta);
+            } else {
+                handleTurnLogic(delta);
+            }
         }
 
         Gdx.gl.glClearColor(0.05f, 0.05f, 0.08f, 1f);
@@ -297,6 +304,11 @@ public class BossFightScreen implements Screen {
         }
 
         batch.end();
+
+        // Dialogue overlay (drawn on top of everything except pause/settings)
+        if (turnState == TurnState.DIALOGUE && dialogueOverlay.isActive()) {
+            dialogueOverlay.render(batch, font, viewport);
+        }
 
         if (turnState == TurnState.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
 
@@ -573,6 +585,73 @@ public class BossFightScreen implements Screen {
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
+    /** Build the intro dialogue sequence between Boss and Player. */
+    private void buildIntroDialogue() {
+        Color bossColor = new Color(1f, 0.3f, 0.3f, 1f);
+        Color playerColor = new Color(0.3f, 0.9f, 1f, 1f);
+
+        List<DialogueOverlay.DialogueNode> nodes = new ArrayList<>();
+
+        // Node 0
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "So... you've finally made it this far. I must admit, I'm impressed.",
+            bossColor
+        ));
+
+        // Node 1
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "But this is where your little adventure ends, mortal.",
+            bossColor
+        ));
+
+        // Node 2 — player choice
+        nodes.add(new DialogueOverlay.DialogueNode(
+            "You",
+            "...",
+            playerColor,
+            Arrays.asList(
+                new DialogueOverlay.Choice("I will end you, demon!", 3),
+                new DialogueOverlay.Choice("(Stay silent and draw your weapon)", 5)
+            )
+        ));
+
+        // Node 3 — brave path
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "Ha! Bold words for someone standing in MY domain.",
+            bossColor
+        ));
+
+        // Node 4 — brave path continued
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "Very well... Let's see if your blade is as sharp as your tongue!",
+            bossColor
+        ));
+        // -> falls through to node 5 naturally since indices are sequential
+
+        // Node 5 — silent path / shared ending
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "No words? ...Fine. Actions speak louder anyway.",
+            bossColor
+        ));
+
+        // Node 6
+        nodes.add(new DialogueOverlay.DialogueNode(
+            bossName,
+            "PREPARE YOURSELF!",
+            bossColor
+        ));
+
+        dialogueOverlay.start(nodes, () -> {
+            // Dialogue finished — transition to the card battle
+            startPlayerTurn();
+        });
+    }
+
     @Override public void dispose() {
         if (cardQuizHandler != null && quizStage != null) {
             cardQuizHandler.cancelQuiz(quizStage);
@@ -582,6 +661,7 @@ public class BossFightScreen implements Screen {
 
         batch.dispose(); shape.dispose(); font.dispose();
         if (background != null) background.dispose();
+        dialogueOverlay.dispose();
         for(Card c : drawPile) if(c.texture != null) c.texture.dispose();
         for(Card c : discardPile) if(c.texture != null) c.texture.dispose();
         for(Card c : hand) if(c.texture != null) c.texture.dispose();
