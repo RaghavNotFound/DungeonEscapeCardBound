@@ -22,12 +22,12 @@ public class MCQComponent extends Table {
 
     public MCQComponent(Question question, QuizUIStyles styles, Consumer<Set<Integer>> onSubmit) {
         setBackground(styles.dialogBackground);
-        pad(30f, 40f, 30f, 40f);
+        pad(15f, 30f, 15f, 30f); 
         setTransform(true);
 
         // === Instruction ===
         Label instructionLabel = new Label("Select your answer(s):", styles.instructionStyle);
-        add(instructionLabel).padBottom(18).center().row();
+        add(instructionLabel).padBottom(10).center().row();
 
         // === Option buttons ===
         for (int i = 0; i < question.getOptions().size(); i++) {
@@ -53,7 +53,7 @@ public class MCQComponent extends Table {
 
             // FIX: Use expandX() and fillX() to let the button stretch to fit the text
             // minWidth ensures it's wide enough to look like a proper menu
-            add(optionBtn).expandX().fillX().minWidth(400).minHeight(50).padBottom(10).row();
+            add(optionBtn).expandX().fillX().minWidth(350).minHeight(40).padBottom(5).row();
         }
 
         // === Submit button ===
@@ -70,7 +70,7 @@ public class MCQComponent extends Table {
         });
 
         // Slightly wider submit button for a cleaner look
-        add(submitBtn).width(250).height(50).padTop(20).center();
+        add(submitBtn).width(200).height(45).padTop(10).center();
 
         pack();
 

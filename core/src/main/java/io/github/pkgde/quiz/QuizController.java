@@ -59,14 +59,14 @@ public class QuizController {
         });
 
         // --- NEW WRAPPER TABLE LOGIC ---
-        // This takes control of the layout and forces it to the bottom
         wrapperTable = new Table();
         wrapperTable.setFillParent(true);
-        wrapperTable.bottom(); // Anchors the table to the bottom edge of the screen
         
-        // Adds the MCQ UI to the table with a bit of padding so it doesn't touch the very bottom
-        wrapperTable.add(currentMcq).padBottom(60f); 
+        // FIX: Center the table in the viewport, but push it down 30 pixels 
+        // to safely clear the bottom of the Dialogue Box
+        wrapperTable.center().padTop(30f); 
         
+        wrapperTable.add(currentMcq); 
         stage.addActor(wrapperTable);
     }
 

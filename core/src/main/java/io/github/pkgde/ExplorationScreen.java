@@ -189,10 +189,13 @@ public class ExplorationScreen implements Screen {
 
                         // If enemies are alive, deny entry and warn the player
                         if (enemiesAlive) {
-                            world.getPlayer().getPosition().add(
-                                world.getPlayer().getBounds().x > exit.x ? 5f : -5f,
-                                world.getPlayer().getBounds().y > exit.y ? 5f : -5f
-                            );
+                            // FIX: Calculate knockback direction away from the door
+                            float knockX = world.getPlayer().getBounds().x > exit.x ? 1f : -1f;
+                            float knockY = world.getPlayer().getBounds().y > exit.y ? 1f : -1f;
+                            
+                            // Physically push the player backward so their hitbox clears the door
+                            world.getPlayer().applyKnockback(new com.badlogic.gdx.math.Vector2(knockX, knockY).nor(), 400f);
+                            
                             lastTriggeredDoor = door;
 
                             java.util.List<DialogueOverlay.DialogueNode> nodes = new java.util.ArrayList<>();
