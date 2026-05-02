@@ -1,88 +1,168 @@
 # Dungeon Escape: Cardbound
-
-A tactical 2D roguelike deck-builder built with [libGDX](https://libgdx.com/). 
-
-Navigate a pixel-art dungeon filled with treacherous lava and deadly enemies. Once you reach the end of the dungeon, engage the boss (The Lich King) in a "Slay the Spire" style turn-based card battle!
-
+ 
+> A tactical hybrid 2D game blending real-time dungeon exploration with turn-based deck-building card combat — built from scratch in Java with LibGDX.
+ 
+![Java](https://img.shields.io/badge/Java-JDK%208+-orange?style=flat-square&logo=java)
+![LibGDX](https://img.shields.io/badge/LibGDX-Framework-red?style=flat-square)
+![Gradle](https://img.shields.io/badge/Build-Gradle-02303A?style=flat-square&logo=gradle)
+![License](https://img.shields.io/badge/License-Academic-blue?style=flat-square)
+ 
+---
+ 
+## Table of Contents
+ 
+- [About](#about)
+- [Gameplay](#gameplay)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Running the Game](#running-the-game)
+  - [Building a Standalone JAR](#building-a-standalone-jar)
+- [Project Structure](#project-structure)
+- [Core Systems](#core-systems)
+- [Team](#team)
+- [Known Issues & Roadmap](#known-issues--roadmap)
+---
+ 
+## About
+ 
+**Dungeon Escape: Cardbound** is a B.Tech Computer Science project developed at the University of Petroleum and Energy Studies (UPES), Dehradun, for the Object-Oriented Programming (Java) / Software Engineering Lab course (AY 2025–2026).
+ 
+The game merges two distinct gameplay paradigms:
+- A **real-time, top-down dungeon exploration** phase across three LDtk-designed map stages
+- A **turn-based, deck-building card battle** (inspired by *Slay the Spire*) for the final boss encounter against The Demonic Monk
+The project was developed by a six-member team using an Agile Jira Kanban workflow, with each developer owning independent subsystems integrated through well-defined interfaces.
+ 
+---
+ 
+## Gameplay
+ 
+1. **Explore** three dungeon stages (Tutorial → Safe Room → Final Map), navigate enemies, open chests, and collect loot.
+2. **Fight** enemies in real time using melee and bow combat. Enemies navigate using a custom A\* pathfinding AI.
+3. **Face the Boss** — on reaching the final trigger, the game switches to a full card-battle UI where you use a deck of cards and 3 energy per turn to defeat The Demonic Monk.
+---
+ 
 ## Features
-- **Exploration & Combat:** Navigate through an LDtk-generated dungeon, collect loot, and fight off basic enemies using real-time sword and bow combat. Enemies have a chance to drop unique cards upon defeat.
-- **Advanced Platforming:** Master directional jumping and dashing to traverse the dungeon. Players can execute precision jumps to clear dangerous lava pools (granting mid-air immunity), with shift-modified jumps for extended horizontal distance.
-- **Card-Based Boss Fights:** When you reach the boss (The Lich King), combat transitions into a turn-based deck-building system. Draw cards, manage energy and block, and survive the Boss's devastating Ultimate attacks.
-- **Dynamic Lighting:** A custom frame-buffer lighting engine ensures torches and campfires realistically illuminate your surroundings in the dark dungeon.
-- **Full Save/Load System:** Save your progress mid-run, including player position, health, inventory, and cleared rooms.
-- **Developer Debug Tools:** Press `F3` to open a robust debug overlay featuring God Mode, hitbox rendering, and instant teleportation.
-
-## Architecture
-- `core`: Contains the main application logic, game loop (`GameWorld`), and screens (`ExplorationScreen`, `BossFightScreen`, etc.). 
-- `lwjgl3`: The desktop launcher module. Handles window creation, focus management, and packaging for PC platforms.
-- `android`: The mobile launcher module (currently in development).
-
-### File Structure (Core Module)
-```text
-core/src/main/java/io/github/pkgde/
-├── Main.java                 # Main game entry point & AssetManager initialization
-├── ExplorationScreen.java    # Real-time dungeon exploration game loop and UI rendering
-├── BossFightScreen.java      # Turn-based deck-building card combat loop
-├── GameWorld.java            # Central simulation manager (player, enemies, loot, collision, aggro)
-├── GameRenderer.java         # Master rendering coordinator (draws map, entities, lighting)
-├── MapManager.java           # LDtk map loader, parses layers, tiles, and spawn coordinates
-├── Player.java               # Player state, movement, stamina, and combat actions
-├── Enemy.java                # Enemy AI, stats, animations, and A* pathfinding logic
-├── AStar.java / Node.java    # Custom pathfinding algorithms for enemy navigation
-├── LightingManager.java      # FrameBuffer-based dynamic lighting (torches, campfires, lava glow)
-├── Arrow.java                # Player bow projectile entity
-├── Interactable.java         # Chests, Signs, Barrels, and level Exit logic
-├── LootDrop.java             # Health/Stamina/Arrows generated upon enemy deaths and chest opens
-├── SaveManager.java          # Handles JSON serialization, saving/loading, and cross-level transitions
-├── SaveState.java            # Data Transfer Object (DTO) for game saves
-├── WindowModeManager.java    # Fullscreen / Borderless Window toggle logic
-├── BlurShader.java           # Custom GLSL shader used to blur the background during pause menus
-├── GameTimeManager.java      # Keeps track of the total time in the game
-├── LoadingScreen.java        # Loading Screen shown between parts of the game
-├── InputHandler.java         # Handler for standard user inputs
-├── KeyBindings.java          # Utility storing the user mapped inputs
-├── HomeScreen.java           # Main menu launch screen
-├── PauseOverlay.java         # Mid-game pause UI
-├── SettingsOverlay.java      # Audio/Visual configuration UI
-├── SaveLoadOverlay.java      # Menu UI to load, overwrite, and delete runs
-├── InventoryOverlay.java     # Player's collected items and active cards view
-├── DebugOverlay.java         # F3 Developer tooling (God Mode, Teleport, Hitboxes)
-├── GameOverOverlay.java      # Player death screen
-└── VictoryScreen.java        # Game completion screen with run statistics
-```
-
-## Running the Game (Desktop)
-This project uses [Gradle](https://gradle.org/) to manage dependencies. Run the game from the root directory using the Gradle wrapper:
-
-**Windows:**
-```cmd
-gradlew.bat lwjgl3:run
-```
-
-**macOS / Linux:**
+ 
+- 🗺️ **Three LDtk-driven map stages** with collision, entity spawning, and stage transitions
+- 🤖 **Custom A\* pathfinding AI** with wall-adjacency penalty to prevent corner-clipping
+- 🔦 **Dynamic FBO lighting** — torch, campfire, and lava tile radial light falloff via OpenGL Frame Buffer Objects
+- 🃏 **Full deck-builder boss fight** with card types, energy economy, block mechanics, and three boss attack patterns
+- 💾 **JSON save/load system** — three save slots, persisting player position, health, stamina, inventory, and enemy states
+- 🐛 **F3 Developer Debug Overlay** — hitbox view, teleport, God Mode, and boundary toggles
+- 🎨 **BlurShader** GLSL post-processing for glass-morphism pause/settings menus
+- 📦 **Distributable standalone JAR** via Gradle — no IDE required to run
+---
+ 
+## Tech Stack
+ 
+| Component | Technology |
+|---|---|
+| Language | Java (JDK 8+) |
+| Game Framework | LibGDX |
+| Desktop Backend | LWJGL3 |
+| Build Tool | Gradle |
+| Level Design | LDtk (Level Designer Toolkit) |
+| Asset Creation | Aseprite |
+| Project Management | Jira Software (Agile Kanban) |
+ 
+---
+ 
+## Getting Started
+ 
+### Prerequisites
+ 
+- Java JDK 8 or higher installed
+- Gradle (or use the included `gradlew` wrapper)
+### Running the Game
+ 
+Clone the repository and run via Gradle:
+ 
 ```bash
+git clone https://github.com/RaghavNotFound/DungeonEscapeCardBound.git
+cd DungeonEscapeCardBound
+ 
+# On Windows
+gradlew.bat lwjgl3:run
+ 
+# On macOS/Linux
 ./gradlew lwjgl3:run
 ```
-
-## Building Executables
-To build a standalone runnable `.jar` file that can be distributed and played without an IDE:
+ 
+### Building a Standalone JAR
+ 
 ```bash
 ./gradlew lwjgl3:jar
 ```
-The compiled file will be located at `lwjgl3/build/libs/`.
-
-## Debug Controls
-* **F3:** Toggle Debug Overlay
-* **1:** Toggle Hitboxes
-* **2:** Toggle Boundaries
-* **3:** Toggle Collision Rectangles
-* **4:** Toggle Info Panel
-* **8:** Teleport to Mouse
-* **9:** Spawn Enemy at Mouse
-* **0:** Skip Level (Kill all enemies and teleport to exit)
-* **B:** Instant Boss Trigger Cheat
-* **L:** Toggle God Mode (Lava/Damage Immunity)
-
-## Map Editing
-Dungeon Escape uses [LDtk (Level Designer Toolkit)](https://ldtk.io/) for map creation. 
-The maps are located in `assets/Maps/`. The primary game flow uses `final_map.ldtk`. To edit the maps, open the `.ldtk` file in the LDtk application and simply hit "Save"; the game's `MapManager` parses the JSON file dynamically at runtime.
+ 
+The distributable `.jar` will be output to `lwjgl3/build/libs/`. Run it on any machine with Java installed — no IDE or development environment required.
+ 
+---
+ 
+## Project Structure
+ 
+```
+DungeonEscapeCardBound/
+├── lwjgl3/          # Desktop launcher — LWJGL3 context, window config, Gradle packaging
+├── android/         # Android launcher (scaffolded, in development)
+├── assets/
+│   ├── Maps/        # LDtk .ldtk map files
+│   ├── Player_sprite/
+│   ├── Enemy_Sprite/
+│   └── UI/          # Fonts, card art .png files
+└── core/src/.../pkgde/   # All core game logic
+```
+ 
+### Core Class Reference
+ 
+| Class | Responsibility |
+|---|---|
+| `Main.java` | Entry point; initialises AssetManager and screen stack |
+| `ExplorationScreen.java` | Real-time dungeon loop — input, physics, rendering, HUD |
+| `BossFightScreen.java` | Turn-based deck-builder — card UI, energy, phase machine, boss AI |
+| `GameWorld.java` | Central simulation: player, enemies, loot, collision, aggro |
+| `GameRenderer.java` | Render coordinator: map layers, depth-sorted entities, lighting |
+| `MapManager.java` | LDtk JSON parser: tile layers, entity spawning, collision boundaries |
+| `Player.java` | Player state, wall-slide movement, stamina, melee & bow combat |
+| `Enemy.java` | Enemy FSM, animations, A\* path following, attack range detection |
+| `AStar.java` / `Node.java` | Custom A\* pathfinding with wall-adjacency movement penalty |
+| `LightingManager.java` | FBO-based dynamic lighting: torch, campfire, lava glow |
+| `SaveManager.java` | JSON serialisation/deserialisation and save slot management |
+| `SaveState.java` | DTO holding all serialisable game state fields |
+| `BlurShader.java` | Custom GLSL shader for pause/settings background blur |
+| `DebugOverlay.java` | F3 developer tools: God Mode, teleport, hitbox/boundary toggles |
+ 
+---
+ 
+## Core Systems
+ 
+### A\* Pathfinding
+Enemy navigation uses a custom A\* implementation (`AStar.java`, `Node.java`) with the cost function `F = G + H` (Manhattan distance heuristic). A wall-adjacency movement penalty discourages corner-hugging, producing natural, organic enemy movement without geometry clipping.
+ 
+### FBO Lighting
+`LightingManager.java` renders a dark overlay to an off-screen Frame Buffer Object, then applies OpenGL's `GL_DST_COLOR / GL_ZERO` blend equation to punch transparent radial gradients at light source positions. Hardware-accelerated and constant-cost regardless of light source count.
+ 
+### Save System
+`SaveManager.java` uses a Data Transfer Object pattern — all live game state is serialised to JSON via LibGDX's `Json` library and written to disk. On load, the `SaveState` DTO is deserialised and all game objects are reconstructed, supporting clean cross-level transitions.
+ 
+### Boss Fight
+`BossFightScreen.java` implements a three-phase state machine (`PLAYER_TURN → BOSS_THINKING → BOSS_TURN`), a shuffled card deck with 3 energy per turn, block mechanics, and three distinct boss attack patterns.
+ 
+---
+ 
+## Known Issues & Roadmap
+ 
+### Known Issues
+- [ ] Combat balance: boss *Black Flash* attack deals disproportionate burst damage vs. available block values
+- [ ] Screen transition between `ExplorationScreen` and `BossFightScreen` is an instant cut (fade-to-black designed but not yet integrated)
+### Future Scope
+- [ ] **Procedural Dungeon Generation** — BSP-tree or cellular automata to generate unique layouts per run
+- [ ] **Expanded Deck-Building** — discover cards from chests during exploration to build a pre-boss deck
+- [ ] **Audio System** — positional ambient sounds, attack SFX, and dynamic boss battle music via LibGDX Sound/Music APIs
+- [ ] **Expanded Boss Roster** — add The Lich King as a mid-game boss encounter
+- [ ] **Android Port** — complete the scaffolded Android launcher module
+---
+ 
+*Developed for the Object-Oriented Programming (Java) — UPES Dehradun, AY 2025–2026*
+ 
