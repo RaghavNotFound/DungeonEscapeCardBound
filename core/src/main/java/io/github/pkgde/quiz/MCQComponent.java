@@ -1,6 +1,7 @@
 package io.github.pkgde.quiz;
 
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -10,26 +11,37 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
+/**
+ * Self-contained MCQ dialog component.
+ */
 public class MCQComponent extends Table {
 
     private final Set<Integer> selectedIndices = new HashSet<>();
     private final TextButton submitBtn;
+    private boolean submitted = false;
 
     public MCQComponent(Question question, QuizUIStyles styles, Consumer<Set<Integer>> onSubmit) {
-        setFillParent(true);
-        // Add a slight dark background to the whole table or just center it.
-        // For simplicity, we just center elements.
-        center();
+        setBackground(styles.dialogBackground);
+        pad(30f, 40f, 30f, 40f);
+        setTransform(true);
 
-        Label instructionLabel = new Label("Select one or more answers", styles.labelStyle);
-        add(instructionLabel).padBottom(20).row();
+        // === Instruction ===
+        Label instructionLabel = new Label("Select your answer(s):", styles.instructionStyle);
+        add(instructionLabel).padBottom(18).center().row();
 
+        // === Option buttons ===
         for (int i = 0; i < question.getOptions().size(); i++) {
             final int index = i;
             TextButton optionBtn = new TextButton(question.getOptions().get(i), styles.optionStyle);
+
+            // Allow long answers to wrap nicely if needed
+            optionBtn.getLabel().setWrap(true);
+
             optionBtn.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
+                    if (submitted)
+                        return;
                     if (optionBtn.isChecked()) {
                         selectedIndices.add(index);
                     } else {
@@ -38,21 +50,33 @@ public class MCQComponent extends Table {
                     updateSubmitButton();
                 }
             });
-            add(optionBtn).width(400).height(50).padBottom(10).row();
+
+            // FIX: Use expandX() and fillX() to let the button stretch to fit the text
+            // minWidth ensures it's wide enough to look like a proper menu
+            add(optionBtn).expandX().fillX().minWidth(400).minHeight(50).padBottom(10).row();
         }
 
+        // === Submit button ===
         submitBtn = new TextButton("Submit", styles.submitStyle);
-        submitBtn.setDisabled(true); // Disable initially
+        submitBtn.setDisabled(true);
         submitBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if (!submitBtn.isDisabled()) {
-                    // Create a copy of the set to prevent external modification
+                if (!submitBtn.isDisabled() && !submitted) {
+                    submitted = true;
                     onSubmit.accept(new HashSet<>(selectedIndices));
                 }
             }
         });
-        add(submitBtn).width(200).height(50).padTop(20);
+
+        // Slightly wider submit button for a cleaner look
+        add(submitBtn).width(250).height(50).padTop(20).center();
+
+        pack();
+
+        // === Fade-in animation ===
+        getColor().a = 0f;
+        addAction(Actions.fadeIn(0.25f));
     }
 
     private void updateSubmitButton() {

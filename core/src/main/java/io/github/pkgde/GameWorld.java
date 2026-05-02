@@ -35,6 +35,7 @@ public class GameWorld {
 
     private boolean levelComplete = false; // flag for level completion
     private boolean bossFightTriggered = false;
+    private boolean quizBlocked = false;
 
     private boolean isTutorialBossWaveActive = false;
     private int tutorialWavePhase = 0;
@@ -113,6 +114,8 @@ public class GameWorld {
     }
 
     public void update(float delta, OrthographicCamera camera, com.badlogic.gdx.graphics.glutils.ShapeRenderer shape) {
+        if (quizBlocked) return;
+
         lightingManager.update(delta);
         player.update(delta, camera);
 
@@ -348,6 +351,11 @@ public class GameWorld {
         // --- LEVEL EXIT LOGIC ---
         for (Rectangle exit : mapManager.getExitGateRects()) {
             if (player.getBounds().overlaps(exit)) {
+                io.github.pkgde.quiz.DoorEntity door = getDoorAt(exit);
+                if (door != null && door.isLocked()) {
+                    continue; // Door is locked, wait for quiz to unlock it
+                }
+
                 Vector2 spawn = mapManager.getPlayerSpawn();
                 float dx = player.getPosition().x - spawn.x;
                 float dy = player.getPosition().y - spawn.y;
@@ -479,6 +487,16 @@ public class GameWorld {
         }
     }
 
+    public io.github.pkgde.quiz.DoorEntity getDoorAt(Rectangle rect) {
+        if (mapManager == null || mapManager.getDoors() == null) return null;
+        for (io.github.pkgde.quiz.DoorEntity door : mapManager.getDoors()) {
+            if (door.getBounds().overlaps(rect)) {
+                return door;
+            }
+        }
+        return null;
+    }
+
     // ===== GETTERS & SETTERS =====
     public Player getPlayer() { return player; }
     public ArrayList<Enemy> getEnemies() { return enemies; }
@@ -490,6 +508,8 @@ public class GameWorld {
     public boolean isLevelComplete() { return levelComplete; } // Getter for levelComplete
     public boolean isBossFightTriggered() { return bossFightTriggered; }
     public void setBossFightTriggered(boolean val) { this.bossFightTriggered = val; }
+    public boolean isQuizBlocked() { return quizBlocked; }
+    public void setQuizBlocked(boolean val) { this.quizBlocked = val; }
 
     public void dispose() {
         player.dispose();

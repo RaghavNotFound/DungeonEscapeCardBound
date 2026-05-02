@@ -93,6 +93,8 @@ public class DialogueOverlay {
 
     private int selectedChoice = 0;
     private float animTime = 0f;
+    private boolean isTop = false; // Vertical position flag
+    private boolean inputLocked = false;
 
     // Input helpers
     private final Vector3 touch = new Vector3();
@@ -134,6 +136,18 @@ public class DialogueOverlay {
         return active;
     }
 
+    public void setTop(boolean top) {
+        this.isTop = top;
+    }
+
+    public void setInputLocked(boolean locked) {
+        this.inputLocked = locked;
+    }
+
+    public void hide() {
+        finish();
+    }
+
     /** Advance simulation (call every frame). */
     public void update(float delta) {
         if (!active) return;
@@ -169,7 +183,7 @@ public class DialogueOverlay {
                 charProgress = node.text.length();
                 textFullyRevealed = true;
             }
-        } else {
+        } else if (!inputLocked) { // <-- ONLY ADVANCE IF NOT LOCKED
             // Text fully shown
             if (node.hasChoices()) {
                 // Navigate choices
@@ -210,7 +224,7 @@ public class DialogueOverlay {
         float boxW = worldW * 0.85f;
         float boxH = worldH * 0.25f;
         float boxX = (worldW - boxW) * 0.5f;
-        float boxY = worldH * 0.03f;
+        float boxY = isTop ? (worldH * 0.72f) : (worldH * 0.03f);
 
         // Padding inside the box for text
         // The texture has a built-in name plate at the top (~30% of box height)

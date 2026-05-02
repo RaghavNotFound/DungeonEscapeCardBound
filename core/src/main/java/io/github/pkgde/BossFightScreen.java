@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import io.github.pkgde.quiz.*;
 
 public class BossFightScreen implements Screen {
 
@@ -91,11 +92,15 @@ public class BossFightScreen implements Screen {
     private enum TurnState { DIALOGUE, PLAYER_TURN, BOSS_THINKING, BOSS_FLASHING_CARD, VICTORY, GAME_OVER, ANSWERING_QUESTION }
     private TurnState turnState = TurnState.DIALOGUE;
 
+    private Stage gameStage;
     private Stage quizStage;
-    private io.github.pkgde.quiz.QuizUIStyles quizUIStyles;
-    private io.github.pkgde.quiz.CardQuizHandler cardQuizHandler;
+    private Stage pauseStage;
+    private QuizUIStyles quizUIStyles;
+    private QuizController quizController;
+    private QuestionProvider questionProvider;
     private Card pendingCard = null;
-    private io.github.pkgde.quiz.QuestionPresenter questionPresenter;
+    private Boolean pendingQuizResult = null;
+    private QuestionPresenter questionPresenter;
 
     private float bossThinkTimer = 0f;
     private float bossFlashTimer = 0f;
@@ -126,16 +131,20 @@ public class BossFightScreen implements Screen {
         settingsOverlay = new SettingsOverlay();
         dialogueOverlay = new DialogueOverlay();
 
-        quizStage = new Stage(viewport, batch);
-        quizUIStyles = new io.github.pkgde.quiz.QuizUIStyles(font);
-        cardQuizHandler = new io.github.pkgde.quiz.CardQuizHandler(quizUIStyles);
+        quizUIStyles = new QuizUIStyles(font);
+        questionProvider = new HardcodedQuestionProvider();
+        quizController = new QuizController(quizUIStyles, questionProvider);
 
-        questionPresenter = new io.github.pkgde.quiz.QuestionPresenter() {
-            @Override
-            public void showQuestion(String text) {
-                // Dialogue box placeholder
-                combatLog = "Question: " + text;
-            }
+        gameStage = new Stage(viewport, batch);
+        quizStage = new Stage(viewport, batch);
+        pauseStage = new Stage(viewport, batch);
+
+        questionPresenter = text -> {
+            java.util.List<DialogueOverlay.DialogueNode> nodes = new java.util.ArrayList<>();
+            nodes.add(new DialogueOverlay.DialogueNode(bossName, text, new Color(1f, 0.3f, 0.3f, 1f)));
+            dialogueOverlay.setTop(true);
+            dialogueOverlay.setInputLocked(true); // Lock the dialogue box!
+            dialogueOverlay.start(nodes, null);
         };
 
         loadAnimations();
@@ -312,10 +321,18 @@ public class BossFightScreen implements Screen {
 
         if (turnState == TurnState.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
 
-        if (state == State.GAME) {
-            quizStage.act(delta);
+        if (state == State.GAME || (turnState == TurnState.ANSWERING_QUESTION && (state == State.PAUSE || state == State.SETTINGS))) {
+            if (turnState == TurnState.ANSWERING_QUESTION && state == State.GAME) {
+                quizStage.act(delta);
+                quizController.update(quizStage);
+                if (dialogueOverlay.isActive()) dialogueOverlay.update(delta);
+            }
+            if (dialogueOverlay.isActive()) dialogueOverlay.render(batch, font, viewport);
             quizStage.draw();
         }
+
+        // --- Render HUD layer ---
+        gameStage.draw();
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         if (state == State.PAUSE || (state == State.SETTINGS && settingsOverlay.getTransitionProgress() < 1f)) {
@@ -329,6 +346,7 @@ public class BossFightScreen implements Screen {
             pauseOverlay.render(shape, batch, font, viewport, alpha);
         }
         settingsOverlay.render(shape, batch, font, viewport);
+        pauseStage.draw();
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
@@ -373,6 +391,26 @@ public class BossFightScreen implements Screen {
 
     private void handleTurnLogic(float delta) {
         if (turnState == TurnState.ANSWERING_QUESTION) {
+            // Check for frame-safe pending result from QuizController
+            if (pendingQuizResult != null) {
+                boolean isCorrect = pendingQuizResult;
+                pendingQuizResult = null; // Consume
+
+                // TWO-PHASE COMMIT: Deduct and move only AFTER quiz result
+                if (pendingCard != null) {
+                    playerEnergy -= pendingCard.cost;
+                    hand.remove(pendingCard);
+                    discardPile.add(pendingCard);
+
+                    if (isCorrect) {
+                        playPlayerCard(pendingCard);
+                    } else {
+                        combatLog = pendingCard.name + " failed! Incorrect answer.";
+                    }
+                    pendingCard = null;
+                }
+                turnState = TurnState.PLAYER_TURN;
+            }
             return; // Freeze game logic during quiz
         }
 
@@ -383,11 +421,13 @@ public class BossFightScreen implements Screen {
         if (bossHealth <= 0 && turnState != TurnState.VICTORY && turnState != TurnState.GAME_OVER) {
             combatLog = "You defeated " + bossName + "!";
             turnState = TurnState.VICTORY;
-            cardQuizHandler.cancelQuiz(quizStage);
+            quizController.cancelQuiz(quizStage);
         } else if (playerHealth <= 0 && turnState != TurnState.GAME_OVER && turnState != TurnState.VICTORY) {
             combatLog = "You Died!";
             turnState = TurnState.GAME_OVER;
-            cardQuizHandler.cancelQuiz(quizStage);
+            quizController.cancelQuiz(quizStage);
+            pendingCard = null;
+            pendingQuizResult = null;
         }
 
         if (turnState == TurnState.BOSS_THINKING) {
@@ -436,6 +476,15 @@ public class BossFightScreen implements Screen {
     }
 
     private void handleStateInput() {
+        // --- Input Routing ---
+        if (state == State.PAUSE || state == State.SETTINGS) {
+            Gdx.input.setInputProcessor(pauseStage);
+        } else if (turnState == TurnState.ANSWERING_QUESTION) {
+            Gdx.input.setInputProcessor(quizStage);
+        } else {
+            Gdx.input.setInputProcessor(null);
+        }
+
         if (state == State.GAME) {
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) && turnState != TurnState.GAME_OVER && turnState != TurnState.VICTORY) {
                 state = State.PAUSE;
@@ -448,7 +497,9 @@ public class BossFightScreen implements Screen {
             } else {
                 PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
                 switch (action) {
-                    case RESUME -> state = State.GAME;
+                    case RESUME -> {
+                        state = State.GAME;
+                    }
                     case SAVE -> {
                         combatLog = "Cannot save during boss fight!";
                     }
@@ -507,21 +558,17 @@ public class BossFightScreen implements Screen {
                     if (c.bounds.contains(touch.x, touch.y)) {
                         if (playerEnergy >= c.cost) {
                             pendingCard = c;
+                            pendingQuizResult = null;
                             turnState = TurnState.ANSWERING_QUESTION;
 
-                            cardQuizHandler.startQuizForCard(pendingCard, questionPresenter, quizStage, isCorrect -> {
-                                playerEnergy -= pendingCard.cost;
-                                hand.remove(pendingCard);
-                                discardPile.add(pendingCard);
+                            QuizContext ctx = new QuizContext(QuizContext.Source.CARD, false);
+                            quizController.startQuiz(ctx, questionPresenter, quizStage, isCorrect -> {
+                                // Unlock and hide the dialogue box
+                                dialogueOverlay.setInputLocked(false);
+                                dialogueOverlay.hide();
 
-                                if (isCorrect) {
-                                    playPlayerCard(pendingCard);
-                                } else {
-                                    combatLog = pendingCard.name + " failed! Incorrect answer.";
-                                }
-
-                                pendingCard = null;
-                                turnState = TurnState.PLAYER_TURN;
+                                // Frame-safe: just store result
+                                pendingQuizResult = isCorrect;
                             });
                         } else {
                             combatLog = "Not enough energy for " + c.name + "!";
@@ -653,10 +700,14 @@ public class BossFightScreen implements Screen {
     }
 
     @Override public void dispose() {
-        if (cardQuizHandler != null && quizStage != null) {
-            cardQuizHandler.cancelQuiz(quizStage);
+        if (quizController != null && quizStage != null) {
+            quizController.cancelQuiz(quizStage);
+            pendingCard = null;
+            pendingQuizResult = null;
         }
         if (quizStage != null) quizStage.dispose();
+        if (gameStage != null) gameStage.dispose();
+        if (pauseStage != null) pauseStage.dispose();
         if (quizUIStyles != null) quizUIStyles.dispose();
 
         batch.dispose(); shape.dispose(); font.dispose();

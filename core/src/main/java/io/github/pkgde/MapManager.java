@@ -33,6 +33,7 @@ public class MapManager {
     private final ArrayList<Rectangle> torchRects = new ArrayList<>();
     private final ArrayList<Rectangle> chestRects = new ArrayList<>();
     private final ArrayList<Rectangle> exitGateRects = new ArrayList<>();
+    private final ArrayList<io.github.pkgde.quiz.DoorEntity> doors = new ArrayList<>();
     private final ArrayList<Rectangle> lavaRects = new ArrayList<>();
     private final ArrayList<Interactable> interactables = new ArrayList<>();
 
@@ -148,6 +149,7 @@ public class MapManager {
         torchRects.clear();
         chestRects.clear();
         exitGateRects.clear();
+        doors.clear();
         lavaRects.clear();
         interactables.clear();
         tileLayers.clear();
@@ -274,6 +276,7 @@ public class MapManager {
                 case "Exit":
                 case "ExitDoor":
                     exitGateRects.add(new Rectangle(x, y, eWidth, eHeight));
+                    doors.add(new io.github.pkgde.quiz.DoorEntity(x, y, eWidth, eHeight));
                     break;
                 case "LavaDamage":
                     lavaRects.add(new Rectangle(x, y, eWidth, eHeight));
@@ -478,6 +481,10 @@ public class MapManager {
 
     public ArrayList<Rectangle> getExitGateRects() {
         return exitGateRects;
+    }
+
+    public ArrayList<io.github.pkgde.quiz.DoorEntity> getDoors() {
+        return doors;
     }
 
     public ArrayList<Rectangle> getLavaRects() {

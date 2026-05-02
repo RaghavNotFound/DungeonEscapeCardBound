@@ -8,6 +8,8 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import io.github.pkgde.quiz.*;
 
 public class ExplorationScreen implements Screen {
 
@@ -16,6 +18,7 @@ public class ExplorationScreen implements Screen {
 
     private OrthographicCamera camera;
     private Viewport viewport;
+    private Viewport uiViewport;
 
     private MapManager mapManager;
     private GameWorld world;
@@ -29,12 +32,23 @@ public class ExplorationScreen implements Screen {
     private SaveLoadOverlay saveLoadOverlay;
     private DebugOverlay debugOverlay;
 
-    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD }
+    public enum State { GAME, INVENTORY, PAUSE, SETTINGS, GAME_OVER, SAVE_LOAD, ANSWERING_QUESTION }
     private State state = State.GAME;
+
+    private Stage gameStage;
+    private Stage quizStage;
+    private Stage pauseStage;
+    private QuizUIStyles quizUIStyles;
+    private QuizController quizController;
+    private QuestionProvider questionProvider;
 
     private float shakeTime = 0f;
     private final float shakeDuration = 0.25f;
     private boolean shakeTriggered = false;
+    private DoorEntity lastTriggeredDoor = null;
+    private State previousState = null;
+
+    private DialogueOverlay dialogueOverlay;
 
     private FrameBuffer fbo;
     private ShaderProgram blurShader;
@@ -83,12 +97,24 @@ public class ExplorationScreen implements Screen {
         gameOverOverlay = new GameOverOverlay();
         saveLoadOverlay = new SaveLoadOverlay();
         debugOverlay = new DebugOverlay();
+        dialogueOverlay = new DialogueOverlay();
 
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
         fbo.getColorBufferTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         blurShader = BlurShader.createShader(true);
         blurBatch = new SpriteBatch();
         blurBatch.setShader(blurShader);
+
+        // Create a standard 720p viewport purely for UI consistency
+        uiViewport = new FitViewport(1280, 720);
+
+        quizUIStyles = new QuizUIStyles(renderer.getFont());
+        questionProvider = new HardcodedQuestionProvider();
+        quizController = new QuizController(quizUIStyles, questionProvider);
+
+        gameStage = new Stage(uiViewport, renderer.getBatch());
+        quizStage = new Stage(uiViewport, renderer.getBatch());
+        pauseStage = new Stage(uiViewport, renderer.getBatch());
 
         if (saveFileToLoad != null) {
             SaveManager.loadGame(world, saveFileToLoad);
@@ -140,6 +166,88 @@ public class ExplorationScreen implements Screen {
             return;
         }
 
+        // --- CHECK FOR DOOR QUIZ ---
+        if (state == State.GAME) {
+            boolean overlappingAnyDoor = false;
+            for (com.badlogic.gdx.math.Rectangle exit : mapManager.getExitGateRects()) {
+                if (world.getPlayer().getBounds().overlaps(exit)) {
+                    overlappingAnyDoor = true;
+                    DoorEntity door = world.getDoorAt(exit);
+                    if (door != null && door.isLocked()) {
+                        // Re-entry guard
+                        if (door == lastTriggeredDoor) continue;
+                        if (quizController.isActive()) continue;
+
+                        // NEW LOGIC: Check if any enemies are still alive
+                        boolean enemiesAlive = false;
+                        for (Enemy e : world.getEnemies()) {
+                            if (e.isAlive()) {
+                                enemiesAlive = true;
+                                break;
+                            }
+                        }
+
+                        // If enemies are alive, deny entry and warn the player
+                        if (enemiesAlive) {
+                            world.getPlayer().getPosition().add(
+                                world.getPlayer().getBounds().x > exit.x ? 5f : -5f,
+                                world.getPlayer().getBounds().y > exit.y ? 5f : -5f
+                            );
+                            lastTriggeredDoor = door;
+
+                            java.util.List<DialogueOverlay.DialogueNode> nodes = new java.util.ArrayList<>();
+                            nodes.add(new DialogueOverlay.DialogueNode("SYSTEM", "The door is sealed. You must defeat all enemies first!", Color.RED));
+                            dialogueOverlay.setTop(true);
+                            // Ensure the lock is false so they can dismiss the warning
+                            dialogueOverlay.setInputLocked(false); 
+                            dialogueOverlay.start(nodes, null);
+                            break; // Stop processing the door
+                        }
+
+                        // If enemies are dead, proceed to the quiz as normal!
+                        world.getPlayer().getPosition().add(
+                            world.getPlayer().getBounds().x > exit.x ? 2f : -2f,
+                            world.getPlayer().getBounds().y > exit.y ? 2f : -2f
+                        );
+
+                        state = State.ANSWERING_QUESTION;
+                        world.setQuizBlocked(true);
+                        lastTriggeredDoor = door;
+
+                        QuizContext ctx = new QuizContext(QuizContext.Source.DOOR, true);
+
+                        QuestionPresenter presenter = text -> {
+                            java.util.List<DialogueOverlay.DialogueNode> nodes = new java.util.ArrayList<>();
+                            nodes.add(new DialogueOverlay.DialogueNode("SYSTEM", text, Color.YELLOW));
+                            dialogueOverlay.setTop(true);
+                            dialogueOverlay.setInputLocked(true); 
+                            dialogueOverlay.start(nodes, null);
+                        };
+
+                        quizController.startQuiz(ctx, presenter, quizStage, isCorrect -> {
+                            dialogueOverlay.setInputLocked(false);
+                            dialogueOverlay.hide();
+
+                            world.setQuizBlocked(false);
+                            dialogueOverlay.setTop(false); 
+                            
+                            if (isCorrect) {
+                                door.unlock();
+                            } else {
+                                world.getPlayer().setHealth(0f); // Kill player on wrong answer
+                            }
+                            
+                            state = State.GAME;
+                        });
+                        break;
+                    }
+                }
+            }
+            if (!overlappingAnyDoor) {
+                lastTriggeredDoor = null; 
+            }
+        }
+
         if (world.isBossFightTriggered()) {
             world.setBossFightTriggered(false);
             world.getEnemies().removeIf(io.github.pkgde.Enemy::isBoss);
@@ -154,15 +262,47 @@ public class ExplorationScreen implements Screen {
         if (debugOverlay.handleInput()) return;
         debugOverlay.handleCheats(camera, world, mapManager);
 
-        if (state == State.GAME) {
+        // --- Input Routing ---
+        if (state == State.PAUSE || state == State.SETTINGS || state == State.SAVE_LOAD) {
+            Gdx.input.setInputProcessor(pauseStage); 
+        } else if (state == State.ANSWERING_QUESTION) {
+            Gdx.input.setInputProcessor(quizStage);
+        } else {
+            Gdx.input.setInputProcessor(null); 
+        }
+
+        if (state == State.GAME || state == State.ANSWERING_QUESTION) {
             InputHandler.Action action = input.handle();
             switch (action) {
-                case TOGGLE_PAUSE -> state = State.PAUSE;
-                case TOGGLE_INVENTORY -> state = State.INVENTORY;
-                case OPEN_SETTINGS -> { state = State.SETTINGS; settingsOverlay.show(); }
+                case TOGGLE_PAUSE -> {
+                    previousState = state;
+                    state = State.PAUSE;
+                }
+                case TOGGLE_INVENTORY -> {
+                    if (state == State.GAME) state = State.INVENTORY;
+                }
+                case OPEN_SETTINGS -> {
+                    previousState = state;
+                    state = State.SETTINGS;
+                    if (previousState == State.ANSWERING_QUESTION) {
+                        Gdx.input.setInputProcessor(null);
+                    }
+                    settingsOverlay.show();
+                }
                 case EXIT_TO_MENU -> {
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new HomeScreen());
                     this.dispose();
+                }
+            }
+            
+            if (state == State.ANSWERING_QUESTION) {
+                // Quiz-specific input locking is handled by Gdx.input.setInputProcessor(quizStage)
+                // but we still check for ESC cancel if needed
+                if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                    quizController.cancelQuiz(quizStage);
+                    world.setQuizBlocked(false);
+                    lastTriggeredDoor = null;
+                    state = State.GAME;
                 }
             }
         } else if (state == State.INVENTORY) {
@@ -172,11 +312,15 @@ public class ExplorationScreen implements Screen {
             }
         } else if (state == State.PAUSE) {
             if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-                state = State.GAME;
+                state = (previousState != null) ? previousState : State.GAME;
+                previousState = null;
             } else {
-                PauseOverlay.Action action = pauseOverlay.handleInput(viewport);
+                PauseOverlay.Action action = pauseOverlay.handleInput(uiViewport);
                 switch (action) {
-                    case RESUME -> state = State.GAME;
+                    case RESUME -> {
+                        state = (previousState != null) ? previousState : State.GAME;
+                        previousState = null;
+                    }
                     case SAVE -> { state = State.SAVE_LOAD; saveLoadOverlay.show(SaveLoadOverlay.Mode.SAVE); }
                     case RESTART -> {
                         ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null)); // Changed to LoadingScreen
@@ -190,23 +334,24 @@ public class ExplorationScreen implements Screen {
                 }
             }
         } else if (state == State.SETTINGS) {
-            if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(viewport);
+            if (settingsOverlay.getTransitionProgress() >= 1f) settingsOverlay.handleInput(uiViewport);
             if (!settingsOverlay.isOverlayVisible() && settingsOverlay.getTransitionProgress() <= 0f) state = State.PAUSE;
         } else if (state == State.SAVE_LOAD) {
-            SaveLoadOverlay.Result res = saveLoadOverlay.handleInput(viewport);
+            SaveLoadOverlay.Result res = saveLoadOverlay.handleInput(uiViewport);
             if (res != null) {
                 if (res.action == SaveLoadOverlay.ResultAction.LOAD) {
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(res.saveName));
                     this.dispose();
                 } else if (res.action == SaveLoadOverlay.ResultAction.SAVE) {
                     SaveManager.saveGame(world, res.saveName);
-                    state = State.GAME;
+                    state = (previousState != null) ? previousState : State.GAME;
+                    previousState = null;
                 }
             } else if (!saveLoadOverlay.isVisible()) {
                 state = State.PAUSE;
             }
         } else if (state == State.GAME_OVER) {
-            GameOverOverlay.Action action = gameOverOverlay.handleInput(viewport);
+            GameOverOverlay.Action action = gameOverOverlay.handleInput(uiViewport);
             switch (action) {
                 case RETRY -> {
                     ((Main) Gdx.app.getApplicationListener()).setScreen(new LoadingScreen(null)); // Changed to LoadingScreen
@@ -221,7 +366,13 @@ public class ExplorationScreen implements Screen {
     }
 
     private void updateGameLogic(float delta) {
-        if (state != State.GAME) {
+        if (state == State.ANSWERING_QUESTION) {
+            quizStage.act(delta);
+            quizController.update(quizStage);
+            if (dialogueOverlay.isActive()) dialogueOverlay.update(delta);
+        }
+
+        if (state != State.GAME && state != State.ANSWERING_QUESTION) {
             world.getLightingManager().updateLightFbo(camera, renderer.getShape());
             return;
         }
@@ -302,25 +453,44 @@ public class ExplorationScreen implements Screen {
         ShapeRenderer shape = renderer.getShape();
         BitmapFont font = renderer.getFont();
 
-        batch.setProjectionMatrix(camera.combined);
-        shape.setProjectionMatrix(camera.combined);
+        uiViewport.apply();
+        batch.setProjectionMatrix(uiViewport.getCamera().combined);
+        shape.setProjectionMatrix(uiViewport.getCamera().combined);
+
+        // 1. Game Stage (HUD)
+        gameStage.draw();
+
+        if (state == State.ANSWERING_QUESTION || (previousState == State.ANSWERING_QUESTION && (state == State.PAUSE || state == State.SETTINGS))) {
+            if (dialogueOverlay.isActive()) dialogueOverlay.render(batch, font, uiViewport);
+            quizStage.draw();
+        }
 
         if (state == State.PAUSE || (state == State.SETTINGS && settingsOverlay.getTransitionProgress() < 1f)) {
             float alpha = 1f;
             if (state == State.SETTINGS) alpha = 1f - settingsOverlay.getTransitionProgress();
-            pauseOverlay.render(shape, batch, font, viewport, alpha);
+            pauseOverlay.render(shape, batch, font, uiViewport, alpha);
         }
-        settingsOverlay.render(shape, batch, font, viewport);
-        if (state == State.SAVE_LOAD) saveLoadOverlay.render(shape, batch, font, viewport);
-        if (state == State.INVENTORY) inventoryOverlay.render(shape, batch, font, viewport, world.getPlayer());
-        if (state == State.GAME_OVER) gameOverOverlay.render(shape, batch, font, viewport);
+        settingsOverlay.render(shape, batch, font, uiViewport);
+        if (state == State.SAVE_LOAD) saveLoadOverlay.render(shape, batch, font, uiViewport);
+        if (state == State.INVENTORY) inventoryOverlay.render(shape, batch, font, uiViewport, world.getPlayer());
+        if (state == State.GAME_OVER) gameOverOverlay.render(shape, batch, font, uiViewport);
+
+        // 4. Pause Stage
+        pauseStage.draw();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
+
+
     }
 
     @Override
     public void resize(int w, int h) {
         viewport.update(w, h, true);
+        
+        // FIX: Ensure the UI viewport is also updated when the screen resizes
+        if (uiViewport != null) {
+            uiViewport.update(w, h, true);
+        }
         if (w == 0 || h == 0) return; // Prevent crash when minimized
         if (fbo != null) fbo.dispose();
         fbo = new FrameBuffer(Pixmap.Format.RGBA8888, w, h, false);
@@ -339,7 +509,15 @@ public class ExplorationScreen implements Screen {
         if(fbo != null) fbo.dispose();
         if(blurBatch != null) blurBatch.dispose();
         if(blurShader != null) blurShader.dispose();
-        if(inventoryOverlay != null) inventoryOverlay.dispose();
+        if (inventoryOverlay != null) inventoryOverlay.dispose();
+        if (dialogueOverlay != null) dialogueOverlay.dispose();
+        if (quizController != null && quizStage != null) {
+            quizController.cancelQuiz(quizStage);
+        }
+        if (quizStage != null) quizStage.dispose();
+        if (gameStage != null) gameStage.dispose();
+        if (pauseStage != null) pauseStage.dispose();
+        if (quizUIStyles != null) quizUIStyles.dispose();
     }
 
     @Override public void show() {}
